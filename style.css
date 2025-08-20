@@ -1,0 +1,380 @@
+#lasso { position: fixed; border:1px dashed #888; background: rgba(128,128,128,0.12); pointer-events: none; z-index: 99999; }
+
+/* Selection group box */
+.selbox { position:fixed; border:0; border-radius:6px; pointer-events:none; z-index: 800; }
+.selbox.hidden { display:none; }
+.selbox .sb-h { position:absolute; width:10px; height:10px; border-radius:50%; background:#fff; border:2px solid #7c3aed; box-shadow:0 1px 2px rgba(0,0,0,.1); pointer-events:auto; }
+.selbox .sb-h[data-handle="nw"]{ left:-6px; top:-6px; }
+.selbox .sb-h[data-handle="n"]{ left:50%; top:-6px; transform:translateX(-50%); }
+.selbox .sb-h[data-handle="ne"]{ right:-6px; top:-6px; }
+.selbox .sb-h[data-handle="e"]{ right:-6px; top:50%; transform:translateY(-50%); }
+.selbox .sb-h[data-handle="se"]{ right:-6px; bottom:-6px; }
+.selbox .sb-h[data-handle="s"]{ left:50%; bottom:-6px; transform:translateX(-50%); }
+.selbox .sb-h[data-handle="sw"]{ left:-6px; bottom:-6px; }
+.selbox .sb-h[data-handle="w"]{ left:-6px; top:50%; transform:translateY(-50%); }
+/* Move and rotate handles */
+.selbox .sb-h[data-handle="rotate"]{ right:50%; bottom:-24px; transform:translate(50%,50%); width:12px; height:12px; border-radius:50%; border-color:#3b82f6; cursor: grab; }
+/* Move handle moved down next to rotation handle (offset to the right) */
+.selbox .sb-h[data-handle="move"]{ left:calc(50% + 20px); bottom:-24px; transform:translate(-50%,50%); width:12px; height:12px; border-radius:4px; border-color:#10b981; cursor: grab; }
+.selbox .sb-h[data-handle="move"]::after{ content:""; position:absolute; inset:2px; background:#10b981; border-radius:2px; }
+.selbox .sb-h[data-handle="rotate"]::after{ content:""; position:absolute; inset:2px; border-radius:50%; background:#3b82f6; }
+/* Resize cursors for handles */
+.selbox .sb-h[data-handle="n"], .selbox .sb-h[data-handle="s"] { cursor: ns-resize; }
+.selbox .sb-h[data-handle="e"], .selbox .sb-h[data-handle="w"] { cursor: ew-resize; }
+.selbox .sb-h[data-handle="ne"], .selbox .sb-h[data-handle="sw"] { cursor: nesw-resize; }
+.selbox .sb-h[data-handle="nw"], .selbox .sb-h[data-handle="se"] { cursor: nwse-resize; }
+/* Layout & theme for refactored editor */
+:root{
+  /* Use real-world millimeter dimensions so exports map directly to A4 */
+  --page-w: 210mm;  /* A4 width */
+  --page-h: 297mm;  /* A4 height */
+  /* MonTech brand */
+  --brand-primary: #E10600;
+  --brand-dark: #222222;
+  --brand-light: #F5F5F5;
+  --brand-white: #FFFFFF;
+  /* App theme mapped to brand */
+  --bg: var(--brand-light);
+  --panel: var(--brand-white);
+  --ink: var(--brand-dark);
+  --muted: #6b6b6b;
+  --primary: var(--brand-primary);
+  --border: #e5e5e5;
+  --shadow: 0 2px 8px rgba(0,0,0,.06), 0 10px 20px rgba(0,0,0,.04);
+  --zoom: 1;
+  /* Panel dimensions */
+  --left-panel-width: 200px;
+  --right-panel-width: 240px;
+  accent-color: var(--primary);
+}
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial; }
+
+/* Top bar */
+.topbar { position: fixed; inset: 0 0 auto 0; height: 35px; background: var(--panel); display: flex; align-items: center; gap: 6px; padding: 0 8px; box-shadow: var(--shadow); z-index: 1100; }
+.topbar .group { display: inline-flex; gap: 4px; border: 1px solid var(--border); border-radius: 10px; padding: 4px; background: #fff; }
+.btn { height: 26px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: border-color .15s, background .15s, color .15s; }
+.btn:hover{ background:#f9fafb; }
+.btn.mini{ height: 22px; padding: 0 6px; font-size: 12px; }
+.spacer { flex: 1; }
+.topbar #version { font-size: 12px; color: var(--muted); display: flex; align-items: center; }
+.pages-strip { display:flex; gap:6px; margin-right:8px; }
+.pages-strip .page-tab { padding: 6px 10px; border:1px solid var(--border); border-radius: 8px; background:#fff; cursor:pointer; }
+.pages-strip .page-tab.active { border-color: var(--primary); color: var(--primary); background:#eef2ff; }
+.switch { display:inline-flex; align-items:center; gap:8px; font-size:14px; }
+
+/* App layout */
+.app { padding-top: calc(48px + 44px + 16px); display: grid; grid-template-columns: 1fr; gap: 12px; align-items: start; }
+.side { background:#fff; border:1px solid var(--border); border-radius:10px; padding: 0; height: calc(100dvh - 96px); position: fixed; top: 64px; overflow:hidden; z-index: 1000; transition: width 0.3s ease, left 0.3s ease, right 0.3s ease; box-shadow: var(--shadow); }
+.side.left { left:12px; width: var(--left-panel-width); }
+.side.right { right:12px; width: var(--right-panel-width); }
+.side.collapsed { width: 32px !important; }
+.side.collapsed .panel-content { display: none; }
+.side.collapsed .panel-header h3 { display: none; }
+.side.left.collapsed ~ .workspace #pageViewport { padding-left: 44px; }
+.side.right.collapsed ~ .workspace #pageViewport { padding-right: 44px; }
+
+/* Panel structure */
+.panel-header { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); background: var(--bg); border-radius: 10px 10px 0 0; }
+.panel-header h3 { margin: 0; font-size: 14px; color: var(--muted); }
+.panel-toggle { background: none; border: none; cursor: pointer; padding: 4px; color: var(--muted); font-size: 16px; border-radius: 4px; transition: background 0.2s ease; }
+.panel-toggle:hover { background: var(--border); }
+.panel-content { padding: 10px; overflow-y: auto; height: calc(100% - 60px); }
+
+/* Panel resize handles */
+.panel-resize-handle { position: absolute; top: 0; bottom: 0; width: 4px; background: transparent; cursor: ew-resize; z-index: 1001; transition: background 0.2s ease; }
+.panel-resize-handle:hover { background: var(--primary); }
+.panel-resize-right { right: -2px; }
+.panel-resize-left { left: -2px; }
+
+.props label { display:flex; justify-content:space-between; align-items:center; gap:8px; margin:6px 0; font-size: 13px; }
+
+/* Workspace and page */
+.workspace { display: grid; grid-template-columns: 1fr; }
+#pageViewport { height: calc(100dvh - 96px); overflow:auto; display:grid; place-items:start center; padding-left: calc(var(--left-panel-width) + 12px); padding-right: calc(var(--right-panel-width) + 12px); }
+#pageContainer { padding: 12px; }
+.page { position: relative; width: var(--page-w); height: var(--page-h); background:#fff; box-shadow: var(--shadow); overflow:hidden; border-radius:6px; transform: scale(var(--zoom)); transform-origin: top left; }
+/* grid background removed per request (no ::before) */
+
+/* Elements */
+.element { position:absolute; box-sizing:border-box; outline:none; user-select:none; touch-action:none; }
+
+/* Image elements */
+.element.image { overflow:hidden; }
+.element.image img { 
+  width: 100%; 
+  height: 100%; 
+  object-fit: contain; 
+  object-position: center;
+  display: block;
+}
+/* .element.selected { box-shadow: inset 0 0 0 1.5px var(--primary); } */
+.text { min-width:10px; min-height:10px; padding:6px 8px; border:1px solid var(--border); border-radius:4px; background:#fff; color:var(--ink); line-height:1.4; font-size:14pt; overflow:hidden; white-space:pre-wrap; word-break:break-word; }
+/* NEW: make field look and behave like text */
+.field {
+  min-width:10px; min-height:10px; padding:6px 8px;
+  border:1px solid var(--border); border-radius:4px;
+  background:#fff; color:var(--ink); line-height:1.4; font-size:14pt;
+  overflow:hidden; white-space:pre-wrap; word-break:break-word;
+}
+
+/* Allow caret & selection while editing */
+.text.editing, .field.editing { cursor:text; user-select:text; }
+
+/* Placeholder styling */
+.text.has-placeholder, .field.has-placeholder { 
+  color: #999; 
+  font-style: italic; 
+}
+
+/* Table element */
+.element.table { position:absolute; background:#fff; }
+
+/* Grid host */
+.table-grid {
+  display:grid;
+  width:100%; height:100%;
+  user-select:none;           /* selection handled by app */
+}
+
+/* Cells */
+.table-cell {
+  display:flex;
+  align-items:flex-start;     /* vertical alignment */
+  justify-content:flex-start; /* horizontal alignment */
+  padding:6px 8px;
+  font-size:14pt; line-height:1.4;
+  white-space:pre-wrap; word-break:break-word;
+  /* outline removed; borders are set per-cell inline */
+  background:var(--cell-bg, transparent);
+}
+
+/* Editing */
+.table-cell[contenteditable="true"] {
+  cursor:text;
+  user-select:text;
+  outline-offset:-1px;
+}
+
+/* Focus ring for the active cell (roving tabindex) */
+.table-cell:focus-visible { outline: none; }
+/* Improve caret visibility while editing */
+.table-cell[contenteditable="true"] {
+  caret-color: currentColor;
+}
+
+/* Selection (cell/range): darken existing cell background without recoloring */
+.table-cell.is-selected { background-image: linear-gradient(rgba(0,0,0,.16), rgba(0,0,0,.16)); }
+.table-cell.is-range    { background-image: linear-gradient(rgba(0,0,0,.08), rgba(0,0,0,.08)); }
+
+/* Outer border (draw once for crisp edges) */
+.table-outer {
+  pointer-events:none;
+  position:absolute; inset:0;
+  /* border:1px solid var(--table-outer, #000); */
+}
+
+/* Floating table actions bar */
+/* removed .table-actions toolbar; replaced by context menu */
+
+/* Table border drag affordances (shown on hover) */
+.table-resizer {
+  position:absolute; pointer-events:auto; z-index:1003;
+  background: rgba(108,92,231,.55);
+}
+.table-resizer.v { width:2px; top:0; bottom:0; }
+.table-resizer.h { height:2px; left:0; right:0; }
+.table-grid.resizing { cursor: col-resize; }
+.table-grid.resizing.row { cursor: row-resize; }
+.rect { border:1px solid var(--border); background:var(--brand-light); border-radius:6px; min-width:10px; min-height:10px; }
+.line { height:2px; width:40px; background:#111827; transform-origin:0 0; }
+
+/* Handles */
+.handle { position:absolute; width:10px; height:10px; background:#fff; border:2px solid #10b981; border-radius:50%; box-shadow:0 1px 2px rgba(0,0,0,.1); pointer-events:all; }
+.handle.corner { margin:-6px 0 0 -6px; }
+.handle.tl{ top:0; left:0; } .handle.tr{ top:0; right:0; } .handle.bl{ bottom:0; left:0; } .handle.br{ bottom:0; right:0; }
+.handle.endpoint { margin:-6px 0 0 -6px; z-index:5; }
+
+/* Floating/format toolbar */
+.floating { background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow: var(--shadow); padding:6px; display:flex; flex-direction:row; gap:8px; z-index: 2000; }
+.floating.hidden { display:none; }
+.floating .row { display:flex; flex-wrap:nowrap; gap:12px; align-items:center; overflow-x:auto; white-space:nowrap; }
+/* Align label text and controls vertically in toolbar */
+.floating label { display:inline-flex; align-items:center; gap:6px; }
+/* Fixed position for format toolbar under topbar */
+#formatToolbar { position: fixed; top: 35px; left: 0; right: 0; margin: 4px auto 0; width: fit-content; z-index: 1100; }
+
+/* Pages list */
+#pagesList { display: grid; gap: 32px; place-items: start center; width: 100%; }
+.page-wrapper { display: grid; gap: 8px; }
+.page-title { color: var(--muted); font-size: 13px; }
+.page-stage { position: relative; width: calc(var(--page-w) * var(--zoom)); height: calc(var(--page-h) * var(--zoom)); }
+.page-controls { display: inline-flex; gap: 6px; }
+
+/* Element actions bubble */
+#elementActions { position: fixed; transform: translate(-50%, -100%); background:var(--panel); border:1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow); padding: 6px; display: inline-flex; gap: 6px; z-index: 900; }
+#elementActions.hidden { display: none; }
+#elementActions .menu { display: inline-flex; gap: 6px; }
+#elementActions .dropdown.hidden { display: none; }
+
+/* Floating table actions (small bubble) */
+#tableActions { position: fixed; top: 72px; left: 0; right: 0; margin: 0 auto; transform: none; background:var(--panel); border:1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; display: inline-flex; gap: 6px; z-index: 1150; width: fit-content; }
+#tableActions.hidden { display: none; }
+
+/* Alignment guides */
+.guide { position: absolute; pointer-events: none; background: var(--primary); opacity: .8; z-index: 1500; }
+.guide.v { width: 2px; height: 100%; top: 0; }
+.guide.h { height: 2px; width: 100%; left: 0; }
+
+/* generic hidden utility */
+.hidden { display: none !important; }
+
+/* circular color inputs */
+input[type="color"].circle { appearance: none; -webkit-appearance: none; border: none; width: 24px; height: 24px; padding: 0; background: none; }
+input[type="color"].circle::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"].circle::-webkit-color-swatch { border: 1px solid var(--border); border-radius: 999px; }
+
+/* Custom Color Picker */
+.custom-color-picker {
+  position: fixed;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  padding: 12px;
+  z-index: 2100;
+  width: 200px;
+}
+
+.custom-color-picker.hidden {
+  display: none;
+}
+
+.color-picker-section {
+  margin-bottom: 12px;
+}
+
+.color-picker-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.color-history-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.color-history-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.color-history-circle:hover {
+  transform: scale(1.05);
+  border-color: var(--primary);
+}
+
+.color-history-circle.selected {
+  border-color: var(--primary);
+}
+
+.color-picker-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-picker-input-wrapper input[type="color"] {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.color-picker-hex {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 13px;
+}
+
+/* Toolbar toggle pressed state */
+.btn[aria-pressed="true"] { background: color-mix(in srgb, var(--primary) 12%, #fff); border-color: var(--primary); color: var(--primary); }
+
+/* Alignment hamburger icons (simple CSS drawing) */
+.align { position: relative; width: 28px; height: 28px; }
+.align::before, .align::after { content: ""; position: absolute; left: 4px; right: 4px; height: 2px; background: currentColor; border-radius: 2px; }
+.align::before { top: 8px; box-shadow: 0 6px 0 currentColor, 0 12px 0 currentColor; }
+/* Horizontal states adjust content alignment via extra bar */
+.align.h-left { text-align: left; }
+.align.h-center { text-align: center; }
+.align.h-right { text-align: right; }
+/* Vertical states can be hinted with a small vertical guide line */
+.align.v-top::after { top: 4px; left: 12px; right: 12px; }
+.align.v-middle::after { top: 13px; left: 12px; right: 12px; }
+.align.v-bottom::after { bottom: 4px; left: 12px; right: 12px; }
+
+/* View mode: hide editing UI */
+.edit-off #formatToolbar,
+.edit-off #elementActions,
+.edit-off .guide { display: none !important; }
+.edit-off .page .element { cursor: default; }
+.edit-off .page .element.selected { box-shadow: none; }
+.edit-off .page-title .title-actions { visibility: hidden; }
+.edit-off .side { display: none; }
+.edit-off .app { grid-template-columns: 1fr; }
+/* Export sandbox guard: ensure no transforms leak into the clone */
+.__export_sandbox, .__export_sandbox * {
+  transform: none !important;
+}
+
+/* Deterministic image boxes used by the editor */
+.image-box {
+  position: relative;
+  display: flex;
+  align-items: center;   /* vertical center (html2canvas-safe) */
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;  /* borders don't change content size */
+}
+
+/* Images on the canvas should behave the same in editor and export */
+.canvas img,
+.image-box img {
+  display: block;           /* kill baseline alignment shifts */
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;      /* don't crop */
+  object-position: center;  /* center inside its box */
+}
+
+/* Background image boxes (alternative for maximum html2canvas reliability) */
+.bg-image-box {
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;   /* or 'cover' if you want fill */
+  box-sizing: border-box;
+}
+
+/* Not used. Styles are embedded in index.html for a single-file app per request. */
+
+
+
+/* Disable text selection during drags/resizes */
+body.app-noselect, body.app-noselect * { user-select: none !important; }

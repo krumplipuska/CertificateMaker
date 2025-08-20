@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Minimal A4 Editor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <!-- External libs for export (CDN). Works offline once loaded. -->
+  <!-- <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script> -->
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="group">
+      <label class="switch"><input id="editToggle" type="checkbox" checked><span>Edit</span></label>
+    </div>
+    <div class="group">
+      <button id="undoBtn" class="btn" disabled>Undo</button>
+      <button id="redoBtn" class="btn" disabled>Redo</button>
+    </div>
+    <div class="group" id="zoomGroup">
+      <input id="zoomSlider" type="range" min="25" max="300" step="1" value="100" style="width:160px">
+      <span id="zoomLabel">100%</span>
+    </div>
+    <div class="spacer"></div>
+    <span>v.2.0.0.</span>
+    <div class="group">
+      
+      <button id="saveBtn" class="btn">Save</button>
+      <button id="saveAsBtn" class="btn">Save As</button>
+      <button id="savePdfBtn" class="btn">Export as PDF</button>
+    </div>
+    <div class="group" id="version"></div>
+  </div>
+
+  <div class="app">
+    <aside class="side left" id="elementsPanel">
+      <div class="panel-header">
+        <h3>Elements</h3>
+        <button class="panel-toggle" id="elementsToggle" title="Collapse/Expand Elements Panel">⇤</button>
+      </div>
+      <div class="panel-content">
+        <button class="btn add-el" data-add="text">Text</button>
+        <button class="btn add-el" data-add="field">Field</button>
+        <button class="btn add-el" data-add="rect">Rectangle</button>
+        <button class="btn add-el" data-add="line">Line</button>
+        <button class="btn add-el" data-add="image">Image</button>
+        <button class="btn add-el" data-add="table">Table</button>
+      </div>
+      <div class="panel-resize-handle panel-resize-right" data-panel="elementsPanel"></div>
+    </aside>
+
+    <main class="workspace">
+      <div id="pageViewport">
+        <div id="pagesList" aria-label="Pages list"></div>
+      </div>
+    </main>
+
+    <aside class="side right" id="propertiesPanel">
+      <div class="panel-resize-handle panel-resize-left" data-panel="propertiesPanel"></div>
+      <div class="panel-header">
+        <h3>Properties</h3>
+        <button class="panel-toggle" id="propertiesToggle" title="Collapse/Expand Properties Panel">⇥</button>
+      </div>
+      <div class="panel-content">
+        <div id="propertiesContent" class="props"></div>
+      </div>
+    </aside>
+  </div>
+  <!-- aria-live region to announce selection and range changes for screen readers -->
+  <div id="srAnnouncer" aria-live="polite" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden"></div>
+
+  <div id="formatToolbar" class="floating hidden" role="toolbar" aria-label="Editing toolbar">
+    <div class="row">
+      <label>Fill <input class="circle" type="color" data-prop="styles.fill"></label>
+      <label>Text <input class="circle" type="color" data-prop="styles.textColor"></label>
+      <label>Stroke <input class="circle" type="color" data-prop="styles.strokeColor"></label>
+      <label>Stroke W <input type="range" min="0" max="20" step="1" style="width:120px" data-prop="styles.strokeWidth"></label>
+      <label>Radius <input type="range" min="0" max="60" step="1" style="width:120px" data-prop="styles.radius"></label>
+      <label>Font <select data-prop="styles.fontFamily">
+        <option value="system-ui">System</option>
+        <option value="Arial">Arial</option>
+        <option value="Helvetica Neue">Helvetica</option>
+        <option value="Times New Roman">Times</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Courier New">Courier</option>
+      </select></label>
+      <label>Size <select style="width:64px" data-prop="styles.fontSize">
+        <option value="8">8</option>
+        <option value="9">9</option>
+        <option value="10">10</option>
+        <option value="11">11</option>
+        <option value="12">12</option>
+        <option value="14" selected>14</option>
+        <option value="16">16</option>
+        <option value="18">18</option>
+        <option value="20">20</option>
+        <option value="24">24</option>
+        <option value="28">28</option>
+        <option value="32">32</option>
+        <option value="36">36</option>
+        <option value="48">48</option>
+        <option value="72">72</option>
+      </select></label>
+      <button class="btn mini" data-toggle="styles.bold" title="Bold">B</button>
+      <button class="btn mini" data-toggle="styles.italic" title="Italic"><em>I</em></button>
+      <button class="btn mini" data-toggle="styles.underline" title="Underline"><u>U</u></button>
+      <button class="btn mini align h-left" id="alignHBtn" data-align-h-cycle title="Horizontal align"></button>
+      <button class="btn mini align v-top" id="alignVBtn" data-align-v-cycle title="Vertical align"></button>
+      <label class="btn" style="gap:6px; align-items:center"><input type="checkbox" id="bgTransparentToggle"> Transparent BG</label>
+    </div>
+  </div>
+
+  <div id="lasso" hidden></div>
+  <div id="selectionBox" class="selbox hidden">
+    <div class="sb-h" data-handle="nw"></div>
+    <div class="sb-h" data-handle="n"></div>
+    <div class="sb-h" data-handle="ne"></div>
+    <div class="sb-h" data-handle="e"></div>
+    <div class="sb-h" data-handle="se"></div>
+    <div class="sb-h" data-handle="s"></div>
+    <div class="sb-h" data-handle="sw"></div>
+    <div class="sb-h" data-handle="w"></div>
+    <div class="sb-h" data-handle="move" title="Drag to move"></div>
+    <div class="sb-h" data-handle="rotate" title="Drag to rotate"></div>
+  </div>
+
+  <div id="elementActions" class="actions hidden" role="toolbar" aria-label="Element actions">
+    <button class="btn mini" data-action="copy" title="Copy">⎘</button>
+    <button class="btn mini" data-action="delete" title="Delete">🗑</button>
+    <button class="btn mini" data-group-toggle title="Group/Ungroup"></button>
+    <div class="menu" style="position:relative">
+      <button class="btn mini" data-menu="layers" title="Layer">⋯</button>
+      <div class="dropdown hidden" data-menu-panel="layers" style="position:absolute;top:36px;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;gap:6px;min-width:190px">
+        
+        <hr/>
+        <button class="btn mini" data-z="up">Bring forward</button>
+        <button class="btn mini" data-z="down">Send backward</button>
+        <button class="btn mini" data-z="front">Bring to front</button>
+        <button class="btn mini" data-z="back">Send to back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Minimal floating table action bar (appears when a table is selected) -->
+  <div id="tableActions" class="hidden" role="toolbar" aria-label="Table actions">
+    <button class="btn mini" data-tact="row-add">+ Row</button>
+    <button class="btn mini" data-tact="col-add">+ Col</button>
+    <button class="btn mini" data-tact="row-del">Del Row</button>
+    <button class="btn mini" data-tact="col-del">Del Col</button>
+    <button class="btn mini" data-tact="merge">Merge</button>
+    <button class="btn mini" data-tact="unmerge">Unmerge</button>
+    <div class="menu" style="position:relative">
+      <button class="btn mini" data-menu="borders">Borders</button>
+      <div class="dropdown hidden" data-menu-panel="borders" style="position:absolute;top:36px;left:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);padding:8px;display:flex;flex-direction:column;gap:8px;min-width:220px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+          <button class="btn mini" data-borders="all" title="All">All</button>
+          <button class="btn mini" data-borders="outer" title="Outer">Outer</button>
+          <button class="btn mini" data-borders="inner" title="Inner">Inner</button>
+          <button class="btn mini" data-borders="none" title="None">None</button>
+          <button class="btn mini" data-borders="top" title="Top">Top</button>
+          <button class="btn mini" data-borders="right" title="Right">Right</button>
+          <button class="btn mini" data-borders="bottom" title="Bottom">Bottom</button>
+          <button class="btn mini" data-borders="left" title="Left">Left</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <label>Color <input type="color" id="tblBorderColor" value="#000000"></label>
+          <label>Width <input type="range" id="tblBorderWidth" min="0" max="12" step="1" value="1" style="width:120px"></label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table context menu -->
+  <div id="tableMenu" class="hidden" style="position:fixed; z-index:1101; background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); padding:6px; display:flex; flex-direction:column; gap:4px; min-width:180px">
+    <button class="btn mini" data-tm="merge">Merge cells</button>
+    <button class="btn mini" data-tm="unmerge">Unmerge</button>
+    <hr/>
+    <button class="btn mini" data-tm="row-insert-above">Insert row above</button>
+    <button class="btn mini" data-tm="row-insert-below">Insert row below</button>
+    <button class="btn mini" data-tm="row-delete">Delete row</button>
+    <hr/>
+    <button class="btn mini" data-tm="col-insert-left">Insert column left</button>
+    <button class="btn mini" data-tm="col-insert-right">Insert column right</button>
+    <button class="btn mini" data-tm="col-delete">Delete column</button>
+  </div>
+
+  
+</body>
+</html>
