@@ -19,8 +19,18 @@ const HISTORY_LIMIT = 10;
 const History = { past: [], future: [] };
 const APP_VERSION = 'v1.0.0';
 
+function isElementIdInUse(id){
+  try {
+    return (Model.document?.pages || []).some(p => (p.elements || []).some(el => el.id === id));
+  } catch { return false; }
+}
 function generateId(prefix = 'el') {
-  return `${prefix}-${Model.document.nextElementId++}`;
+  // Ensure uniqueness even if nextElementId is out of sync with existing data
+  let id = `${prefix}-${Model.document.nextElementId++}`;
+  while (isElementIdInUse(id)) {
+    id = `${prefix}-${Model.document.nextElementId++}`;
+  }
+  return id;
 }
 
 /* ----------------------- DOM refs ----------------------- */

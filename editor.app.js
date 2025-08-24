@@ -26,12 +26,37 @@ function renderPagesList() {
       <strong>Page ${index + 1}</strong>
       <span style="margin-left:6px;color:var(--muted)">${p.name}</span>
       <span class="title-actions" style="float:right;display:inline-flex;gap:6px">
-        <button class="btn mini" data-act="move-up" title="Move up">▲</button>
-        <button class="btn mini" data-act="move-down" title="Move down">▼</button>
-        <button class="btn mini" data-act="toggle-visibility" title="Show/Hide">👁</button>
-        <button class="btn mini" data-act="duplicate" title="Duplicate">⎘</button>
-        <button class="btn mini" data-act="delete" title="Delete">🗑</button>
-        <button class="btn mini" data-act="add-below" title="Add page below">＋</button>
+        <button class="btn mini" data-act="move-up" title="Move up" aria-label="Move up">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6l-6 6h12z" fill="currentColor"/></svg>
+        </button>
+        <button class="btn mini" data-act="move-down" title="Move down" aria-label="Move down">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18l6-6H6z" fill="currentColor"/></svg>
+        </button>
+        <button class="btn mini" data-act="toggle-visibility" title="Show/Hide" aria-label="Show or hide">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M1.5 12s4-7.5 10.5-7.5S22.5 12 22.5 12s-4 7.5-10.5 7.5S1.5 12 1.5 12z" fill="none" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="12" r="3" fill="currentColor"/>
+          </svg>
+        </button>
+        <button class="btn mini" data-act="duplicate" title="Duplicate" aria-label="Duplicate">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>
+            <rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </button>
+        <button class="btn mini" data-act="delete" title="Delete" aria-label="Delete">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="btn mini" data-act="add-below" title="Add page below" aria-label="Add page below">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
       </span>`;
     wrap.appendChild(title);
 
@@ -95,6 +120,10 @@ function ensureElementNode(elModel) {
   return node;
 }
 
+// Attach user-defined action listeners to an element node
+// Deprecated binder (kept no-op for compatibility with older documents that may carry an actions array)
+function bindElementActions(){ /* no-op: using inline attributes approach */ }
+
 function applyElementStyles(node, m) {
   node.style.left = m.x + 'px';
   node.style.top = m.y + 'px';
@@ -123,13 +152,15 @@ function applyElementStyles(node, m) {
     const rot = Number(m.styles.rotate || 0);
     node.style.transformOrigin = '50% 50%';
     node.style.transform = rot ? `rotate(${rot}deg)` : '';
-    if (m.type === 'text' || m.type === 'field'){
+    if (m.type === 'text' || m.type === 'field' || m.type === 'rect'){
       node.style.display = 'flex';
       node.style.flexDirection = 'column';
       const h = m.styles.textAlignH || 'left';
       const v = m.styles.textAlignV || 'top';
       node.style.alignItems = h === 'left' ? 'flex-start' : (h === 'center' ? 'center' : 'flex-end');
       node.style.justifyContent = v === 'top' ? 'flex-start' : (v === 'middle' ? 'center' : 'flex-end');
+      // Ensure wrapped text follows toolbar horizontal alignment
+      node.style.textAlign = h === 'left' ? 'left' : (h === 'center' ? 'center' : 'right');
     }
     if (m.type === 'text' || m.type === 'field') {
       if (m.content) {
@@ -140,6 +171,10 @@ function applyElementStyles(node, m) {
         node.textContent = placeholder;
         node.classList.add('has-placeholder');
       }
+    } else if (m.type === 'rect') {
+      // Rectangles can display editable text but have no placeholder
+      node.textContent = m.content || '';
+      node.classList.remove('has-placeholder');
     }
   } else {
     // line: use rotated div like before
@@ -155,9 +190,19 @@ function applyElementStyles(node, m) {
     node.style.transform = `rotate(${angleRad}rad)`;
   }
   node.style.zIndex = String(m.z || 1);
-  if (m.type === 'text' || m.type === 'field') {
+  if (m.type === 'text' || m.type === 'field' || m.type === 'rect') {
     if (!node.hasAttribute('contenteditable')) node.setAttribute('contenteditable', 'false');
   }
+  // Apply any custom attributes defined on the model
+  try {
+    const attrs = getCustomAttributesFromModel(m);
+    Object.keys(attrs).forEach((name) => {
+      const val = attrs[name];
+      if (val === false || val == null || val === '') node.removeAttribute(name);
+      else if (val === true) node.setAttribute(name, '');
+      else node.setAttribute(name, String(val));
+    });
+  } catch {}
 }
 
 function renderPage(page) {
@@ -202,6 +247,7 @@ function renderPage(page) {
     } else if (elm.type === 'table') {
       renderTable(elm, node);
     }
+    // Inline HTML event handlers (e.g., onclick) are set via attributes by render
     container.appendChild(node);
   });
   updateSelectionBox();
@@ -210,6 +256,119 @@ function renderPage(page) {
 /* ----------------------- Updates ----------------------- */
 function updateElement(id, patch) {
   const page = getCurrentPage();
+
+  // If a CSS selector string is provided (and not a known model id), resolve and apply
+  if (typeof id === 'string' && id) {
+    const maybeModel = getElementById(id);
+    if (!maybeModel) {
+      // Preserve current element and table selections
+      const prevSelIds = Array.from(document.querySelectorAll('.page .element.selected'))
+        .map(n => n && n.getAttribute('data-id'))
+        .filter(Boolean);
+      const prevTableSel = tableSel ? { ...tableSel } : null;
+
+      const targets = { elementIds: new Set(), cells: [] }; // cells: { tableId, r, c }
+      function addElementId(eid){ if (eid) targets.elementIds.add(eid); }
+      function addCellTarget(tableId, cellId){
+        try {
+          const tModel = getElementById(tableId);
+          const grid = tModel?.grid || [];
+          for (let r = 0; r < grid.length; r++){
+            const row = grid[r] || [];
+            for (let c = 0; c < row.length; c++){
+              if (row[c] === cellId){ targets.cells.push({ tableId, r, c }); return; }
+            }
+          }
+        } catch {}
+      }
+
+      let nodes = [];
+      try { nodes = Array.from(document.querySelectorAll(id)); } catch {}
+      if (!nodes.length) {
+        const token = String(id).replace(/^#/, '');
+        const byData = document.querySelector(`.page [data-id="${token}"]`);
+        if (byData) nodes.push(byData);
+      }
+      nodes.forEach(node => {
+        if (!node) return;
+        if (node.classList && node.classList.contains('element') && node.dataset?.id){
+          addElementId(node.dataset.id);
+          return;
+        }
+        const container = node.closest('.element[data-id]');
+        if (node.dataset?.id && container?.dataset?.id) { addCellTarget(container.dataset.id, node.dataset.id); return; }
+        if (container?.dataset?.id) addElementId(container.dataset.id);
+      });
+
+      // Apply to normal elements in one batch, mirroring selection multi-update
+      if (targets.elementIds.size){
+        commitHistory('update-multi');
+        [...targets.elementIds].forEach(selId => {
+          const sIdx = page.elements.findIndex(e => e.id === selId);
+          if (sIdx !== -1) page.elements[sIdx] = deepMerge(page.elements[sIdx], patch);
+        });
+        renderPage(page);
+        updateSelectionUI();
+      }
+
+      // Apply to specific table cells via temporary selection
+      if (targets.cells.length){
+        targets.cells.forEach(({ tableId, r, c }) => {
+          if (typeof setTableSelection === 'function') setTableSelection(tableId, r, c, r, c);
+          updateElement(null, patch);
+        });
+      }
+
+      // Restore previous selections
+      if (prevTableSel && typeof setTableSelection === 'function') {
+        setTableSelection(prevTableSel.tableId, prevTableSel.r0, prevTableSel.c0, prevTableSel.r1, prevTableSel.c1);
+      }
+      if (Array.isArray(prevSelIds) && prevSelIds.length && typeof setSelection === 'function') {
+        setSelection(prevSelIds);
+      }
+      return;
+    }
+  }
+
+  // Unified behavior: if id is null/undefined, apply to selection or table cells
+  if (id == null) {
+    // If there is an active table cell selection, apply patch via table helpers
+    if (tableSel) {
+      const tModel = getElementById(tableSel.tableId);
+      if (!tModel) return;
+      commitHistory('update-element');
+      let next = tModel;
+      const styles = (patch && patch.styles) || {};
+      // Map model styles to table cell operations
+      if (styles.fill != null) next = tableApplyCellBg(next, tableSel, styles.fill);
+      if (styles.textColor != null) next = tableApplyTextColor(next, tableSel, styles.textColor);
+      const alignH = (styles.textAlignH != null) ? styles.textAlignH : undefined;
+      const alignV = (styles.textAlignV != null) ? styles.textAlignV : undefined;
+      if (alignH || alignV) next = tableApplyAlign(next, tableSel, alignH, alignV);
+      const perCellKeys = ['strokeColor','strokeWidth','fontFamily','fontSize','bold','italic','underline'];
+      perCellKeys.forEach(k => { if (styles[k] != null) next = tableApplyCellStyle(next, tableSel, k, styles[k]); });
+      // Commit updated table model
+      const tIdx = page.elements.findIndex(e => e.id === tModel.id);
+      if (tIdx === -1) return;
+      page.elements[tIdx] = next;
+      renderPage(page);
+      // Preserve current table selection
+      setTableSelection(tableSel.tableId, tableSel.r0, tableSel.c0, tableSel.r1, tableSel.c1);
+      return;
+    }
+    // Otherwise, apply to all currently selected elements (multi-update)
+    if (selectedIds.size === 0) return;
+    commitHistory('update-multi');
+    [...selectedIds].forEach(selId => {
+      const sIdx = page.elements.findIndex(e => e.id === selId);
+      if (sIdx !== -1) page.elements[sIdx] = deepMerge(page.elements[sIdx], patch);
+    });
+    renderPage(page);
+    updateSelectionUI();
+    return;
+  }
+
+  // Original behavior: update a single element by id
   const idx = page.elements.findIndex(e => e.id === id);
   if (idx === -1) return;
   commitHistory('update-element');
@@ -269,7 +428,7 @@ function syncFormatToolbar(m){
   const setPressed = (selector, value, expected) => {
     const btn = bar.querySelector(selector); if (btn) btn.setAttribute('aria-pressed', String(value === expected));
   };
-  if (m.type === 'text' || m.type === 'field'){
+  if (m.type === 'text' || m.type === 'field' || m.type === 'rect'){
     setPressed('[data-align-h="left"]', m.styles.textAlignH || 'left', 'left');
     setPressed('[data-align-h="center"]', m.styles.textAlignH || 'left', 'center');
     setPressed('[data-align-h="right"]', m.styles.textAlignH || 'left', 'right');
@@ -347,6 +506,8 @@ let resizeSelectionState = null; // { handle, startBounds, starts: Map }
 let rotateSelectionState = null; // { startBounds, center:{x,y}, startAngle, starts: Map(id->startRotate) }
 
 function onMouseDown(e){
+  // Ignore canvas interactions while a picker is active (element/style picker)
+  if (window.__PICKING) { e.preventDefault(); return; }
   // Prevent moving/resizing when edit mode is off, but allow clicking/selection
   if (!Model.document.editMode) return;
   const target = e.target.closest('.element');
@@ -436,7 +597,8 @@ function onMouseMove(e){
     const dx = pt.x - (dragSelection.startBounds.x + ox);
     const dy = pt.y - (dragSelection.startBounds.y + oy);
     const tentative = { x: dragSelection.startBounds.x + dx, y: dragSelection.startBounds.y + dy, w: dragSelection.startBounds.w, h: dragSelection.startBounds.h };
-    const snapped = snapSelectionBounds(tentative, [...selectedIds]);
+    // Consistent snapping for movement
+    const snapped = snapSelectionBounds(tentative, [...selectedIds], undefined, INTERACTIVE_SNAP);
     const snapDx = snapped.x - tentative.x; const snapDy = snapped.y - tentative.y;
     [...selectedIds].forEach(id => {
       const start = dragSelection.starts.get(id);
@@ -462,18 +624,70 @@ function onMouseMove(e){
     applyResize(m, dx, dy, resize.mode);
     // Apply snapping to single element resize
     const tentativeBounds = getBoundsForModel(m);
-    const snappedBounds = snapSelectionBounds(tentativeBounds, [active.id]);
-    const snapDx = snappedBounds.x - tentativeBounds.x;
-    const snapDy = snappedBounds.y - tentativeBounds.y;
-    if (m.type === 'line' && typeof m.x2 === 'number'){
-      m.x += snapDx; m.y += snapDy; m.x2 += snapDx; m.y2 += snapDy;
-    } else { m.x += snapDx; m.y += snapDy; }
+    // Provide preference so snapping uses the active resized edges
+    const prefer = { x: resize.mode.includes('e') ? 'right' : resize.mode.includes('w') ? 'left' : undefined,
+                     y: resize.mode.includes('s') ? 'bottom' : resize.mode.includes('n') ? 'top' : undefined };
+    // Consistent snapping for resize
+    const snappedBounds = snapSelectionBounds(tentativeBounds, [active.id], prefer, INTERACTIVE_SNAP);
+    // Instead of shifting the whole element (which moves the opposite edge),
+    // adjust the resized edge to the snapped coordinate.
+    const tentLeft = tentativeBounds.x;
+    const tentRight = tentativeBounds.x + tentativeBounds.w;
+    const tentTop = tentativeBounds.y;
+    const tentBottom = tentativeBounds.y + tentativeBounds.h;
+    const snapLeft = snappedBounds.x;
+    const snapRight = snappedBounds.x + snappedBounds.w;
+    const snapTop = snappedBounds.y;
+    const snapBottom = snappedBounds.y + snappedBounds.h;
+
+    // Horizontal adjustment
+    if (resize.mode.includes('e')) {
+      const deltaRight = snapRight - tentRight;
+      if (m.type === 'line' && typeof m.x2 === 'number'){
+        m.x2 += deltaRight;
+      } else {
+        m.w = Math.max(10, (m.w || 0) + deltaRight);
+      }
+    } else if (resize.mode.includes('w')) {
+      const newLeft = snapLeft;
+      const newWidth = Math.max(10, tentRight - newLeft);
+      if (m.type === 'line' && typeof m.x2 === 'number'){
+        // Move left endpoint while keeping right endpoint fixed
+        const rightX = Math.max(m.x, m.x2);
+        const leftWas = Math.min(m.x, m.x2);
+        const shift = newLeft - tentLeft;
+        if (m.x <= m.x2) { m.x += shift; } else { m.x2 += shift; }
+      } else {
+        m.x = newLeft; m.w = newWidth;
+      }
+    }
+
+    // Vertical adjustment
+    if (resize.mode.includes('s')) {
+      const deltaBottom = snapBottom - tentBottom;
+      if (m.type === 'line' && typeof m.y2 === 'number'){
+        m.y2 += deltaBottom;
+      } else {
+        m.h = Math.max(10, (m.h || 0) + deltaBottom);
+      }
+    } else if (resize.mode.includes('n')) {
+      const newTop = snapTop;
+      const newHeight = Math.max(10, tentBottom - newTop);
+      if (m.type === 'line' && typeof m.y2 === 'number'){
+        const topWas = Math.min(m.y, m.y2);
+        const shift = newTop - tentTop;
+        if (m.y <= m.y2) { m.y += shift; } else { m.y2 += shift; }
+      } else {
+        m.y = newTop; m.h = newHeight;
+      }
+    }
     showGuidesForBounds(snappedBounds, getPageNode());
   } else {
     if (m.type === 'line') { m.x += dx; m.y += dy; m.x2 += dx; m.y2 += dy; } else { m.x += dx; m.y += dy; }
     // snap and show guides for single element
     const tentative = getBoundsForModel(m);
-    const snapped = snapSelectionBounds(tentative, [active.id]);
+    // Consistent snapping for movement
+    const snapped = snapSelectionBounds(tentative, [active.id], undefined, INTERACTIVE_SNAP);
     const snapDx = snapped.x - tentative.x; const snapDy = snapped.y - tentative.y;
     if (m.type === 'line' && typeof m.x2 === 'number'){
       m.x += snapDx; m.y += snapDy; m.x2 += snapDx; m.y2 += snapDy;
@@ -577,13 +791,43 @@ function applySelectionResize(event){
   if (h.includes('n')) { ny = Math.min(pt.y, bottom - minH); nh = Math.max(minH, bottom - ny); }
   // Apply snapping to the new bounds before applying transformations
   const tentativeBounds = { x: nx, y: ny, w: nw, h: nh };
-  const snappedBounds = snapSelectionBounds(tentativeBounds, [...selectedIds]);
+  const prefer = { x: resizeSelectionState?.handle?.includes('e') ? 'right' : resizeSelectionState?.handle?.includes('w') ? 'left' : undefined,
+                   y: resizeSelectionState?.handle?.includes('s') ? 'bottom' : resizeSelectionState?.handle?.includes('n') ? 'top' : undefined };
+  // Consistent snapping for resize
+  const snappedBounds = snapSelectionBounds(tentativeBounds, [...selectedIds], prefer, INTERACTIVE_SNAP);
   
-  // Use the snapped bounds
-  nx = snappedBounds.x;
-  ny = snappedBounds.y;
-  nw = snappedBounds.w;
-  nh = snappedBounds.h;
+  // Adjust only the actively resized edges to the snapped coordinates,
+  // keeping the opposite edges anchored to the original selection bounds.
+  const tentLeft = tentativeBounds.x;
+  const tentRight = tentativeBounds.x + tentativeBounds.w;
+  const tentTop = tentativeBounds.y;
+  const tentBottom = tentativeBounds.y + tentativeBounds.h;
+  const snapLeft = snappedBounds.x;
+  const snapRight = snappedBounds.x + snappedBounds.w;
+  const snapTop = snappedBounds.y;
+  const snapBottom = snappedBounds.y + snappedBounds.h;
+
+  // Horizontal adjustments
+  if (h.includes('e')) {
+    const deltaRight = snapRight - tentRight;
+    nw = Math.max(minW, nw + deltaRight);
+  }
+  if (h.includes('w')) {
+    const newLeft = snapLeft;
+    nx = newLeft;
+    nw = Math.max(minW, right - nx);
+  }
+
+  // Vertical adjustments
+  if (h.includes('s')) {
+    const deltaBottom = snapBottom - tentBottom;
+    nh = Math.max(minH, nh + deltaBottom);
+  }
+  if (h.includes('n')) {
+    const newTop = snapTop;
+    ny = newTop;
+    nh = Math.max(minH, bottom - ny);
+  }
   
   // Recalculate scaling factors with snapped bounds
   const sx = nw / sb.w;
@@ -631,7 +875,9 @@ function hideGuides(){
 }
 
 // Softer snapping so it feels less aggressive
-const SNAP_THRESHOLD = 8; const STICKY_RANGE = 6;
+const SNAP_THRESHOLD = 5; const STICKY_RANGE = 5;
+// Use the same interactive snap config for move and resize gestures
+const INTERACTIVE_SNAP = { threshold: SNAP_THRESHOLD, sticky: 0, noSticky: true };
 function getGuidesForCurrentPage(excludeIds = []){
   const pageNode = getPageNode(); const page = getCurrentPage();
   const v = [0, pageNode.clientWidth/2, pageNode.clientWidth];
@@ -650,23 +896,65 @@ function getBoundsForModel(m){
   }
   return { x:m.x, y:m.y, w:m.w || 0, h:m.h || 0 };
 }
-function snapSelectionBounds(b, excludeIds = []){
+function snapSelectionBounds(b, excludeIds = [], prefer, options){
   const { v, h } = getGuidesForCurrentPage(excludeIds);
+  const threshold = options?.threshold ?? SNAP_THRESHOLD;
+  const stickyRange = options?.sticky ?? STICKY_RANGE;
+  const disableSticky = options?.noSticky === true;
   const left=b.x, cx=b.x+b.w/2, right=b.x+b.w; const top=b.y, cy=b.y+b.h/2, bottom=b.y+b.h;
-  const nx = findNearest(v, [left,cx,right], SNAP_THRESHOLD); const ny = findNearest(h, [top,cy,bottom], SNAP_THRESHOLD);
+  const targetsX = prefer?.x === 'left' ? [left] : prefer?.x === 'center' ? [cx] : prefer?.x === 'right' ? [right] : [left,cx,right];
+  const targetsY = prefer?.y === 'top' ? [top] : prefer?.y === 'middle' ? [cy] : prefer?.y === 'bottom' ? [bottom] : [top,cy,bottom];
+  const nx = findNearest(v, targetsX, threshold); const ny = findNearest(h, targetsY, threshold);
   let outX = b.x, outY = b.y;
-  if (nx || (snapState.x!=null && Math.min(Math.abs(left-snapState.x),Math.abs(cx-snapState.x),Math.abs(right-snapState.x))<=STICKY_RANGE)){
-    const [c,which] = nx || [snapState.x,1]; outX = which===0? c : (which===1? c - b.w/2 : c - b.w); snapState.x = c;
+  // Only apply sticky snapping when no preference is set (i.e., moving) or when sticky matches preferred edge
+  const canStickX = !disableSticky && (!prefer || (Math.min(...targetsX.map(t => Math.abs(t - (snapState.x ?? Infinity)))) <= stickyRange));
+  const canStickY = !disableSticky && (!prefer || (Math.min(...targetsY.map(t => Math.abs(t - (snapState.y ?? Infinity)))) <= stickyRange));
+  if (nx || (snapState.x!=null && canStickX)){
+    const [c,whichIdx] = nx || [snapState.x, (targetsX.length===1?0:1)];
+    // Map whichIdx back to left/center/right index against [left,cx,right]
+    let which = whichIdx;
+    if (targetsX.length !== 3){
+      // derive which from preferred
+      which = prefer?.x === 'left' ? 0 : prefer?.x === 'center' ? 1 : prefer?.x === 'right' ? 2 : 1;
+    }
+    outX = which===0? c : (which===1? c - b.w/2 : c - b.w); snapState.x = c;
   }
-  if (ny || (snapState.y!=null && Math.min(Math.abs(top-snapState.y),Math.abs(cy-snapState.y),Math.abs(bottom-snapState.y))<=STICKY_RANGE)){
-    const [c,which] = ny || [snapState.y,1]; outY = which===0? c : (which===1? c - b.h/2 : c - b.h); snapState.y = c;
+  if (ny || (snapState.y!=null && canStickY)){
+    const [c,whichIdx] = ny || [snapState.y, (targetsY.length===1?0:1)];
+    let which = whichIdx;
+    if (targetsY.length !== 3){
+      which = prefer?.y === 'top' ? 0 : prefer?.y === 'middle' ? 1 : prefer?.y === 'bottom' ? 2 : 1;
+    }
+    outY = which===0? c : (which===1? c - b.h/2 : c - b.h); snapState.y = c;
   }
   return { x: outX, y: outY, w: b.w, h: b.h };
 }
 function showGuidesForBounds(b, pageNode){
   const { v, h } = getGuidesNodes(pageNode); if (!v || !h) return;
-  v.style.left = (snapState.x!=null? snapState.x : b.x + b.w/2) + 'px'; v.style.top = '0px'; v.style.height = pageNode.clientHeight + 'px';
-  h.style.left = '0px'; h.style.top = (snapState.y!=null? snapState.y : b.y + b.h/2) + 'px'; h.style.width = pageNode.clientWidth + 'px';
+  // Compute nearest guides and prefer the currently active resize edge if any
+  const left = b.x, cx = b.x + b.w/2, right = b.x + b.w;
+  const top = b.y, cy = b.y + b.h/2, bottom = b.y + b.h;
+  const { v: vg, h: hg } = getGuidesForCurrentPage([...selectedIds]);
+
+  // Determine active edges for visualization
+  const mode = (resize && resize.mode) || (resizeSelectionState && resizeSelectionState.handle) || '';
+  const preferLeft = !!mode && mode.includes('w');
+  const preferRight = !!mode && mode.includes('e');
+  const preferTop = !!mode && mode.includes('n');
+  const preferBottom = !!mode && mode.includes('s');
+
+  const nx = preferRight ? findNearest(vg, [right], SNAP_THRESHOLD)
+           : preferLeft ? findNearest(vg, [left], SNAP_THRESHOLD)
+           : findNearest(vg, [left, cx, right], SNAP_THRESHOLD);
+  const ny = preferBottom ? findNearest(hg, [bottom], SNAP_THRESHOLD)
+           : preferTop ? findNearest(hg, [top], SNAP_THRESHOLD)
+           : findNearest(hg, [top, cy, bottom], SNAP_THRESHOLD);
+
+  const vx = nx ? nx[0] : (snapState.x != null ? snapState.x : (preferRight ? right : (preferLeft ? left : cx)));
+  const vy = ny ? ny[0] : (snapState.y != null ? snapState.y : (preferBottom ? bottom : (preferTop ? top : cy)));
+
+  v.style.left = vx + 'px'; v.style.top = '0px'; v.style.height = pageNode.clientHeight + 'px';
+  h.style.left = '0px'; h.style.top = vy + 'px'; h.style.width = pageNode.clientWidth + 'px';
   v.classList.remove('hidden'); h.classList.remove('hidden');
 }
 
@@ -996,7 +1284,7 @@ function bindFloatingToolbar(){
     hBtn.classList.add('h-'+h);
     vBtn.classList.add(v === 'middle' ? 'v-middle' : 'v-'+v);
     const t = selectedIds.size === 1 ? getElementById([...selectedIds][0])?.type : null;
-    const pressed = selectedIds.size === 1 && (t === 'text' || t === 'field');
+    const pressed = selectedIds.size === 1 && (t === 'text' || t === 'field' || t === 'rect');
     hBtn.setAttribute('aria-pressed', String(pressed));
     vBtn.setAttribute('aria-pressed', String(pressed));
   };
@@ -1046,6 +1334,41 @@ function togglePatch(path){
   return toPatch(path, !cur[last]);
 }
 
+// Parse a string from the properties panel into a JS value
+function parsePropertyValue(raw){
+  const txt = String(raw ?? '').trim();
+  if (txt === '') return '';
+  if (txt === 'true') return true;
+  if (txt === 'false') return false;
+  if (txt === 'null') return null;
+  // Try number
+  const asNum = Number(txt);
+  if (!Number.isNaN(asNum) && /^-?\d*(?:\.\d+)?$/.test(txt)) return asNum;
+  // Try JSON for arrays/objects
+  if ((txt.startsWith('{') && txt.endsWith('}')) || (txt.startsWith('[') && txt.endsWith(']'))){
+    try { return JSON.parse(txt); } catch {}
+  }
+  return raw; // fallback to original string
+}
+
+// Keys that are part of the element model and should not be treated as HTML attributes
+const RESERVED_MODEL_KEYS = new Set(['id','type','groupId','x','y','w','h','z','x2','y2','content','src','styles','grid','rows','cols','rowHeights','colWidths']);
+
+function getCustomAttributesFromModel(model){
+  const attrs = Object.assign({}, model && model.attrs ? model.attrs : {});
+  // Also treat unknown top-level primitives as attributes for backward-compat
+  if (model && typeof model === 'object'){
+    Object.keys(model).forEach((k) => {
+      if (RESERVED_MODEL_KEYS.has(k)) return;
+      if (k === 'attrs') return;
+      const v = model[k];
+      const isPrimitive = (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean');
+      if (isPrimitive) attrs[k] = v;
+    });
+  }
+  return attrs;
+}
+
 function renderProperties(){
   const box = propertiesContent();
   box.innerHTML = '';
@@ -1079,71 +1402,471 @@ function renderProperties(){
     }
   }
   if (!m) m = page.elements.find(e => selectedIds.has(e.id));
+  // Base rows from core model
   const rows = [
     ['id', m?.id || 'multi'], ['type', m?.type || 'multi'], ['groupId', groupId || ''], ['x', m?.x], ['y', m?.y], ['w', m?.w], ['h', m?.h], ['z', m?.z]
   ];
   if (cellId) rows.unshift(['cellId', cellId]);
   
-  // Add style properties for text and field elements
-  if (m && (m.type === 'text' || m.type === 'field')) {
+  // Add editable text content for text-like elements
+  if (m && (m.type === 'text' || m.type === 'field' || m.type === 'rect')) {
     rows.push(
-      ['textColor', m.styles?.textColor || '#111827'],
-      ['fontFamily', m.styles?.fontFamily || 'system-ui'],
-      ['fontSize', m.styles?.fontSize || 14],
-      ['bold', m.styles?.bold || false],
-      ['italic', m.styles?.italic || false]
+      ['content', m.content || '']
     );
   }
   
-  rows.forEach(([k,v]) => {
-    const div = document.createElement('div');
-    div.className = 'row';
-    
-    // Special handling for different input types
-    if (k === 'fontSize') {
-      div.innerHTML = `<label>${k}<select data-prop="styles.${k}" style="width:90px">
-        <option value="8">8</option>
-        <option value="9">9</option>
-        <option value="10">10</option>
-        <option value="11">11</option>
-        <option value="12">12</option>
-        <option value="14">14</option>
-        <option value="16">16</option>
-        <option value="18">18</option>
-        <option value="20">20</option>
-        <option value="24">24</option>
-        <option value="28">28</option>
-        <option value="32">32</option>
-        <option value="36">36</option>
-        <option value="48">48</option>
-        <option value="72">72</option>
-      </select></label>`;
-      // Set the selected value
-      const select = div.querySelector('select');
-      select.value = v;
-    } else if (k === 'fontFamily') {
-      div.innerHTML = `<label>${k}<select data-prop="styles.${k}" style="width:90px">
-        <option value="system-ui">System</option>
-        <option value="Arial">Arial</option>
-        <option value="Helvetica Neue">Helvetica</option>
-        <option value="Times New Roman">Times</option>
-        <option value="Georgia">Georgia</option>
-        <option value="Courier New">Courier</option>
-      </select></label>`;
-      const select = div.querySelector('select');
-      select.value = v;
-    } else if (k === 'textColor') {
-      div.innerHTML = `<label>${k}<input type="color" data-prop="styles.${k}" value="${v}" style="width:90px"></label>`;
-    } else if (k === 'bold' || k === 'italic') {
-      div.innerHTML = `<label>${k}<input type="checkbox" data-prop="styles.${k}" ${v ? 'checked' : ''}></label>`;
-    } else if (k.startsWith('styles.')) {
-      div.innerHTML = `<label>${k}<input data-prop="${k}" value="${v ?? ''}" style="width:90px"></label>`;
-    } else {
-      div.innerHTML = `<label>${k}<input data-prop="${k}" value="${v ?? ''}" style="width:90px"></label>`;
-    }
-    box.appendChild(div);
+  // Include custom attributes as flat props for editing
+  let customAttrs = getCustomAttributesFromModel(m || {});
+  const customAttrKeys = new Set(Object.keys(customAttrs));
+  Object.keys(customAttrs).forEach((name) => {
+    rows.push([name, customAttrs[name]]);
   });
-  box.addEventListener('input', onPropsInput, { once: true });
+
+  // When a table cell is selected, also expose its per-cell attrs.* for editing
+  if (m && m.type === 'table' && cellId) {
+    const parts = String(cellId).split('_');
+    const rc = parts[parts.length - 1];
+    const [rr, cc] = rc.split('x').map(n => parseInt(n, 10));
+    if (Number.isInteger(rr) && Number.isInteger(cc)){
+      const cell = m.cells && m.grid && m.grid[rr] ? m.cells[m.grid[rr][cc]] : null;
+      if (cell && cell.attrs){
+        Object.keys(cell.attrs).forEach((name) => {
+          rows.push([`cell.${name}`, cell.attrs[name]]);
+        });
+      }
+    }
+  }
+
+  rows.forEach(([k,v]) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const name = document.createElement('label');
+    name.textContent = k;
+    let control;
+    // Controls by type
+    if (k === 'fontSize') {
+      control = document.createElement('select');
+      control.innerHTML = '<option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>14</option><option>16</option><option>18</option><option>20</option><option>24</option><option>28</option><option>32</option><option>36</option><option>48</option><option>72</option>';
+      control.dataset.prop = 'styles.'+k;
+      control.value = String(v);
+    } else if (k === 'fontFamily') {
+      control = document.createElement('select');
+      control.innerHTML = '<option value="system-ui">System</option><option value="Arial">Arial</option><option value="Helvetica Neue">Helvetica</option><option value="Times New Roman">Times</option><option value="Georgia">Georgia</option><option value="Courier New">Courier</option>';
+      control.dataset.prop = 'styles.'+k;
+      control.value = String(v);
+    } else if (k === 'textColor') {
+      control = document.createElement('input'); control.type = 'color'; control.value = v || '#111827'; control.dataset.prop = 'styles.'+k;
+    } else if (k === 'bold' || k === 'italic') {
+      control = document.createElement('input'); control.type = 'checkbox'; control.checked = !!v; control.dataset.prop = 'styles.'+k;
+    } else if (k === 'content' || (customAttrKeys.has(k) && typeof v === 'string')) {
+      control = document.createElement('textarea');
+      control.rows = 3;
+      control.value = v ?? '';
+      control.dataset.prop = k;
+    } else {
+      control = document.createElement('input'); control.value = v ?? ''; control.dataset.prop = k;
+    }
+    row.appendChild(name);
+    row.appendChild(control);
+    box.appendChild(row);
+  });
+
+  // Actions UI (bubble layout): choose function, trigger, and inputs; stack multiple
+  try {
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'row';
+    const lbl = document.createElement('label');
+    lbl.textContent = 'Actions';
+    const container = document.createElement('div');
+    container.setAttribute('data-actions','');
+    container.style.width = '100%';
+    actionsRow.appendChild(lbl);
+    actionsRow.appendChild(container);
+    box.appendChild(actionsRow);
+
+    // Supported DOM events -> attribute names
+    const SUPPORTED = [ 'click','change','input','dblclick','focus','blur' ];
+
+   
+
+    function splitCalls(expr){
+      const out = [];
+      if (!expr) return out;
+      let cur = '', depth = 0, quote = '';
+      for (let i=0;i<expr.length;i++){
+        const ch = expr[i];
+        if (quote){ if (ch === quote && expr[i-1] !== '\\') quote = ''; cur += ch; continue; }
+        if (ch === '"' || ch === "'") { quote = ch; cur += ch; continue; }
+        if (ch === '(') { depth++; cur += ch; continue; }
+        if (ch === ')') { depth = Math.max(0, depth-1); cur += ch; continue; }
+        if ((ch === ';' || ch === ',') && depth === 0){ if (cur.trim()) out.push(cur.trim()); cur = ''; continue; }
+        cur += ch;
+      }
+      if (cur.trim()) out.push(cur.trim());
+      return out;
+    }
+    function parseCall(call){
+      const m = call.match(/^\s*([\w$]+)\s*\((.*)\)\s*$/);
+      if (!m) return { fn:'', args:[] };
+      const fn = m[1];
+      const argsRaw = m[2].trim();
+      if (!argsRaw) return { fn, args:[] };
+      const parts = splitCalls(argsRaw).map(s => s.trim()).filter(Boolean);
+      return { fn, args: parts };
+    }
+    function buildExpr(calls){
+      return calls.filter(c => c && c.fn).map(c => `${c.fn}(${c.args.join(', ')})`).join('; ');
+    }
+
+    function collectExisting(){
+      // If a table cell is selected, read actions from the cell's attrs
+      if (m && m.type === 'table' && cellId){
+        const cell = m.cells ? m.cells[cellId] : null;
+        const attrs = (cell && cell.attrs) ? cell.attrs : {};
+        const items = [];
+        SUPPORTED.forEach(evt => {
+          const key = 'on' + evt;
+          const expr = String(attrs[key] || '');
+          splitCalls(expr).map(parseCall).forEach(c => items.push({ event: evt, fn: c.fn, args: c.args }));
+        });
+        return items;
+      }
+      // Otherwise use element-level attrs
+      const attrs = getCustomAttributesFromModel(m || {});
+      const items = [];
+      SUPPORTED.forEach(evt => {
+        const key = 'on' + evt;
+        const expr = String(attrs[key] || '');
+        splitCalls(expr).map(parseCall).forEach(c => items.push({ event: evt, fn: c.fn, args: c.args }));
+      });
+      return items;
+    }
+
+    function writeBack(items){
+      // Preserve current selection (elements or table cells) to avoid deselection during updates
+      const prevSelIds = Array.from(document.querySelectorAll('.page .element.selected'))
+        .map(n => n && n.getAttribute('data-id'))
+        .filter(Boolean);
+      // Group by event and write complete expressions for each
+      const per = {};
+      SUPPORTED.forEach(e => per[e] = []);
+      items.forEach(it => { if (SUPPORTED.includes(it.event) && it.fn) per[it.event].push({ fn: it.fn, args: it.args || [] }); });
+
+      // If a table cell is selected, write actions into that cell's attrs
+      if (m && m.type === 'table' && cellId){
+        const next = deepClone(m);
+        if (!next.cells[cellId]) next.cells[cellId] = { attrs: {} };
+        if (!next.cells[cellId].attrs) next.cells[cellId].attrs = {};
+        SUPPORTED.forEach(evt => {
+          const expr = buildExpr(per[evt]);
+          next.cells[cellId].attrs['on' + evt] = expr;
+        });
+        updateElement(next.id, next);
+        // Restore selection after update
+        if (Array.isArray(prevSelIds) && prevSelIds.length && typeof setSelection === 'function') {
+          setSelection(prevSelIds);
+        }
+        return;
+      }
+
+      // Otherwise, element-level attrs
+      SUPPORTED.forEach(evt => {
+        const path = `attrs.on${evt}`;
+        const expr = buildExpr(per[evt]);
+        applyPatchToSelection(toPatch(path, expr), 'actions-update');
+      });
+      // Restore selection after attributes update
+      if (Array.isArray(prevSelIds) && prevSelIds.length && typeof setSelection === 'function') {
+        setSelection(prevSelIds);
+      }
+    }
+
+    function render(){
+      container.innerHTML = '';
+      const funcs = getUserFunctionChoices();
+      let items = collectExisting();
+      const openSet = (window.__ACTION_OPEN || (window.__ACTION_OPEN = new Set()));
+
+      // Add header with + button
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.alignItems = 'center';
+      header.style.justifyContent = 'space-between';
+      header.style.marginBottom = '6px';
+        const title = document.createElement('div');
+      title.textContent = 'Adding function (add a bubble)';
+      title.style.color = 'var(--muted)';
+      title.style.fontSize = '11px';
+      const addBtn = document.createElement('button'); addBtn.type='button'; addBtn.className='btn mini';
+      addBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+      header.appendChild(title); header.appendChild(addBtn);
+      container.appendChild(header);
+
+      function addEmpty(){
+        const firstFn = funcs[0]?.name || '';
+        const inputs = funcs[0]?.inputs || 0;
+        items.push({ event: 'click', fn: firstFn, args: Array(inputs).fill("'"+""+"'") });
+        writeBack(items); render();
+      }
+      addBtn.addEventListener('click', addEmpty);
+
+      // List bubbles
+      items.forEach((it, idx) => {
+        const bubble = document.createElement('div');
+        bubble.style.border = '1px solid var(--border)';
+        bubble.style.borderRadius = '8px';
+        bubble.style.padding = '8px';
+        bubble.style.marginBottom = '8px';
+        bubble.style.background = '#fafafa';
+        bubble.style.width = '100%';
+        bubble.style.boxSizing = 'border-box';
+
+        // Top row: function + trigger + remove
+        const top = document.createElement('div');
+        top.style.display = 'grid';
+        top.style.gridTemplateColumns = '28px minmax(0,1fr) 110px 28px';
+        top.style.gap = '6px';
+
+        // expand/collapse toggle
+        const keyOf = () => `${idx}:${it.event}:${it.fn}`;
+        let collapsed = !openSet.has(keyOf());
+        const expBtn = document.createElement('button');
+        expBtn.type = 'button';
+        expBtn.className = 'btn mini';
+        expBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 10l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+
+        // Function dropdown (same style as trigger)
+        const fnSel = document.createElement('select');
+        fnSel.innerHTML = '<option value="">Select function…</option>' + funcs.map(f => `<option value="${f.name}">${f.label}</option>`).join('');
+        fnSel.value = it.fn || '';
+        fnSel.style.width = '100%';
+
+        const trgSel = document.createElement('select');
+        trgSel.innerHTML = SUPPORTED.map(e => `<option value="${e}">${'on'+e}</option>`).join('');
+        trgSel.value = it.event;
+        trgSel.style.width = '100%';
+
+        const delBtn = document.createElement('button'); delBtn.type='button'; delBtn.className='btn mini';
+        delBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+        delBtn.style.width = '24px';
+        delBtn.style.height = '24px';
+        delBtn.style.padding = '0';
+        delBtn.style.display = 'inline-flex';
+        delBtn.style.alignItems = 'center';
+        delBtn.style.justifyContent = 'center';
+        delBtn.style.borderRadius = '999px';
+
+        top.appendChild(expBtn); top.appendChild(fnSel); top.appendChild(trgSel); top.appendChild(delBtn);
+        bubble.appendChild(top);
+
+        const inputsWrap = document.createElement('div');
+        inputsWrap.style.display = 'grid';
+        inputsWrap.style.gap = '6px';
+        inputsWrap.style.marginTop = '6px';
+
+        function rebuildInputs(){
+          inputsWrap.innerHTML = '';
+          const meta = funcs.find(f => f.name === fnSel.value);
+          const count = meta ? (meta.inputs || 0) : 0;
+          for (let i=0;i<count;i++){
+            const r = document.createElement('div'); r.className='row'; r.style.display='contents';
+            const lab = document.createElement('label'); lab.textContent = `input ${i+1}`;
+            // input + pickers container
+            const line = document.createElement('div');
+            line.style.display = 'grid';
+            line.style.gridTemplateColumns = '1fr 28px 28px';
+            line.style.gap = '6px';
+            const inp = document.createElement('input');
+            // Prefer custom placeholders from function metadata, else default for first arg
+            if (meta && Array.isArray(meta.placeholders) && meta.placeholders[i]) {
+              inp.placeholder = String(meta.placeholders[i]);
+            } else {
+              inp.placeholder = i === 0 ? 'selected element (css selector)' : '';
+            }
+            // show clean value without surrounding quotes
+            const raw = it.args?.[i] ? String(it.args[i]) : '';
+            const unquoted = (raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"')) ? raw.slice(1,-1) : raw;
+            inp.value = unquoted;
+            // Only commit on change/blur (finished editing)
+            const finished = () => commit();
+            inp.addEventListener('change', finished);
+            inp.addEventListener('blur', finished);
+            // element picker button (target icon)
+            const pickBtn = document.createElement('button'); pickBtn.type='button'; pickBtn.className='btn mini';
+            pickBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+            // style picker button (eyedropper)
+            const styleBtn = document.createElement('button'); styleBtn.type='button'; styleBtn.className='btn mini';
+            styleBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M3 21l6-6m6-6l3 3-9 9H6v-3l9-9 3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+            line.appendChild(inp); line.appendChild(pickBtn); line.appendChild(styleBtn);
+            r.appendChild(lab); r.appendChild(line);
+            inputsWrap.appendChild(r);
+
+            // Picker helpers
+            function rgbToHex(rgb){
+              const m = String(rgb||'').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i); if (!m) return '#000000';
+              const r = Number(m[1]).toString(16).padStart(2,'0');
+              const g = Number(m[2]).toString(16).padStart(2,'0');
+              const b = Number(m[3]).toString(16).padStart(2,'0');
+              return `#${r}${g}${b}`;
+            }
+            function startElementPicker(kind){
+              // Preserve selection before entering picker mode
+              const prevSelIds = Array.from(document.querySelectorAll('.page .element.selected'))
+                .map(n => n && n.getAttribute('data-id'))
+                .filter(Boolean);
+              const pageEl = document.querySelector('.page'); if (!pageEl) return;
+              let last;
+              window.__PICKING = true;
+              document.body.classList.add('app-noselect');
+              // Block pointer down inside the page so nothing re-targets selection
+              const blockDown = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+              document.addEventListener('pointerdown', blockDown, true);
+              document.addEventListener('mousedown', blockDown, true);
+              document.addEventListener('touchstart', blockDown, { capture:true, passive:false });
+              const onMove = (ev) => {
+                // Prefer highlighting a table cell if under pointer; otherwise the element box
+                const cell = ev.target.closest('.table-cell');
+                const el = cell || ev.target.closest('.page .element');
+                if (last === el) return;
+                if (last) last.style.outline = '';
+                last = el;
+                if (last) last.style.outline = '2px solid var(--primary)';
+              };
+              const done = () => {
+                document.removeEventListener('mousemove', onMove, true);
+                document.removeEventListener('click', onClick, true);
+                document.removeEventListener('keydown', onKey, true);
+                document.removeEventListener('pointerdown', blockDown, true);
+                document.removeEventListener('mousedown', blockDown, true);
+                document.removeEventListener('touchstart', blockDown, true);
+                if (last) last.style.outline = '';
+                document.body.classList.remove('app-noselect');
+                window.__PICKING = false;
+                // Restore selection after picking
+                if (Array.isArray(prevSelIds) && prevSelIds.length && typeof setSelection === 'function') {
+                  setSelection(prevSelIds);
+                }
+              };
+              const onKey = (e) => { if (e.key === 'Escape'){ e.preventDefault(); done(); } };
+              const onClick = (e) => {
+                // Support picking individual table cells as well as whole elements
+                const cell = e.target.closest('.table-cell');
+                const el = cell || e.target.closest('.page .element');
+                if (!el) { done(); return; }
+                e.preventDefault(); e.stopPropagation();
+                if (kind === 'selector'){
+                  if (cell){
+                    const cid = cell.getAttribute('data-id');
+                    if (cid) inp.value = `'[data-id="${cid}"]'`;
+                  } else {
+                    const id = el.getAttribute('data-id');
+                    if (id) inp.value = `'[data-id="${id}"]'`;
+                  }
+                } else if (kind === 'style'){
+                  const EXCLUDE = /^(?:width|height|left|top|right|bottom|inset|transform|translate|scale|rotate|position|z-index|x|y|outline(?:-.+)?)$/i;
+                  const parts = [];
+                  // Use the exact inline style attribute (as shown in DevTools)
+                  try {
+                    // Ensure picker outline is cleared before reading inline styles
+                    el.style.outline = '';
+                    const attr = el.getAttribute('style') || '';
+                    attr.split(';').forEach(chunk => {
+                      const seg = chunk.trim();
+                      if (!seg) return;
+                      const [kRaw, ...rest] = seg.split(':');
+                      const k = (kRaw || '').trim();
+                      const v = rest.join(':').trim(); // preserve any colons in values
+                      if (!k || !v) return;
+                      if (EXCLUDE.test(k)) return;
+                      parts.push(`${k}:${v}`);
+                    });
+                  } catch {}
+                  if (parts.length === 0){
+                    // Fallback: pick a curated set from computed styles
+                    const cs = getComputedStyle(el);
+                    const keys = [
+                      'background-color','color','border','border-color','border-width','border-style','border-radius',
+                      'box-shadow','font-family','font-size','font-weight','font-style','text-decoration','text-align','line-height',
+                      'opacity'
+                    ];
+                    keys.forEach(k => { const v = cs.getPropertyValue(k); if (v && v !== 'auto' && v !== 'normal' && v !== 'none') parts.push(`${k}:${v.trim()}`); });
+                  }
+                  const styleStr = parts.join('; ');
+                  const escaped = styleStr.replace(/'/g, "\\'");
+                  inp.value = `'${escaped}'`;
+                }
+                inp.dispatchEvent(new Event('change', { bubbles:true }));
+                done();
+              };
+              document.addEventListener('mousemove', onMove, true);
+              document.addEventListener('click', onClick, true);
+              document.addEventListener('keydown', onKey, true);
+            }
+            pickBtn.addEventListener('click', () => startElementPicker('selector'));
+            styleBtn.addEventListener('click', () => startElementPicker('style'));
+          }
+          // preserve args array length
+          it.args = (it.args || []).slice(0, count);
+        }
+
+        function commit(){
+          it.fn = fnSel.value || '';
+          it.event = trgSel.value || 'click';
+          // Read current inputs
+          const vals = Array.from(inputsWrap.querySelectorAll('input')).map((inputEl) => {
+            const v = String(inputEl.value || '').trim();
+            if (v === '') return "''";
+            if (v.startsWith("'") || v.startsWith('"')) return v; // already quoted
+            // JSON-like only if it parses successfully
+            if (v.startsWith('{') || v.startsWith('[')) {
+              try { JSON.parse(v); return v; } catch {/* fall through to quote as string */}
+            }
+            if (/^-?\d+(?:\.\d+)?$/.test(v) || /^(true|false|null|undefined)$/i.test(v)) return v;
+            const escaped = v.replace(/'/g, "\\'");
+            return `'${escaped}'`;
+          });
+          it.args = vals;
+          writeBack(items);
+          // nothing else
+          // keep expansion state for this updated signature
+          if (!collapsed) openSet.add(keyOf()); else openSet.delete(keyOf());
+        }
+
+        fnSel.addEventListener('change', () => { rebuildInputs(); commit(); });
+        trgSel.addEventListener('change', () => { commit(); });
+        delBtn.addEventListener('click', () => {
+          items.splice(idx, 1);
+          writeBack(items);
+          render();
+        });
+
+        bubble.appendChild(inputsWrap);
+        rebuildInputs();
+        // collapse by default
+        const applyCollapsed = () => { inputsWrap.style.display = collapsed ? 'none' : 'grid'; expBtn.innerHTML = collapsed
+          ? '<svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M10 8l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
+          : '<svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 10l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+        };
+        applyCollapsed();
+        expBtn.addEventListener('click', () => { collapsed = !collapsed; if (collapsed) openSet.delete(keyOf()); else openSet.add(keyOf()); applyCollapsed(); });
+        container.appendChild(bubble);
+      });
+    }
+
+    render();
+  } catch {}
+
+  // Add-property trigger button (centered)
+  const addWrap = document.createElement('div');
+  addWrap.className = 'add-wrap';
+  addWrap.innerHTML = `
+    <button type="button" title="Add property" aria-label="Add property" data-add-prop-trigger
+      style="width:28px;height:28px;border-radius:6px;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;font-size:18px;line-height:26px;">+</button>`;
+  box.appendChild(addWrap);
+  const trigger = addWrap.querySelector('[data-add-prop-trigger]');
+  if (trigger) trigger.addEventListener('click', () => showAddPropRow(box), { once: true });
+  // Apply edits only when the field commits (blur/change)
   box.addEventListener('change', onPropsInput, { once: true });
 }
 function onPropsInput(e){
@@ -1153,11 +1876,106 @@ function onPropsInput(e){
   if (t.type === 'checkbox') {
     val = t.checked;
   } else {
-    val = Number.isNaN(Number(t.value)) ? t.value : Number(t.value);
+    val = parsePropertyValue(t.value);
   }
-  applyPatchToSelection(toPatch(key, val));
-  propertiesContent().addEventListener('input', onPropsInput, { once: true });
+  // Special case: validate id uniqueness across the document
+  if (key === 'id'){
+    const newId = String(val || '');
+    const currentIds = new Set();
+    try {
+      (Model.document?.pages || []).forEach(p => (p.elements || []).forEach(el => currentIds.add(el.id)));
+    } catch {}
+    // Allow keeping the same id of the first selected element
+    const firstSelected = (selectedIds && selectedIds.size) ? [...selectedIds][0] : null;
+    if (firstSelected) currentIds.delete(firstSelected);
+    const exists = currentIds.has(newId);
+    if (exists || newId.trim() === ''){
+      // Mark invalid and stop
+      t.setAttribute('aria-invalid','true');
+      t.style.borderColor = '#ef4444';
+      t.style.background = '#fee2e2';
+      // Rebind for next change
   propertiesContent().addEventListener('change', onPropsInput, { once: true });
+      return;
+    } else {
+      t.removeAttribute('aria-invalid');
+      t.style.borderColor = '';
+      t.style.background = '';
+    }
+  }
+  // Special handling for per-cell attrs when a cell is active
+  if (key.startsWith('cell.') && tableSel){
+    const tModel = getElementById(tableSel.tableId);
+    if (tModel && tModel.type === 'table'){
+      const ar = Math.min(tableSel.r0, tableSel.r1);
+      const ac = Math.min(tableSel.c0, tableSel.c1);
+      const cid = tModel.grid[ar]?.[ac];
+      if (cid){
+        const next = deepClone(tModel);
+        next.cells[cid] = next.cells[cid] || { attrs: {} };
+        next.cells[cid].attrs = Object.assign({}, next.cells[cid].attrs);
+        const name = key.slice('cell.'.length);
+        next.cells[cid].attrs[name] = val;
+        updateElement(next.id, next);
+        // Keep selection
+        setTableSelection(next.id, ar, ac);
+      }
+    }
+    propertiesContent().addEventListener('change', onPropsInput, { once: true });
+    return;
+  }
+
+  // If editing a reserved key or styles.* keep path, otherwise map to attrs.*
+  const topKey = key.split('.')[0];
+  const isReserved = RESERVED_MODEL_KEYS.has(topKey) || key.startsWith('styles.');
+  const path = isReserved ? key : `attrs.${key}`;
+  applyPatchToSelection(toPatch(path, val));
+  propertiesContent().addEventListener('change', onPropsInput, { once: true });
+}
+
+function showAddPropRow(container){
+  // Replace trigger with input row
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.setAttribute('data-add-prop-row','');
+  row.innerHTML = `
+    <label>key</label>
+    <input name="k" placeholder="path.like.styles.custom">
+    <label>value</label>
+    <textarea name="v" rows="3" placeholder="number / text / true / {…}"></textarea>
+    <div class="row-hint"></div>
+    <div style="display:flex; gap:6px; justify-content:flex-end;">
+      <button type="button" data-confirm-add class="btn mini">Add</button>
+      <button type="button" data-cancel-add class="btn mini">Cancel</button>
+    </div>`;
+  // Remove the trigger wrapper if it exists
+  const trigWrap = container.querySelector('[data-add-prop-trigger]')?.parentElement;
+  if (trigWrap) container.replaceChild(row, trigWrap); else container.appendChild(row);
+
+  const keyInput = row.querySelector('input[name="k"]');
+  const valInput = row.querySelector('[name="v"]');
+  const confirmBtn = row.querySelector('[data-confirm-add]');
+  const cancelBtn = row.querySelector('[data-cancel-add]');
+  const confirm = () => {
+    const key = keyInput.value.trim();
+    const raw = valInput.value;
+    if (!key) { keyInput.focus(); return; }
+    const val = parsePropertyValue(raw);
+    const topKey = key.split('.')[0];
+    const isReserved = RESERVED_MODEL_KEYS.has(topKey) || key.startsWith('styles.');
+    const path = isReserved ? key : `attrs.${key}`;
+    applyPatchToSelection(toPatch(path, val), 'add-prop');
+    renderProperties();
+  };
+  const cancel = () => { renderProperties(); };
+
+  confirmBtn.addEventListener('click', confirm);
+  cancelBtn.addEventListener('click', cancel);
+  row.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); confirm(); }
+    if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+  });
+  keyInput.focus();
 }
 
 function normalizeZOrder(){
@@ -1194,50 +2012,124 @@ document.getElementById('savePdfBtn').addEventListener('click', exportPdf);
 
 
 
+// Dynamically ensure required libs are available without changing app logic
+async function loadExternalScript(src){
+  return new Promise((resolve, reject) => {
+    // Deduplicate loads
+    let existing = document.querySelector(`script[data-dynamic-src="${src}"]`);
+    if (existing){
+      if (existing.dataset.loaded === 'true') return resolve();
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('Failed to load: '+src)));
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.crossOrigin = 'anonymous';
+    s.referrerPolicy = 'no-referrer';
+    s.dataset.dynamicSrc = src;
+    s.addEventListener('load', () => { s.dataset.loaded = 'true'; resolve(); });
+    s.addEventListener('error', () => reject(new Error('Failed to load: '+src)));
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureHtml2Canvas(){
+  if (typeof window.html2canvas === 'function') return window.html2canvas;
+  // Load standalone html2canvas in case the html2pdf bundle didn't expose it globally
+  await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  if (typeof window.html2canvas === 'function') return window.html2canvas;
+  throw new Error('html2canvas is not available');
+}
+
+async function ensureJsPDF(){
+  // Prefer modern UMD namespace first
+  if (window.jspdf && typeof window.jspdf.jsPDF === 'function') return window.jspdf.jsPDF;
+  if (typeof window.jsPDF === 'function') return window.jsPDF;
+  await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  if (window.jspdf && typeof window.jspdf.jsPDF === 'function') return window.jspdf.jsPDF;
+  if (typeof window.jsPDF === 'function') return window.jsPDF;
+  throw new Error('jsPDF is not available');
+}
+
 async function exportPdf({ filename = 'myfile.pdf', dpi = 220, orientation = 'portrait' } = {}) {
-  const page = document.querySelector('.page'); // <- should be the paper itself
-  if (!page) return;
+  // Multi-page PDF export: export all .page elements as PDF pages
+  const pages = Array.from(document.querySelectorAll('.page'));
+  if (!pages.length) return;
 
   // Save and normalize current zoom so export always uses real dimensions
   const originalZoom = typeof getZoom === 'function' ? getZoom() : 1;
   if (typeof setZoomScale === 'function') setZoomScale(1);
 
-  // Temporarily remove visual effects that extend outside the page box
-  const prevShadow = page.style.boxShadow;
-  const prevRadius = page.style.borderRadius;
-  page.style.boxShadow = 'none';
-  page.style.borderRadius = '0';
-
-  // Prefer layout dimensions to avoid viewport rounding drift
-  const widthPx = page.offsetWidth;
-  const heightPx = page.offsetHeight;
-  // Prefer integer render scales to reduce sub-pixel rounding artifacts
-  const scale = Math.max(1, Math.round(dpi / 96));
-
   // Ensure web fonts are fully loaded to avoid reflow during capture
   try { if (document.fonts && document.fonts.ready) { await document.fonts.ready; } } catch {}
 
-  // Neutralize viewport scroll so the capture isn't shifted
-  const canvasScrollX = -window.scrollX || -7;///keeep the -7!!!
-  const canvasScrollY = -window.scrollY || 0;
+  // Ensure libs up-front
+  const html2canvasFn = await ensureHtml2Canvas();
 
-  const opt = {
-    margin: 0,
-    filename,
-    image: { type: 'jpeg', quality: 0.75 },
-    // html2canvas scale determines print DPI (96 CSS px = 1")
-    html2canvas: { scale, useCORS: true, backgroundColor: '#ffffff', scrollX: canvasScrollX, scrollY: canvasScrollY },
-    // Match PDF page size to the live DOM size in pixels for 1:1 layout
-    jsPDF: { unit: 'px', format: [widthPx, heightPx], orientation, compress: true },
-    pagebreak: { mode: ['avoid-all'] } // keep single page if heights match
-  };
+  // Helper to capture a page as canvas
+  async function capturePageCanvas(page, scale, scrollX, scrollY) {
+    // Temporarily remove visual effects that extend outside the page box
+    const prevShadow = page.style.boxShadow;
+    const prevRadius = page.style.borderRadius;
+    page.style.boxShadow = 'none';
+    page.style.borderRadius = '0';
 
-  return html2pdf().set(opt).from(page).save().finally(() => {
-    // Restore zoom and page visuals after export
+    // Use html2canvas directly for per-page capture
+    const canvas = await html2canvasFn(page, {
+      scale,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      scrollX,
+      scrollY
+    });
+
+    // Restore styles
     page.style.boxShadow = prevShadow;
     page.style.borderRadius = prevRadius;
-    if (typeof setZoomScale === 'function') setZoomScale(originalZoom);
+
+    return canvas;
+  }
+
+  // Prefer integer render scales to reduce sub-pixel rounding artifacts
+  const scale = Math.max(1, Math.round(dpi / 96));
+  // Neutralize viewport scroll so the capture isn't shifted
+  const canvasScrollX = -window.scrollX || -7; // keep the -7!!!
+  const canvasScrollY = -window.scrollY || 0;
+
+  // Get dimensions from the first page for PDF size
+  const firstPage = pages[0];
+  const widthPx = firstPage.offsetWidth;
+  const heightPx = firstPage.offsetHeight;
+
+  // Ensure jsPDF is loaded
+  const jsPDF = await ensureJsPDF();
+
+  // Create jsPDF instance
+  const pdf = new jsPDF({
+    unit: 'px',
+    format: [widthPx, heightPx],
+    orientation,
+    compress: true
   });
+
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i];
+    const canvas = await capturePageCanvas(page, scale, canvasScrollX, canvasScrollY);
+    const imgData = canvas.toDataURL('image/jpeg', 0.75);
+
+    if (i > 0) {
+      pdf.addPage([widthPx, heightPx], orientation);
+    }
+    pdf.addImage(imgData, 'JPEG', 0, 0, widthPx, heightPx);
+  }
+
+  // Save the PDF
+  pdf.save(filename);
+
+  // Restore zoom after export
+  if (typeof setZoomScale === 'function') setZoomScale(originalZoom);
 }
 
 /* -------------------End of PDF Export Utilities ------------------- */
@@ -1254,23 +2146,150 @@ function download(filename, content, type='text/html'){
   const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 1000);
 }
 
+// Save button UI feedback
+function getSaveBtn(){ return document.getElementById('saveBtn'); }
+function indicateSaving(){
+  const btn = getSaveBtn();
+  if (!btn) return;
+  btn.classList.remove('saved');
+  btn.classList.add('saving');
+  if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent || 'Save';
+  btn.textContent = 'Saving…';
+}
+function indicateSaved(){
+  const btn = getSaveBtn();
+  if (!btn) return;
+  btn.classList.remove('saving');
+  btn.classList.add('saved');
+  btn.textContent = 'Saved';
+  if (btn._saveResetTimer) clearTimeout(btn._saveResetTimer);
+  btn._saveResetTimer = setTimeout(() => {
+    btn.classList.remove('saved');
+    btn.textContent = btn.dataset.originalText || 'Save';
+  }, 2000);
+}
 
-function saveDocument(){
-  // Save function - reads filename from URL and overwrites that file
+// ---------------- OPFS (Origin Private File System) helpers ----------------
+// Scope autosave per file by deriving a stable key from the current path
+function getFileScopeId(){
+  try {
+    const path = (window && window.location && window.location.pathname) ? window.location.pathname : '';
+    const key = path.replace(/[^a-z0-9\-_.]/gi, '_').toLowerCase();
+    return key || 'index';
+  } catch (_) {
+    return 'index';
+  }
+}
+function getOpfsAutosaveName(){
+  return `autosave-${getFileScopeId()}.json`;
+}
+function supportsOPFS(){
+  return typeof navigator !== 'undefined' && navigator.storage && navigator.storage.getDirectory;
+}
+async function opfsGetRoot(){
+  return await navigator.storage.getDirectory();
+}
+async function opfsWriteFile(filename, text){
+  const root = await opfsGetRoot();
+  const fh = await root.getFileHandle(filename, { create: true });
+  const w = await fh.createWritable();
+  await w.write(text);
+  await w.close();
+}
+async function opfsReadTextIfExists(filename){
+  try {
+    const root = await opfsGetRoot();
+    const fh = await root.getFileHandle(filename, { create: false });
+    const file = await fh.getFile();
+    return await file.text();
+  } catch (_) {
+    return null;
+  }
+}
+
+// LocalStorage fallback for silent autosave when OPFS isn't available
+function localAutosaveKey(){
+  return `certificateMaker:autosave:v1:${getFileScopeId()}`;
+}
+function localSaveDocument(){
+  try {
+    const json = serializeDocument();
+    localStorage.setItem(localAutosaveKey(), json);
+    return true;
+  } catch (_) { return false; }
+}
+function localLoadDocument(){
+  try {
+    const json = localStorage.getItem(localAutosaveKey());
+    return json || null;
+  } catch (_) { return null; }
+}
+
+// File System Access API helpers for silent saves after initial user selection
+let currentFileHandle = null;
+function supportsFileSystemAccess(){
+  return typeof window !== 'undefined' && 'showSaveFilePicker' in window;
+}
+function buildSaveHtml(){
+  const documentData = serializeDocument();
+  const currentHtml = document.documentElement.outerHTML;
+  return currentHtml.replace(
+    '<body>',
+    `<body>\n  <pre id="__doc__" style="display:none">${documentData}</pre>`
+  );
+}
+async function verifyPermission(fileHandle, withWrite){
+  const opts = {};
+  if (withWrite) opts.mode = 'readwrite';
+  if ((await fileHandle.queryPermission(opts)) === 'granted') return true;
+  if ((await fileHandle.requestPermission(opts)) === 'granted') return true;
+  return false;
+}
+async function writeFile(handle, content){
+  const ok = await verifyPermission(handle, true);
+  if (!ok) throw new Error('Permission denied');
+  const writable = await handle.createWritable();
+  await writable.write(content);
+  await writable.close();
+}
+
+
+async function saveDocument(){
+  indicateSaving();
+  // Prefer OPFS silent save if available
+  if (supportsOPFS()) {
+    try {
+      const json = serializeDocument();
+      await opfsWriteFile(getOpfsAutosaveName(), json);
+      indicateSaved();
+      return;
+    } catch (_) {}
+  }
+
+  // Next, silently persist to localStorage
+  if (localSaveDocument()) {
+    indicateSaved();
+    return;
+  }
+
+  // If we have a picked file and FS Access is supported, overwrite silently
+  if (supportsFileSystemAccess() && currentFileHandle) {
+    try {
+      const saveHtml = buildSaveHtml();
+      await writeFile(currentFileHandle, saveHtml);
+      indicateSaved();
+      return;
+    } catch (e) {
+      // fall through to legacy behavior
+    }
+  }
+
+  // Legacy behavior: read filename from URL and trigger a download
   const currentFilename = getCurrentFilename();
-  
   if (currentFilename) {
-    // Use the current file's name
-    const documentData = serializeDocument();
-    const currentHtml = document.documentElement.outerHTML;
-    const saveHtml = currentHtml.replace(
-      '<body>',
-      `<body>\n  <pre id="__doc__" style="display:none">${documentData}</pre>`
-    );
+    const saveHtml = buildSaveHtml();
     download(currentFilename, saveHtml, 'text/html');
-  } else {
-    // No filename detected, act like Save As
-    saveDocumentAs();
+    indicateSaved();
   }
 }
 
@@ -1287,30 +2306,71 @@ function getCurrentFilename(){
   return null;
 }
 
-function saveDocumentAs(){
-  // Save As function - uses browser's file dialog
+async function saveDocumentAs(){
+  indicateSaving();
+  // Prefer File System Access API if available for future silent saves
+  if (supportsFileSystemAccess()) {
+    try {
+      const defaultName = `certificate-maker-${new Date().toISOString().slice(0,19).replace(/[:.]/g,'-')}.html`;
+      const handle = await window.showSaveFilePicker({
+        suggestedName: defaultName,
+        types: [{
+          description: 'HTML',
+          accept: { 'text/html': ['.html', '.htm'] }
+        }]
+      });
+      currentFileHandle = handle;
+      const saveHtml = buildSaveHtml();
+      await writeFile(currentFileHandle, saveHtml);
+      indicateSaved();
+      return;
+    } catch (e) {
+      // If user cancels or API fails, fall back to download below
+    }
+  }
+
+  // Fallback: Use browser download
   const defaultName = `certificate-maker-${new Date().toISOString().slice(0,19).replace(/[:.]/g,'-')}.html`;
-  
-  const documentData = serializeDocument();
-  const currentHtml = document.documentElement.outerHTML;
-  const saveHtml = currentHtml.replace(
-    '<body>',
-    `<body>\n  <pre id="__doc__" style="display:none">${documentData}</pre>`
-  );
-  
-  // Use browser's file dialog
+  const saveHtml = buildSaveHtml();
   download(defaultName, saveHtml, 'text/html');
+  indicateSaved();
 }
 
 
 /* ----------------------- Init & Events ----------------------- */
-function bootstrap(){
-  // Load from embedded data if present
+async function bootstrap(){
+  // Prefer embedded document from the current file first
+  let loaded = false;
   const saved = document.getElementById('__doc__');
   if (saved && saved.textContent) {
-    try { deserializeDocument(saved.textContent.replaceAll('&lt;','<')); } catch {}
-  } else {
-    // initial document with one page
+    try { deserializeDocument(saved.textContent.replaceAll('&lt;','<')); loaded = true; } catch {}
+  }
+
+  // Next, try OPFS autosave scoped to this file
+  if (!loaded && supportsOPFS()) {
+    try {
+      const text = await opfsReadTextIfExists(getOpfsAutosaveName());
+      if (text) {
+        deserializeDocument(text);
+        loaded = true;
+      }
+      // Reduce eviction risk (best-effort)
+      if (navigator.storage && navigator.storage.persist) {
+        try { await navigator.storage.persist(); } catch {}
+      }
+    } catch (_) {}
+  }
+
+  // Finally, try localStorage autosave scoped to this file
+  if (!loaded){
+    const ls = localLoadDocument();
+    if (ls) {
+      try { deserializeDocument(ls); loaded = true; } catch {}
+    }
+  }
+
+  // If nothing loaded, create an initial document
+  if (!loaded){
     Model.document.pages = [createPage('Page 1')];
     Model.document.currentPageId = Model.document.pages[0].id;
   }
@@ -1376,21 +2436,70 @@ function bootstrap(){
     }
     if (getPageNode() === page) onMouseDown(e);
   });
+  // Allow starting a lasso selection from outside of any page within the viewport
+  const viewportEl = document.getElementById('pageViewport');
+  if (viewportEl){
+    viewportEl.addEventListener('mousedown', (e) => {
+      // If inside a page, let the page handler above manage it
+      if (e.target.closest && e.target.closest('.page')) return;
+      // Ignore clicks on overlays/toolbars within the viewport
+      const bar = formatToolbar && formatToolbar();
+      if (bar && bar.contains && bar.contains(e.target)) return;
+      const bubble = elementActions && elementActions();
+      if (bubble && bubble.contains && bubble.contains(e.target)) return;
+      const tblMenu = document.getElementById('tableMenu');
+      if (tblMenu && tblMenu.contains && tblMenu.contains(e.target)) return;
+
+      // Start lasso selection similar to inside-page behavior
+      const start = { x: e.clientX, y: e.clientY };
+      const lasso = document.getElementById('lasso');
+      let additive = e.shiftKey || e.ctrlKey || e.metaKey;
+      let moved = false;
+      const onMove = (ev) => {
+        const dx = ev.clientX - start.x; const dy = ev.clientY - start.y;
+        if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return; // threshold
+        moved = true;
+        lasso.hidden = false;
+        const left = Math.min(start.x, ev.clientX);
+        const top = Math.min(start.y, ev.clientY);
+        const w = Math.abs(dx); const h = Math.abs(dy);
+        Object.assign(lasso.style, { left:left+'px', top:top+'px', width:w+'px', height:h+'px' });
+        const hits = [];
+        document.querySelectorAll('.page .element').forEach(node => {
+          const r = node.getBoundingClientRect();
+          const inter = !(left > r.left + r.width || left + w < r.left || top > r.top + r.height || top + h < r.top);
+          if (inter) hits.push(node.dataset.id);
+        });
+        additive ? setSelection([...selectedIds, ...hits]) : setSelection(hits);
+      };
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        lasso.hidden = true;
+        if (!moved) {
+          // click without movement clears selection when outside the page
+          additive ? null : clearSelection();
+        }
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    });
+  }
   window.addEventListener('mousemove', onMouseMove);
   window.addEventListener('mouseup', onMouseUp);
   window.addEventListener('resize', () => { updateFormatToolbarVisibility(); alignOverlays(); });
   window.addEventListener('scroll', () => { alignOverlays(); }, true);
 
-  // text/field editing (field editable even when edit mode is off)
+  // text/field/rect editing (field editable even when edit mode is off)
   pagesList().addEventListener('dblclick', (e) => {
     const active = getPageNode();
     if (!active || !active.contains(e.target)) return;
 
-    const elNode = e.target.closest('.element.text, .element.field');
+    const elNode = e.target.closest('.element.text, .element.field, .element.rect');
     if (!elNode) return;
 
-    // Only block editing when it's a text element AND edit mode is off
-    if (elNode.classList.contains('text') && !Model.document.editMode) return;
+    // Only block editing when it's a text or rect element AND edit mode is off
+    if ((elNode.classList.contains('text') || elNode.classList.contains('rect')) && !Model.document.editMode) return;
 
     const id = elNode.dataset.id;
     setSelection([id]);
@@ -1409,7 +2518,7 @@ function bootstrap(){
       elNode.removeEventListener('blur', onBlur);
       elNode.setAttribute('contenteditable', 'false');
       elNode.classList.remove('editing');
-      const content = elNode.textContent.trim();
+      const content = elNode.textContent;
       updateElement(id, { content: content });
       
       // Re-render to show placeholder if content is empty
@@ -1528,6 +2637,30 @@ function bootstrap(){
     if (!panel) return; if (panel.classList.contains('hidden')) return;
     if (!actions.contains(e.target)) panel.classList.add('hidden');
   });
+  // Deselect elements when clicking anywhere outside of a page (but ignore editor overlays)
+  document.addEventListener('mousedown', (e) => {
+    const t = e.target;
+    // If clicking inside a page, let page handlers manage selection
+    if (t.closest && t.closest('.page')) return;
+    // Ignore clicks inside overlays/toolbars that operate on the current selection
+    const bar = formatToolbar && formatToolbar();
+    if (bar && bar.contains && bar.contains(t)) return;
+    // Do not clear selection when interacting with side panels
+    const propsPanel = document.getElementById('propertiesPanel');
+    if (propsPanel && propsPanel.contains && propsPanel.contains(t)) return;
+    const elsPanel = document.getElementById('elementsPanel');
+    if (elsPanel && elsPanel.contains && elsPanel.contains(t)) return;
+    const tblMenu = document.getElementById('tableMenu');
+    if (tblMenu && tblMenu.contains && tblMenu.contains(t)) return;
+    const tblActions = document.getElementById('tableActions');
+    if (tblActions && tblActions.contains && tblActions.contains(t)) return;
+    const bubble = elementActions && elementActions();
+    if (bubble && bubble.contains && bubble.contains(t)) return;
+    const selBox = selectionBoxEl && selectionBoxEl();
+    if (selBox && selBox.contains && selBox.contains(t)) return;
+    // Otherwise, clear element selection
+    if (selectedIds && selectedIds.size > 0) clearSelection();
+  });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       const panel = actions.querySelector('[data-menu-panel]'); if (panel) panel.classList.add('hidden');
@@ -1631,6 +2764,13 @@ function createCustomColorPickerElement() {
   `;
   
   document.body.appendChild(picker);
+  // Prevent interactions inside the picker from closing toolbars or clearing selection
+  // Use capture for down events to avoid outside handlers; use bubble for click so inner
+  // click handlers (e.g., recent color chips) still fire correctly.
+  ['pointerdown','mousedown'].forEach((evt) => {
+    picker.addEventListener(evt, (e) => { e.stopPropagation(); }, true);
+  });
+  picker.addEventListener('click', (e) => { e.stopPropagation(); });
   return picker;
 }
 
@@ -1668,19 +2808,12 @@ function updateColorWithoutClosing(color) {
 
 function selectColor(color) {
   if (!currentColorInput) return;
-  
-  // Update the input value
-  currentColorInput.value = color;
-  
-  // Add to history
+  // Apply immediately without closing, so the first click takes effect
+  updateColorWithoutClosing(color);
+  // Then record in history (which may rerender the chips)
   addToColorHistory(color);
-  
-  // Trigger events
-  currentColorInput.dispatchEvent(new Event('input', { bubbles: true }));
+  // Fire a change event to signal commit
   currentColorInput.dispatchEvent(new Event('change', { bubbles: true }));
-  
-  // Close picker
-  hideCustomColorPicker();
 }
 
 function showCustomColorPicker(input, x, y) {
@@ -1833,10 +2966,11 @@ function togglePanelCollapse(panelId) {
   // Update the toggle button icon
   const toggle = panel.querySelector('.panel-toggle');
   if (toggle) {
+    // Use data-dir to control arrow orientation via CSS, no text glyphs
     if (panelId === 'elementsPanel') {
-      toggle.textContent = isCollapsed ? '⇤' : '⇥';
+      toggle.setAttribute('data-dir', isCollapsed ? 'left' : 'right');
     } else if (panelId === 'propertiesPanel') {
-      toggle.textContent = isCollapsed ? '⇥' : '⇤';
+      toggle.setAttribute('data-dir', isCollapsed ? 'right' : 'left');
     }
   }
   
@@ -1977,6 +3111,11 @@ document.addEventListener('DOMContentLoaded', () => {
   bootstrap();
   initializePanelControls();
   initializeCustomColorPicker();
+  // Initialize panel toggle arrow orientation
+  const elT = document.getElementById('elementsToggle');
+  const prT = document.getElementById('propertiesToggle');
+  if (elT) elT.setAttribute('data-dir', document.getElementById('elementsPanel')?.classList.contains('collapsed') ? 'left' : 'right');
+  if (prT) prT.setAttribute('data-dir', document.getElementById('propertiesPanel')?.classList.contains('collapsed') ? 'right' : 'left');
   const versionEl = document.getElementById('version');
   if (versionEl) versionEl.textContent = APP_VERSION;
 });

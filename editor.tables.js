@@ -6,7 +6,8 @@
 // ----- utils -----
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
 function generateCellId(tableId, r, c){
-  return `cell_${tableId}_${r}x${c}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+  // Deterministic, simple id aligned with element data-id scheme
+  return `${tableId}_${r}x${c}`;
 }
 function normalizeRange(r0,c0,r1,c1){ return { r0: Math.min(r0,r1), c0: Math.min(c0,c1), r1: Math.max(r0,r1), c1: Math.max(c0,c1) }; }
 function getElementNode(id){ return document.querySelector(`.page .element[data-id="${id}"]`); }
@@ -21,7 +22,7 @@ function makeTableElement(rows=3, cols=4) {
     grid[r] = [];
     for (let c=0; c<cols; c++){
       const cid = generateCellId(id, r, c);
-      cells[cid] = { id: cid, row:r, col:c, rowSpan:1, colSpan:1, hidden:false, content: "", styles: { alignH:'left', alignV:'top', padding:8, bg:null, borders:{ top:true,right:true,bottom:true,left:true } } };
+      cells[cid] = { id: cid, row:r, col:c, rowSpan:1, colSpan:1, hidden:false, content: "", styles: { alignH:'left', alignV:'top', padding:8, bg:null, borders:{ top:true,right:true,bottom:true,left:true } }, attrs: {} };
       grid[r][c] = cid;
     }
   }
@@ -56,10 +57,11 @@ function tableAddRow(t, at) {
         const srcCell = srcId ? t.cells[srcId] : null;
         const defaultStyles = { alignH:'left', alignV:'top', padding:8, bg:null, borders:{ top:true, right:true, bottom:true, left:true } };
         const clonedStyles = srcCell && srcCell.styles ? clone(srcCell.styles) : defaultStyles;
+        const clonedAttrs = srcCell && srcCell.attrs ? clone(srcCell.attrs) : {};
         cells[cid] = {
           id: cid, row: at, col: c,
           rowSpan: 1, colSpan: 1, hidden: false,
-          content: "", styles: clonedStyles
+          content: "", styles: clonedStyles, attrs: clonedAttrs
         };
         newRow[c] = cid;
         newlyCreated.add(cid);
@@ -104,10 +106,11 @@ function tableAddColumn(t, at) {
         const srcCell = srcId ? t.cells[srcId] : null;
         const defaultStyles = { alignH:'left', alignV:'top', padding:8, bg:null, borders:{ top:true, right:true, bottom:true, left:true } };
         const clonedStyles = srcCell && srcCell.styles ? clone(srcCell.styles) : defaultStyles;
+        const clonedAttrs = srcCell && srcCell.attrs ? clone(srcCell.attrs) : {};
         cells[cid] = {
           id: cid, row: r, col: at,
           rowSpan: 1, colSpan: 1, hidden: false,
-          content: "", styles: clonedStyles
+          content: "", styles: clonedStyles, attrs: clonedAttrs
         };
         row[c] = cid;
         newlyCreated.add(cid);
@@ -142,7 +145,7 @@ function tableDeleteColumn(t, at) {
   Object.values(cells).forEach(cell => { if (cell.col > at) cell.col -= 1; });
   return { ...t, cols:t.cols-1, grid, colWidths, cells };
 }
-function tableSplitAnchor(t, r, c){ const id = t.grid[r][c]; const cell = t.cells[id]; if (!cell) return t; if (cell.rowSpan===1 && cell.colSpan===1) return t; const {row, col, rowSpan, colSpan} = cell; for (let rr=row; rr<row+rowSpan; rr++){ for (let cc=col; cc<col+colSpan; cc++){ const cid = (rr===row && cc===col) ? id : generateCellId(t.id, rr, cc); if (!t.cells[cid]) t.cells[cid] = { id:cid, row:rr, col:cc, rowSpan:1, colSpan:1, hidden:false, content:"", styles:clone(cell.styles) }; t.grid[rr][cc] = cid; t.cells[cid].hidden = false; t.cells[cid].rowSpan = 1; t.cells[cid].colSpan = 1; } } cell.rowSpan = 1; cell.colSpan = 1; return t; }
+function tableSplitAnchor(t, r, c){ const id = t.grid[r][c]; const cell = t.cells[id]; if (!cell) return t; if (cell.rowSpan===1 && cell.colSpan===1) return t; const {row, col, rowSpan, colSpan} = cell; for (let rr=row; rr<row+rowSpan; rr++){ for (let cc=col; cc<col+colSpan; cc++){ const cid = (rr===row && cc===col) ? id : generateCellId(t.id, rr, cc); if (!t.cells[cid]) t.cells[cid] = { id:cid, row:rr, col:cc, rowSpan:1, colSpan:1, hidden:false, content:"", styles:clone(cell.styles), attrs: clone(cell.attrs||{}) }; t.grid[rr][cc] = cid; t.cells[cid].hidden = false; t.cells[cid].rowSpan = 1; t.cells[cid].colSpan = 1; } } cell.rowSpan = 1; cell.colSpan = 1; return t; }
 function tableNormalizeRange(t, r0,c0,r1,c1){ t = clone(t); const {r0:rr0,c0:cc0,r1:rr1,c1:cc1} = normalizeRange(r0,c0,r1,c1); const seen = new Set(); for (let r=rr0;r<=rr1;r++){ for (let c=cc0;c<=cc1;c++){ const id = t.grid[r][c]; if (!seen.has(id)){ seen.add(id); const a = t.cells[id]; if (a.rowSpan>1 || a.colSpan>1) t = tableSplitAnchor(t, a.row, a.col); } } } return t; }
 function tableMergeRange(t, r0,c0,r1,c1) { t = tableNormalizeRange(t, r0,c0,r1,c1); const { r0:rr0,c0:cc0,r1:rr1,c1:cc1 } = normalizeRange(r0,c0,r1,c1); const anchorId = t.grid[rr0][cc0]; const cell = t.cells[anchorId]; cell.row = rr0; cell.col = cc0; cell.rowSpan = rr1-rr0+1; cell.colSpan = cc1-cc0+1; for (let r=rr0;r<=rr1;r++){ for (let c=cc0;c<=cc1;c++){ const id = t.grid[r][c]; if (id !== anchorId){ t.cells[id].hidden = true; t.grid[r][c] = anchorId; } } } return t; }
 function tableUnmerge(t, r, c) { t = clone(t); const anchorId = t.grid[r][c]; const cell = t.cells[anchorId]; if (!cell || (cell.rowSpan===1 && cell.colSpan===1)) return t; return tableSplitAnchor(t, cell.row, cell.col); }
@@ -162,7 +165,7 @@ function renderTable(elModel, host) {
       const id = elModel.grid[r][c]; const cell = elModel.cells[id];
       // Render only anchor positions of cells (skip duplicates mapped to the anchor id)
       if (!cell || cell.hidden || cell.row !== r || cell.col !== c) continue;
-      const div = document.createElement('div'); div.className = 'table-cell'; div.dataset.tableId = elModel.id; div.dataset.r = r; div.dataset.c = c;
+      const div = document.createElement('div'); div.className = 'table-cell'; div.dataset.tableId = elModel.id; div.dataset.r = r; div.dataset.c = c; div.dataset.id = `${elModel.id}_${r}x${c}`;
       div.setAttribute('role', 'gridcell');
       div.setAttribute('aria-rowindex', String(r+1));
       div.setAttribute('aria-colindex', String(c+1));
@@ -171,6 +174,16 @@ function renderTable(elModel, host) {
       const isActive = tableSel ? (tableSel.tableId===elModel.id && r===Math.min(tableSel.r0, tableSel.r1) && c===Math.min(tableSel.c0, tableSel.c1)) : (r===0 && c===0);
       div.tabIndex = isActive ? 0 : -1;
       div.style.gridColumn = `span ${cell.colSpan}`; div.style.gridRow = `span ${cell.rowSpan}`;
+      // Apply per-cell attributes (including inline event handlers like onclick)
+      try {
+        const attrs = cell.attrs || {};
+        Object.keys(attrs).forEach((name) => {
+          const val = attrs[name];
+          if (val === false || val == null || val === '') div.removeAttribute(name);
+          else if (val === true) div.setAttribute(name, '');
+          else div.setAttribute(name, String(val));
+        });
+      } catch {}
       applyCellStyles(div, cell); 
       div.textContent = cell.content || '';
       div.addEventListener('mousedown', onTableCellMouseDown);
@@ -272,12 +285,22 @@ function renderTable(elModel, host) {
     // Ignore clicks inside the format toolbar or other editor overlays
     const bar = formatToolbar();
     if (bar && bar.contains(t)) return;
+    // Ignore clicks inside side panels (elements/properties)
+    const propsPanel = document.getElementById('propertiesPanel');
+    if (propsPanel && propsPanel.contains && propsPanel.contains(t)) return;
+    const elsPanel = document.getElementById('elementsPanel');
+    if (elsPanel && elsPanel.contains && elsPanel.contains(t)) return;
     const tblMenu = document.getElementById('tableActions');
     if (tblMenu && tblMenu.contains(t)) return;
     const bubble = elementActions && elementActions();
     if (bubble && bubble.contains && bubble.contains(t)) return;
     const selBox = selectionBoxEl && selectionBoxEl();
     if (selBox && selBox.contains && selBox.contains(t)) return;
+    // Ignore clicks within custom color picker
+    const colorPicker = document.querySelector('.custom-color-picker');
+    if (colorPicker && colorPicker.contains && colorPicker.contains(t)) return;
+    // Ignore while in picking mode
+    if (window.__PICKING) return;
     clearTableSelection();
     document.removeEventListener('mousedown', onDocClick);
   };
@@ -287,8 +310,10 @@ function applyCellStyles(div, cell) {
   const h = cell.styles.alignH || 'left'; const v = cell.styles.alignV || 'top';
   div.style.justifyContent = h==='left' ? 'flex-start' : (h==='center' ? 'center' : 'flex-end');
   div.style.alignItems = v==='top' ? 'flex-start' : (v==='middle' ? 'center' : 'flex-end');
+  // Ensure wrapped text inside cells follows horizontal alignment
+  div.style.textAlign = h==='left' ? 'left' : (h==='center' ? 'center' : 'right');
   div.style.padding = (cell.styles.padding ?? 8) + 'px';
-  if (cell.styles.bg) div.style.setProperty('--cell-bg', cell.styles.bg);
+  if (cell.styles.bg) div.style.background = cell.styles.bg;
   if (cell.styles.textColor) div.style.color = cell.styles.textColor;
   if (cell.styles.fontFamily) div.style.fontFamily = cell.styles.fontFamily;
   if (cell.styles.fontSize) div.style.fontSize = (cell.styles.fontSize || 14) + 'pt';
@@ -356,6 +381,8 @@ function clearTableSelection(){
     n.setAttribute('aria-selected','false');
     n.tabIndex = -1;
   });
+  // Remove selection overlay if present
+  document.querySelectorAll('.table-selection').forEach(n=> n.remove());
   updateToolbarForSelection(); updateFormatToolbarVisibility();
   const bar = document.getElementById('tableActions'); if (bar) bar.classList.add('hidden');
 }
@@ -373,6 +400,34 @@ function highlightTableSelection(){
     else if (r>=r0 && r<=r1 && c>=c0 && c<=c1){ div.classList.add('is-range'); div.setAttribute('aria-selected','true'); div.tabIndex = -1; }
     else { div.tabIndex = -1; }
   }
+  // Draw single overlay rectangle around the selected range (handles merged cells)
+  const grid = tNode.querySelector('.table-grid');
+  if (grid){
+    // Remove any existing selection overlays for this table
+    grid.querySelectorAll(':scope > .table-selection').forEach(n=> n.remove());
+    // Compute bounding box of selection using anchor cell DOM rects
+    const a = grid.querySelector(`.table-cell[data-r="${r0}"][data-c="${c0}"]`);
+    const b = grid.querySelector(`.table-cell[data-r="${r1}"][data-c="${c1}"]`);
+    if (a && b){
+      const ra = a.getBoundingClientRect();
+      const rb = b.getBoundingClientRect();
+      const rg = grid.getBoundingClientRect();
+      const z = getZoom();
+      // Work in viewport (transformed) pixels, then convert to unscaled CSS pixels
+      const leftV = Math.min(ra.left, rb.left) - rg.left;
+      const topV = Math.min(ra.top, rb.top) - rg.top;
+      const rightV = Math.max(ra.right, rb.right) - rg.left;
+      const bottomV = Math.max(ra.bottom, rb.bottom) - rg.top;
+      const sel = document.createElement('div');
+      sel.className = 'table-selection';
+      sel.style.left = (leftV / z) + 'px';
+      sel.style.top = (topV / z) + 'px';
+      sel.style.width = ((rightV - leftV) / z) + 'px';
+      sel.style.height = ((bottomV - topV) / z) + 'px';
+      const handle = document.createElement('div'); handle.className = 'handle'; sel.appendChild(handle);
+      grid.appendChild(sel);
+    }
+  }
   const sr = document.getElementById('srAnnouncer'); if (sr){ sr.textContent = `Selected ${r1-r0+1} by ${c1-c0+1} cells.`; }
   // Reflect anchor cell styles in toolbar every time selection changes
   const tModel = getElementById(tableSel.tableId);
@@ -381,6 +436,8 @@ function highlightTableSelection(){
   renderProperties();
 }
 function onTableCellMouseDown(e){
+  // Do not alter selection while picker mode is active
+  if (window.__PICKING) { e.preventDefault(); e.stopPropagation(); return; }
   if (e.button !== 0) return; // right-click shouldn't change selection
   e.stopPropagation();
   const div = e.currentTarget; const tableId = div.dataset.tableId; const r = +div.dataset.r, c = +div.dataset.c;
@@ -434,6 +491,14 @@ function startEditCell(e, opts){
     const t = getElementById(tableId); const id = t.grid[r][c];
     // silent update (no extra history spam); merge directly and rerender table only
     t.cells[id].content = text;
+    // Fire a synthetic change event so inline onchange handlers on the cell can react after commit
+    try {
+      const evt = new Event('change', { bubbles: true });
+      div.dispatchEvent(evt);
+      // Also provide a custom event with details for power users
+      const cust = new CustomEvent('cellchange', { bubbles: true, detail: { tableId, r, c, value: text } });
+      div.dispatchEvent(cust);
+    } catch {}
     renderPage(getCurrentPage());
     const cell = getElementNode(tableId)?.querySelector(`.table-cell[data-r="${r}"][data-c="${c}"]`);
     if (cell) cell.focus();
@@ -462,7 +527,7 @@ function startEditCell(e, opts){
 
 function sanitizePlaintext(text){
   const t = String(text || '').replace(/\r\n?/g, '\n');
-  return t.split('\n').map(s => s.replace(/[ \t\f\v\u00A0]+/g, ' ').trimEnd()).join('\n');
+  return t; // preserve all spaces and trailing whitespace per user request
 }
 
 /* ===== Excel-style Clipboard (Table) ===== */
@@ -543,6 +608,24 @@ function pasteGridIntoTable(t, startR, startC, grid) {
     }
   }
   return next;
+}
+
+/** Clear text content in all cells within [r0..r1] x [c0..c1] (anchors only). */
+function tableClearRangeContent(t, r0, c0, r1, c1) {
+  t = clone(t);
+  const rr0 = Math.min(r0, r1), rr1 = Math.max(r0, r1);
+  const cc0 = Math.min(c0, c1), cc1 = Math.max(c0, c1);
+  for (let r = rr0; r <= rr1; r++) {
+    for (let c = cc0; c <= cc1; c++) {
+      const id = t.grid[r][c];
+      const cell = t.cells[id];
+      if (!cell || cell.hidden) continue;
+      if (cell.row === r && cell.col === c) {
+        cell.content = "";
+      }
+    }
+  }
+  return t;
 }
 
 /** When a table selection exists (or a focused .table-cell), return anchor coords. */
@@ -660,6 +743,14 @@ function onTableGridKeydown(e, tableId){
     case 'Tab': prevent(); nc = anchorC + (e.shiftKey?-1:1); if (nc<0){ nc=maxC; nr=Math.max(0,anchorR-1);} if (nc>maxC){ nc=0; nr=Math.min(maxR,anchorR+1);} commitAndFocus(); break;
     case 'Enter': prevent(); if (!grow){ nr = Math.min(maxR, Math.max(0, anchorR + (e.shiftKey?-1:1))); } commitAndFocus(); break;
     case 'Escape': clearTableSelection(); break;
+    case 'Delete':
+    case 'Backspace':
+      e.preventDefault();
+      e.stopPropagation();
+      updateElement(tableId, tableClearRangeContent(t, r0, c0, r1, c1));
+      // Preserve current selection after update
+      setTableSelection(tableId, r0, c0, r1, c1);
+      break;
     case 'F2': // start edit
       prevent();
       const node = getElementNode(tableId)?.querySelector(`.table-cell[data-r="${anchorR}"][data-c="${anchorC}"]`); if (node){ startEditCell({ currentTarget: node }); }
