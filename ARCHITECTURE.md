@@ -253,3 +253,101 @@ Non-goals (now): Converting to a framework. The above can be done as modular pla
 These changes reduce cross-module knowledge, make responsibilities clear, and let you refactor further without breaking working parts.
 
 
+## Planned split of editor.app.js
+
+Goal: reduce `editor.app.js` into cohesive, testable modules with clear boundaries while keeping runtime behavior identical. Below is a proposed minimal split you can do incrementally.
+
+Proposed files (suggested names/roles):
+- `app/render/pages.js`
+  - `renderAll`, `renderPagesList`, `renderPage`, `ensureElementNode`, `applyElementStyles`
+  - Depends on: `core/model` API (`getCurrentPage`, `getPageNode`, `deepClone`), table view (`tables/view`)
+
+- `app/update/element.js`
+  - `updateElement`, `deepMerge`, `applyPatchToSelection`, `toPatch`, `getByPath`
+  - Internals split: selector resolution, element-id updates, table-cell mapping
+  - Depends on: `app/render/pages` for `renderPage`, selection store, table ops
+
+- `app/interaction/gestures.js`
+  - Mouse down/move/up, lasso, move/resize/rotate, snapping (`snapSelectionBounds`, `showGuidesForBounds`, `getGuidesForCurrentPage`), resize helpers
+  - Exposes hooks to update model via `updateElement`/direct page mutation during gesture, then final `renderPage`
+  - Depends on: selection store, `app/render/pages`, `core/model`
+
+- `app/ui/toolbar.js`
+  - Floating toolbar wiring (`bindFloatingToolbar`, `syncFormatToolbar`), align buttons, Z-order helpers
+  - Depends on: selection store, `update/element`, table ops, `app/render/pages`
+
+- `app/ui/properties.js`
+  - `renderProperties`, `onPropsInput`, `showAddPropRow`, `getCustomAttributesFromModel`, constants like `RESERVED_MODEL_KEYS`
+  - Depends on: selection store, `update/element`
+
+- `app/bootstrap/index.js`
+  - `bootstrap`, event registrations (global listeners, panel init, color picker init, clipboard binding), zoom init
+  - Imports the above modules and coordinates startup
+
+- `persistence/storage.js`
+  - OPFS helpers, localStorage helpers, File System Access helpers, `serializeDocument`, `deserializeDocument`, `buildSaveHtml`, `saveDocument`, `saveDocumentAs`
+  - Exports a small façade used by UI
+
+- `export/pdf.js`
+  - `exportPdf`, `ensureHtml2Canvas`, `ensureJsPDF`, `loadExternalScript`
+
+Supporting module:
+- `core/model.js`
+  - `Model`, `History`, `commitHistory/undo/redo`, `getCurrentPage`, `getPageNode`, `generateId`, `deepClone`, zoom helpers, constants
+
+Incremental steps (safe order):
+1. Extract `core/model.js` with readonly exports first (helpers + typedefs). Update imports in-place.
+2. Move `render*` and `applyElementStyles` into `app/render/pages.js`. Keep API identical; re-export from `editor.app.js` temporarily for compatibility.
+3. Extract `export/pdf.js` (self-contained) and `persistence/storage.js` (keep existing save buttons calling through façade).
+4. Move toolbar/properties into `app/ui/*`. Wire from `bootstrap`.
+5. Finally, split `updateElement` into `app/update/element.js` and replace usages.
+6. Extract gestures/snapping into `app/interaction/gestures.js`.
+
+Guidelines:
+- Preserve function names and signatures; export them from new files and import where used.
+- Keep one history entry per action; do not change gesture sequencing.
+- After each move, run a quick manual test: load, select, move, resize, table edit, copy/paste, save, export.
+- Prefer small PRs: one logical extraction per change.
+
+
+## UX and Usability Enhancements
+
+Practical improvements to make the editor easier, clearer, and faster to use. Each item notes priority and likely module(s).
+
+- **Add tips for the buttons**: Add tips for the buttons.
+
+- **Fit/zoom controls (Now)**: Fit page, fit width, 100% toggle, spacebar pan, zoom to selection. Modules: `core/model` (zoom), `app/ui/toolbar`.
+- **Smart alignment and spacing (Now)**: Distribute spacing, equalize sizes, show measured distances when dragging. Modules: `app/interaction/gestures`, `app/ui/toolbar`.
+- **Snap/grid toggles (Next)**: Toggle snap; show/hide grid; set grid size. Modules: `app/interaction/gestures`, `app/render/pages`.
+- **Layers/outline panel (Now)**: Minimal list of elements with hide/lock/rename/reorder. Modules: `app/ui/properties` or new `app/ui/layers`.
+- **Lock/Hide elements (Now)**: Quick lock/unlock and visibility toggle in action bubble and properties. Modules: `app/ui/toolbar`, `app/ui/properties`.
+- **Better number/color inputs (Now)**: Shift+Arrow steps, unit hints (pt/px), accessible color inputs with history (already present) + eyedropper fallback. Modules: `app/ui/properties`.
+- **Selection clarity (Now)**: Indeterminate states for multi-select; show common vs mixed values; batch apply safely. Modules: `app/ui/properties`, `update/element`.
+- **Keyboard shortcuts help (Now)**: “?” to open a shortcuts sheet; surface common combos (copy/paste, align, zoom). Modules: `app/bootstrap`, `app/ui/*`.
+- **History panel (Next)**: Visible undo stack labels; optional named checkpoints. Modules: `core/model` (labels), `app/ui/*`.
+- **Status and toasts (Now)**: Non-blocking toasts for save/export/errors; last saved timestamp and autosave indicator. Modules: `persistence/storage`, `app/ui/*`.
+- **Accessibility (Next)**: Tabbable controls, visible focus, ARIA on toolbars/panels, high-contrast theme toggle. Modules: `app/ui/*`, `style.css`.
+
+
+## Feature Backlog (Candidate roadmap)
+
+Priorities reflect effort vs. impact. All should respect the model/render separation and single-entry `updateElement` contract.
+
+### Now (high impact, low/med effort)
+- **Fit and zoom suite**: Fit page/width, 100%, zoom to selection, spacebar/middle-mouse pan.
+- **Distribute/align/size tools**: Distribute spacing horizontally/vertically; match width/height across selection.
+- **Layers/outline MVP**: List elements on the current page with lock/hide/reorder and rename.
+- **PNG export**: Export selected page(s) as PNG at chosen DPI (reuse html2canvas pipeline). Modules: `export/pdf` → new `export/png`.
+- **Shortcuts overlay**: “?” opens a modal with context-aware shortcuts and tips.
+
+### Next (medium effort)
+
+- **Style presets**: Named style tokens (colors, text styles, borders) applied from toolbar. Modules: `app/ui/toolbar`, `update/element`.
+- **QR/Barcode element**: Generate from text/URL using a small client lib. Modules: new `elements/qr`, `render/pages`.
+- **Table enhancements**: Header row flag, number formatting, CSV import to table, simple formulas (SUM/AVG over range). Modules: `editor.tables.js` split into ops/ui.
+
+
+Implementation notes
+- Map each item to the planned module split (render, update, interaction, ui, persistence, export) to avoid cross-cutting changes.
+- Prefer feature flags and incremental rollouts to minimize regression risk.
+
