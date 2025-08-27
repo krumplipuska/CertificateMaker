@@ -125,8 +125,15 @@ function ensureElementNode(elModel) {
 function bindElementActions(){ /* no-op: using inline attributes approach */ }
 
 function applyElementStyles(node, m) {
-  node.style.left = m.x + 'px';
-  node.style.top = m.y + 'px';
+  // Coordinates are stored absolute on the page model.
+  // If the element has a parentId (inside a Block), render relative to parent.
+  let relX = m.x, relY = m.y;
+  if (m.parentId){
+    const parent = getElementById(m.parentId);
+    if (parent){ relX = (m.x - parent.x); relY = (m.y - parent.y); }
+  }
+  node.style.left = relX + 'px';
+  node.style.top = relY + 'px';
   if (m.type !== 'line') {
     // Enforce table's intrinsic min size so selection box can't shrink below content
     if (m.type === 'table'){
@@ -178,11 +185,16 @@ function applyElementStyles(node, m) {
     }
   } else {
     // line: use rotated div like before
-    const dx = (m.x2 ?? m.x) - m.x; const dy = (m.y2 ?? m.y) - m.y;
+    let x1 = m.x, y1 = m.y, x2 = (m.x2 ?? m.x), y2 = (m.y2 ?? m.y);
+    if (m.parentId){
+      const parent = getElementById(m.parentId);
+      if (parent){ x1 -= parent.x; y1 -= parent.y; x2 -= parent.x; y2 -= parent.y; }
+    }
+    const dx = x2 - x1; const dy = y2 - y1;
     const len = Math.hypot(dx, dy) || 1;
     const angleRad = Math.atan2(dy, dx);
-    node.style.left = m.x + 'px';
-    node.style.top = m.y + 'px';
+    node.style.left = x1 + 'px';
+    node.style.top = y1 + 'px';
     node.style.width = len + 'px';
     node.style.height = (m.styles.strokeWidth || 2) + 'px';
     node.style.background = m.styles.strokeColor || '#111827';
@@ -211,7 +223,14 @@ function renderPage(page) {
   // remove old elements except guides
   Array.from(container.querySelectorAll('.element')).forEach(n => n.remove());
   if (!page) return;
-  page.elements.forEach(elm => {
+  // Render parents (no parentId) first, then children inside their parents
+  const roots = page.elements.filter(e => !e.parentId);
+  const childrenByParent = new Map();
+  page.elements.filter(e => e.parentId).forEach(e => {
+    if (!childrenByParent.has(e.parentId)) childrenByParent.set(e.parentId, []);
+    childrenByParent.get(e.parentId).push(e);
+  });
+  const renderOne = (elm, parentNode) => {
     const node = ensureElementNode({ ...elm, pageId: page.id });
     applyElementStyles(node, elm);
     // Special rendering for image element
@@ -248,8 +267,13 @@ function renderPage(page) {
       renderTable(elm, node);
     }
     // Inline HTML event handlers (e.g., onclick) are set via attributes by render
-    container.appendChild(node);
-  });
+    (parentNode || container).appendChild(node);
+
+    // If this is a block, render its children inside
+    const kids = childrenByParent.get(elm.id) || [];
+    if (kids.length){ kids.forEach(k => renderOne(k, node)); }
+  };
+  roots.forEach(r => renderOne(r, null));
   updateSelectionBox();
 }
 
@@ -477,6 +501,16 @@ function placePendingAt(x, y, pageId = Model.document.currentPageId){
     // Tables should not have an outer border by default
     base.styles.strokeWidth = 0;
   }
+  // New stacked Block container
+  if (pendingAddType === 'block') {
+    base.type = 'block';
+    base.w = 420; base.h = 180;
+    base.styles.fill = '#ffffff';
+    base.styles.strokeWidth = 1;
+    base.styles.radius = 8;
+    base.stackChildren = true;
+    base.stackByPage = false;
+  }
   const page = Model.document.pages.find(p => p.id === pageId) || getCurrentPage();
   page.elements.push(base);
   Model.document.currentPageId = page.id;
@@ -498,20 +532,81 @@ function getCanvasPoint(evt, pageNode = getPageNode()){
   return { x: Math.max(0, Math.min(w, x)), y: Math.max(0, Math.min(h, y)) };
 }
 
-let drag = null; // {id, start:{x,y}, orig:{...}}
+let drag = null; // {id, start:{x,y}, orig:{...}, descendants?: Map}
+let dragMaybe = null; // tentative single-element drag starter
 let resize = null; // {id, start:{x,y}, orig:{...}, mode:'n|s|e|w|ne|nw|se|sw'}
 let snapState = { x: null, y: null }; // sticky snapping memory
 let dragSelection = null; // { startBounds, starts: Map }
 let resizeSelectionState = null; // { handle, startBounds, starts: Map }
 let rotateSelectionState = null; // { startBounds, center:{x,y}, startAngle, starts: Map(id->startRotate) }
 
+function getDescendantIds(rootId){
+  const page = getCurrentPage();
+  const out = [];
+  const queue = [rootId];
+  const seen = new Set([rootId]);
+  while (queue.length){
+    const cur = queue.shift();
+    page.elements.forEach(e => {
+      if (e.parentId === cur && !seen.has(e.id)){
+        out.push(e.id);
+        seen.add(e.id);
+        queue.push(e.id);
+      }
+    });
+  }
+  return out;
+}
+
+function isElementHidden(el){
+  try {
+    const a = el && el.attrs ? el.attrs : {};
+    if (a && (a.hidden === true || a.hidden === 'true')) return true;
+    const st = String(a && a.style ? a.style : '');
+    if (/display\s*:\s*none/i.test(st)) return true;
+  } catch {}
+  return false;
+}
+
+function reflowStacks(page){
+  if (!page) page = getCurrentPage();
+  // Reflow children inside blocks
+  const blocks = page.elements.filter(e => e.type === 'block');
+  blocks.forEach(b => {
+    if (!b.stackChildren) return;
+    const kids = page.elements.filter(e => e.parentId === b.id && e.type !== 'line' && !isElementHidden(e))
+      .sort((a,bm)=> (a.y - bm.y));
+    let y = 8;
+    kids.forEach(k => { k.y = b.y + y; y += (k.h||0) + 8; });
+  });
+  // Reflow blocks on page for those opted-in
+  const pageBlocksToStack = page.elements.filter(e => e.type === 'block' && e.stackByPage === true && !isElementHidden(e));
+  if (pageBlocksToStack.length){
+    const sorted = [...pageBlocksToStack].sort((a,b) => a.y - b.y);
+    let y = 16;
+    sorted.forEach(b => { b.y = y; y += (b.h||0) + 16; });
+  }
+}
+
+// expose for userFunctions
+window.reflowStacks = reflowStacks;
+
 function onMouseDown(e){
   // Ignore canvas interactions while a picker is active (element/style picker)
   if (window.__PICKING) { e.preventDefault(); return; }
   // Prevent moving/resizing when edit mode is off, but allow clicking/selection
   if (!Model.document.editMode) return;
+  // If currently editing text/content, do not initiate drags
+  const act = document.activeElement;
+  if (act && (act.isContentEditable || act.tagName === 'INPUT' || act.tagName === 'TEXTAREA')) return;
   const target = e.target.closest('.element');
-  if (target && target.isContentEditable) return; // don't start drag when editing text
+  // Avoid initiating drag on the first click of a double-click for text-like elements
+  if (target && e.detail >= 2 && (target.classList.contains('text') || target.classList.contains('field') || target.classList.contains('rect'))){
+    // Cancel any pending or active drag when entering edit mode via double-click
+    drag = null; dragMaybe = null; dragSelection = null; resize = null;
+    return; // let dblclick handler take over to enter edit mode
+  }
+  if (target && target.isContentEditable) { drag = null; dragMaybe = null; return; } // don't start drag when editing text
   const pt = getCanvasPoint(e);
   if (pendingAddType){ placePendingAt(pt.x, pt.y); return; }
   if (target){
@@ -546,9 +641,16 @@ function onMouseDown(e){
         const pointerOffset = { ox: pt.x - startBounds.x, oy: pt.y - startBounds.y };
         dragSelection = { startBounds, starts, pointerOffset };
       } else {
-        // snapshot before move starts for undo
-        commitHistory('move');
-        drag = { id, start: pt, orig: deepClone(model) };
+        // Defer starting a drag until the pointer actually moves beyond a threshold
+        // Capture possible descendants for blocks to move them together
+        let descendants = null;
+        if (model && model.type === 'block'){
+          const ids = getDescendantIds(model.id);
+          const map = new Map();
+          ids.forEach(cid => { const cm = getElementById(cid); if (cm) map.set(cid, deepClone(cm)); });
+          descendants = map;
+        }
+        dragMaybe = { id, start: pt, orig: deepClone(model), descendants };
       }
     }
     // hide actions while dragging
@@ -560,9 +662,22 @@ function onMouseDown(e){
 }
 
 function onMouseMove(e){
-  if (!drag && !resize && !dragSelection && !resizeSelectionState && !rotateSelectionState) return;
+  // If editing text/content and no gesture is active, ignore move events
+  const activeEl = document.activeElement;
+  const isEditing = !!(activeEl && (activeEl.isContentEditable || activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA'));
+  if (isEditing && !drag && !resize && !dragSelection && !resizeSelectionState && !rotateSelectionState && !dragMaybe) return;
+  if (!drag && !resize && !dragSelection && !resizeSelectionState && !rotateSelectionState && !dragMaybe) return;
   const pt = getCanvasPoint(e);
   const page = getCurrentPage();
+  // Promote tentative drag if moved far enough
+  if (!drag && dragMaybe){
+    const dx0 = Math.abs(pt.x - dragMaybe.start.x);
+    const dy0 = Math.abs(pt.y - dragMaybe.start.y);
+    if (dx0 >= 3 || dy0 >= 3){
+      commitHistory('move');
+      drag = dragMaybe; dragMaybe = null;
+    }
+  }
   if (rotateSelectionState){
     const sb = rotateSelectionState.startBounds;
     const cx = sb.x + sb.w/2; const cy = sb.y + sb.h/2;
@@ -693,6 +808,24 @@ function onMouseMove(e){
       m.x += snapDx; m.y += snapDy; m.x2 += snapDx; m.y2 += snapDy;
     } else { m.x += snapDx; m.y += snapDy; }
     showGuidesForBounds(snapped, getPageNode());
+    // If dragging a block, translate its descendants by the block's total displacement (including snapping)
+    if (active.descendants && active.orig && active.orig.type === 'block'){
+      const totalDx = (m.x - active.orig.x);
+      const totalDy = (m.y - active.orig.y);
+      active.descendants.forEach((startChild, childId) => {
+        const childIdx = page.elements.findIndex(el => el.id === childId);
+        if (childIdx === -1) return;
+        const ch = deepClone(startChild);
+        if (ch.type === 'line' && typeof ch.x2 === 'number'){
+          ch.x += totalDx; ch.y += totalDy; ch.x2 += totalDx; ch.y2 += totalDy;
+        } else {
+          ch.x += totalDx; ch.y += totalDy;
+        }
+        page.elements[childIdx] = ch;
+        const nodeCh = document.querySelector(`.page [data-id="${childId}"]`);
+        if (nodeCh) applyElementStyles(nodeCh, ch);
+      });
+    }
   }
   page.elements[idx] = m;
   applyElementStyles(document.querySelector(`.page [data-id="${active.id}"]`), m);
@@ -700,6 +833,8 @@ function onMouseMove(e){
 }
 
 function onMouseUp(){
+  // Detect whether a gesture actually occurred (move/resize/rotate)
+  const hadGesture = !!drag || !!resize || !!dragSelection || !!resizeSelectionState || !!rotateSelectionState;
   // History was already captured at gesture start
   if (drag){ drag = null; }
   if (resize){ resize = null; }
@@ -710,6 +845,52 @@ function onMouseUp(){
   positionElementActions();
   snapState = { x: null, y: null };
   updateSelectionBox();
+
+  if (!hadGesture) return; // don't re-render/reflow on mere clicks or dblclicks
+  if (window.__SUPPRESS_REFLOW__ > 0) { renderPage(getCurrentPage()); return; }
+
+  // After any move/resize, re-evaluate parenting for selected element(s)
+  // If an element is inside a Block bounds, set parentId; else clear it.
+  const page = getCurrentPage();
+  const blocks = page.elements.filter(e => e.type === 'block');
+  const ids = selectedIds.size ? [...selectedIds] : [];
+  function isDescendant(childId, ancestorId){
+    let cur = getElementById(childId);
+    let guard = 0;
+    while (cur && cur.parentId && guard++ < 1000){
+      if (cur.parentId === ancestorId) return true;
+      cur = getElementById(cur.parentId);
+    }
+    return false;
+  }
+  ids.forEach(id => {
+    const m = getElementById(id); if (!m) return;
+    // compute center point
+    const cx = m.x + (m.w||0)/2; const cy = m.y + (m.h||0)/2;
+    // Exclude self and its descendants as potential parents
+    const candidates = blocks.filter(b => b.id !== m.id && !isDescendant(b.id, m.id));
+    const containing = candidates.filter(b => cx >= b.x && cx <= b.x + (b.w||0) && cy >= b.y && cy <= b.y + (b.h||0));
+    // choose the smallest containing block (deepest)
+    const within = containing.sort((a,b) => (a.w*a.h) - (b.w*b.h))[0];
+    const newParent = within ? within.id : null;
+    if (m.parentId !== newParent){
+      // Prevent cycles: do not set parent to one of its descendants
+      let cyc = false;
+      if (newParent){
+        let cur = newParent;
+        while (cur){
+          if (cur === m.id) { cyc = true; break; }
+          const p = getElementById(cur);
+          cur = p && p.parentId ? p.parentId : null;
+        }
+      }
+      if (!cyc){ m.parentId = newParent || undefined; }
+    }
+  });
+
+  // Reflow after move/resize; respects visibility and flags
+  reflowStacks(page);
+  renderPage(page);
 }
 
 /* ----------------------- Resize helpers ----------------------- */
@@ -1352,7 +1533,7 @@ function parsePropertyValue(raw){
 }
 
 // Keys that are part of the element model and should not be treated as HTML attributes
-const RESERVED_MODEL_KEYS = new Set(['id','type','groupId','x','y','w','h','z','x2','y2','content','src','styles','grid','rows','cols','rowHeights','colWidths']);
+const RESERVED_MODEL_KEYS = new Set(['id','type','groupId','parentId','stackChildren','stackByPage','x','y','w','h','z','x2','y2','content','src','styles','grid','rows','cols','rowHeights','colWidths']);
 
 function getCustomAttributesFromModel(model){
   const attrs = Object.assign({}, model && model.attrs ? model.attrs : {});
@@ -1423,17 +1604,15 @@ function renderProperties(){
   });
 
   // When a table cell is selected, also expose its per-cell attrs.* for editing
-  if (m && m.type === 'table' && cellId) {
-    const parts = String(cellId).split('_');
-    const rc = parts[parts.length - 1];
-    const [rr, cc] = rc.split('x').map(n => parseInt(n, 10));
-    if (Number.isInteger(rr) && Number.isInteger(cc)){
-      const cell = m.cells && m.grid && m.grid[rr] ? m.cells[m.grid[rr][cc]] : null;
-      if (cell && cell.attrs){
-        Object.keys(cell.attrs).forEach((name) => {
-          rows.push([`cell.${name}`, cell.attrs[name]]);
-        });
-      }
+  if (m && m.type === 'table' && tableSel) {
+    const rr = Math.min(tableSel.r0, tableSel.r1);
+    const cc = Math.min(tableSel.c0, tableSel.c1);
+    const cid = m.grid?.[rr]?.[cc];
+    const cell = cid ? m.cells?.[cid] : null;
+    if (cell && cell.attrs){
+      Object.keys(cell.attrs).forEach((name) => {
+        rows.push([`cell.${name}`, cell.attrs[name]]);
+      });
     }
   }
 
@@ -1470,6 +1649,19 @@ function renderProperties(){
     row.appendChild(control);
     box.appendChild(row);
   });
+
+  // Block-specific: stacking toggle
+  if (m && m.type === 'block'){
+    const row = document.createElement('div'); row.className = 'row';
+    const lab = document.createElement('label'); lab.textContent = 'stackChildren';
+    const ctl = document.createElement('input'); ctl.type='checkbox'; ctl.dataset.prop = 'stackChildren'; ctl.checked = !!m.stackChildren;
+    row.appendChild(lab); row.appendChild(ctl); box.appendChild(row);
+
+    const row2 = document.createElement('div'); row2.className = 'row';
+    const lab2 = document.createElement('label'); lab2.textContent = 'stackByPage';
+    const ctl2 = document.createElement('input'); ctl2.type='checkbox'; ctl2.dataset.prop = 'stackByPage'; ctl2.checked = !!m.stackByPage;
+    row2.appendChild(lab2); row2.appendChild(ctl2); box.appendChild(row2);
+  }
 
   // Actions UI (bubble layout): choose function, trigger, and inputs; stack multiple
   try {
@@ -2500,6 +2692,11 @@ async function bootstrap(){
 
     // Only block editing when it's a text or rect element AND edit mode is off
     if ((elNode.classList.contains('text') || elNode.classList.contains('rect')) && !Model.document.editMode) return;
+
+    // Prevent selection/move logic from running on this click and cancel any drags
+    drag = null; dragMaybe = null; dragSelection = null; resize = null; rotateSelectionState = null; resizeSelectionState = null;
+    e.stopPropagation();
+    e.preventDefault();
 
     const id = elNode.dataset.id;
     setSelection([id]);

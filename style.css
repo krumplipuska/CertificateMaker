@@ -218,6 +218,15 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 .rect { border:1px solid var(--border); background:var(--brand-light); border-radius:6px; min-width:10px; min-height:10px; padding:6px 8px; line-height:1.4; overflow:hidden; white-space:pre-wrap; word-break:break-word; }
 .line { height:2px; width:40px; background:#111827; transform-origin:0 0; }
 
+/* Block container (stacked column) */
+.element.block {
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:8px;
+}
+.element.block > .element { position:absolute; }
+
 /* Handles */
 .handle { position:absolute; width:10px; height:10px; background:#fff; border:2px solid #10b981; border-radius:50%; box-shadow:0 1px 2px rgba(0,0,0,.1); pointer-events:all; }
 .handle.corner { margin:-6px 0 0 -6px; }

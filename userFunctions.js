@@ -28,6 +28,7 @@ function getUserFunctionChoices(){
         };
         ensure({ name:'simpleConsoleLogFunction', label:'Console log', inputs:1, placeholders:["message to log"], triggers:['click','change','input','dblclick','focus','blur'] });
         ensure({ name:'coloringFunction', label:'coloringFunction', inputs:2, placeholders:["selected element (css selector)", "style string e.g. background:#ff0000; color:#fff;"], triggers:['click','change','input','dblclick','focus','blur'] });
+        ensure({ name:'toggleVisibility', label:'Toggle visibility', inputs:1, placeholders:["target element (css selector)"], triggers:['click','change','input','dblclick','focus','blur'] });
         ensure({
             name:'conditionalFormatByOffset',
             label:'Conditional Format (offsets)',
@@ -216,6 +217,51 @@ function parseStyleString(styleString){
 
 //your function in here!!
 
+
+function toggleVisibility(targetSelector){
+    try {
+        const norm = (v) => String(v == null ? '' : v).trim().replace(/^['"]|['"]$/g, '');
+        const sel = norm(targetSelector);
+        const page = (typeof getCurrentPage === 'function') ? getCurrentPage() : null;
+        if (!page || typeof updateElement !== 'function') return;
+        const flipFromModel = (m) => {
+            const attrs = Object.assign({}, m?.attrs || {});
+            const styleStr = String(attrs.style || '');
+            const hasNone = /display\s*:\s*none/i.test(styleStr);
+            const cleaned = styleStr.replace(/display\s*:\s*none\s*;?/ig, '').trim();
+            const nextStyle = hasNone ? cleaned : (cleaned ? cleaned + '; display:none' : 'display:none');
+            return { attrs: { ...attrs, style: nextStyle } };
+        };
+        const ids = [];
+        if (sel){
+            try {
+                const nodes = Array.from(document.querySelectorAll(sel));
+                nodes.forEach(n => { const id = n && n.getAttribute('data-id'); if (id) ids.push(id); });
+            } catch {}
+            if (ids.length === 0 && sel.startsWith('#')){
+                const node = document.querySelector(`.page [data-id="${sel.slice(1)}"]`);
+                const id = node && node.getAttribute('data-id'); if (id) ids.push(id);
+            }
+        } else if (this && this.nodeType === 1) {
+            const id = this.getAttribute('data-id'); if (id) ids.push(id);
+        } else {
+            Array.from(document.querySelectorAll('.page .element.selected')).forEach(n => { const id = n.getAttribute('data-id'); if (id) ids.push(id); });
+        }
+        if (ids.length === 0) { console.warn('toggleVisibility: no targets'); return; }
+        ids.forEach(id => {
+            const m = (typeof getElementById === 'function') ? getElementById(id) : null;
+            if (!m) return;
+            const patch = flipFromModel(m);
+            updateElement(id, patch);
+        });
+        if (typeof window.reflowStacks === 'function') {
+            try { window.reflowStacks(page); } catch {}
+        }
+    } catch(err){ console.warn('toggleVisibility failed', err); }
+}
+
+// Ensure global for inline onclick
+try { window.toggleVisibility = toggleVisibility; } catch {}
 
 
 function simpleConsoleLogFunction(message){

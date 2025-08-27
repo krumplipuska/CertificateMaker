@@ -43,6 +43,7 @@ function tableAddRow(t, at) {
   const cells = clone(t.cells);
   const newGrid = [];
   const newlyCreated = new Set();
+  const expandedAnchors = new Set();
   const cols = t.cols;
 
   // Build grid with the inserted row
@@ -50,21 +51,38 @@ function tableAddRow(t, at) {
     if (r === at) {
       const newRow = [];
       for (let c = 0; c < cols; c++) {
-        const cid = generateCellId(t.id, at, c);
-        // Determine source row for style cloning: prefer row above, otherwise the first row
-        const srcR = at > 0 ? at - 1 : 0;
-        const srcId = t.grid[srcR]?.[c];
-        const srcCell = srcId ? t.cells[srcId] : null;
-        const defaultStyles = { alignH:'left', alignV:'top', padding:8, bg:null, borders:{ top:true, right:true, bottom:true, left:true } };
-        const clonedStyles = srcCell && srcCell.styles ? clone(srcCell.styles) : defaultStyles;
-        const clonedAttrs = srcCell && srcCell.attrs ? clone(srcCell.attrs) : {};
-        cells[cid] = {
-          id: cid, row: at, col: c,
-          rowSpan: 1, colSpan: 1, hidden: false,
-          content: "", styles: clonedStyles, attrs: clonedAttrs
-        };
-        newRow[c] = cid;
-        newlyCreated.add(cid);
+        // If inserting inside a vertical span, map to the anchor and grow its rowSpan once
+        let expandId = null;
+        if (at > 0) {
+          const upId = t.grid[at - 1][c];
+          const upCell = upId ? t.cells[upId] : null;
+          if (upCell && upCell.row < at && at <= (upCell.row + (upCell.rowSpan || 1) - 1)) {
+            expandId = upId;
+          }
+        }
+        if (expandId) {
+          newRow[c] = expandId;
+          if (!expandedAnchors.has(expandId)) {
+            cells[expandId].rowSpan = (cells[expandId].rowSpan || 1) + 1;
+            expandedAnchors.add(expandId);
+          }
+        } else {
+          const cid = generateId('cell');
+          // Determine source row for style cloning: prefer row above, otherwise the first row
+          const srcR = at > 0 ? at - 1 : 0;
+          const srcId = t.grid[srcR]?.[c];
+          const srcCell = srcId ? t.cells[srcId] : null;
+          const defaultStyles = { alignH:'left', alignV:'top', padding:8, bg:null, borders:{ top:true, right:true, bottom:true, left:true } };
+          const clonedStyles = srcCell && srcCell.styles ? clone(srcCell.styles) : defaultStyles;
+          const clonedAttrs = srcCell && srcCell.attrs ? clone(srcCell.attrs) : {};
+          cells[cid] = {
+            id: cid, row: at, col: c,
+            rowSpan: 1, colSpan: 1, hidden: false,
+            content: "", styles: clonedStyles, attrs: clonedAttrs
+          };
+          newRow[c] = cid;
+          newlyCreated.add(cid);
+        }
       }
       newGrid[r] = newRow;
     } else {
@@ -94,26 +112,44 @@ function tableAddColumn(t, at) {
   const cells = clone(t.cells);
   const newGrid = [];
   const newlyCreated = new Set();
+  const expandedAnchors = new Set();
 
   for (let r = 0; r < t.rows; r++) {
     const row = [];
     for (let c = 0; c <= t.cols; c++) {
       if (c === at) {
-        const cid = generateCellId(t.id, r, at);
-        // Determine source column for style cloning: prefer column to the left, otherwise the first column
-        const srcC = at > 0 ? at - 1 : 0;
-        const srcId = t.grid[r]?.[srcC];
-        const srcCell = srcId ? t.cells[srcId] : null;
-        const defaultStyles = { alignH:'left', alignV:'top', padding:8, bg:null, borders:{ top:true, right:true, bottom:true, left:true } };
-        const clonedStyles = srcCell && srcCell.styles ? clone(srcCell.styles) : defaultStyles;
-        const clonedAttrs = srcCell && srcCell.attrs ? clone(srcCell.attrs) : {};
-        cells[cid] = {
-          id: cid, row: r, col: at,
-          rowSpan: 1, colSpan: 1, hidden: false,
-          content: "", styles: clonedStyles, attrs: clonedAttrs
-        };
-        row[c] = cid;
-        newlyCreated.add(cid);
+        // If inserting inside a horizontal span, map to the anchor and grow its colSpan once
+        let expandId = null;
+        if (at > 0) {
+          const leftId = t.grid[r][at - 1];
+          const leftCell = leftId ? t.cells[leftId] : null;
+          if (leftCell && leftCell.col < at && at <= (leftCell.col + (leftCell.colSpan || 1) - 1)) {
+            expandId = leftId;
+          }
+        }
+        if (expandId) {
+          row[c] = expandId;
+          if (!expandedAnchors.has(expandId)) {
+            cells[expandId].colSpan = (cells[expandId].colSpan || 1) + 1;
+            expandedAnchors.add(expandId);
+          }
+        } else {
+          const cid = generateId('cell');
+          // Determine source column for style cloning: prefer column to the left, otherwise the first column
+          const srcC = at > 0 ? at - 1 : 0;
+          const srcId = t.grid[r]?.[srcC];
+          const srcCell = srcId ? t.cells[srcId] : null;
+          const defaultStyles = { alignH:'left', alignV:'top', padding:8, bg:null, borders:{ top:true, right:true, bottom:true, left:true } };
+          const clonedStyles = srcCell && srcCell.styles ? clone(srcCell.styles) : defaultStyles;
+          const clonedAttrs = srcCell && srcCell.attrs ? clone(srcCell.attrs) : {};
+          cells[cid] = {
+            id: cid, row: r, col: at,
+            rowSpan: 1, colSpan: 1, hidden: false,
+            content: "", styles: clonedStyles, attrs: clonedAttrs
+          };
+          row[c] = cid;
+          newlyCreated.add(cid);
+        }
       } else {
         const srcC = c > at ? c - 1 : c;
         row[c] = t.grid[r][srcC];
@@ -132,20 +168,70 @@ function tableAddColumn(t, at) {
 }
 function tableDeleteRow(t, at) {
   if (t.rows <= 1) return t; t = clone(t);
-  const cells = clone(t.cells); t.grid[at].forEach(id => { delete cells[id]; });
-  const grid = t.grid.slice(); grid.splice(at,1); const rowHeights = t.rowHeights.slice(); rowHeights.splice(at,1);
-  Object.values(cells).forEach(cell => { if (cell.row > at) cell.row -= 1; });
-  return { ...t, rows:t.rows-1, grid, rowHeights, cells };
+  const cells = clone(t.cells);
+  const rowHeights = t.rowHeights.slice(); rowHeights.splice(at,1);
+
+  // Adjust spans for merged cells that intersect the deleted row
+  const toDelete = new Set();
+  Object.values(cells).forEach(cell => {
+    if (!cell) return;
+    const top = cell.row; const bottom = cell.row + (cell.rowSpan || 1) - 1;
+    if (at >= top && at <= bottom) {
+      if ((cell.rowSpan || 1) > 1) {
+        // Deleting inside this vertical span reduces its height by 1
+        cell.rowSpan = (cell.rowSpan || 1) - 1;
+        // If the anchor starts at the deleted row, keep anchor at same index after splice
+      } else {
+        // Single-height cell fully removed by this row delete
+        toDelete.add(cell.id);
+      }
+    }
+    // Shift anchors below the deleted row
+    if (cell.row > at) cell.row -= 1;
+  });
+
+  // Remove the row from the grid
+  const grid = t.grid.slice();
+  grid.splice(at, 1);
+
+  // Drop cells that have been fully removed
+  toDelete.forEach(id => { delete cells[id]; });
+
+  return { ...t, rows: t.rows - 1, grid, rowHeights, cells };
 }
 function tableDeleteColumn(t, at) {
   if (t.cols <= 1) return t; t = clone(t);
-  const cells = clone(t.cells); for (let r=0;r<t.rows;r++) delete cells[t.grid[r][at]];
-  const grid = t.grid.map(r => { const x = r.slice(); x.splice(at,1); return x; });
+  const cells = clone(t.cells);
   const colWidths = t.colWidths.slice(); colWidths.splice(at,1);
-  Object.values(cells).forEach(cell => { if (cell.col > at) cell.col -= 1; });
-  return { ...t, cols:t.cols-1, grid, colWidths, cells };
+
+  // Adjust spans for merged cells that intersect the deleted column
+  const toDelete = new Set();
+  Object.values(cells).forEach(cell => {
+    if (!cell) return;
+    const left = cell.col; const right = cell.col + (cell.colSpan || 1) - 1;
+    if (at >= left && at <= right) {
+      if ((cell.colSpan || 1) > 1) {
+        // Deleting inside this horizontal span reduces its width by 1
+        cell.colSpan = (cell.colSpan || 1) - 1;
+        // If the anchor starts at the deleted column, keep anchor at same index after splice
+      } else {
+        // Single-width cell fully removed by this column delete
+        toDelete.add(cell.id);
+      }
+    }
+    // Shift anchors to the right of the deleted column
+    if (cell.col > at) cell.col -= 1;
+  });
+
+  // Remove the column from the grid
+  const grid = t.grid.map(r => { const x = r.slice(); x.splice(at, 1); return x; });
+
+  // Drop cells that have been fully removed
+  toDelete.forEach(id => { delete cells[id]; });
+
+  return { ...t, cols: t.cols - 1, grid, colWidths, cells };
 }
-function tableSplitAnchor(t, r, c){ const id = t.grid[r][c]; const cell = t.cells[id]; if (!cell) return t; if (cell.rowSpan===1 && cell.colSpan===1) return t; const {row, col, rowSpan, colSpan} = cell; for (let rr=row; rr<row+rowSpan; rr++){ for (let cc=col; cc<col+colSpan; cc++){ const cid = (rr===row && cc===col) ? id : generateCellId(t.id, rr, cc); if (!t.cells[cid]) t.cells[cid] = { id:cid, row:rr, col:cc, rowSpan:1, colSpan:1, hidden:false, content:"", styles:clone(cell.styles), attrs: clone(cell.attrs||{}) }; t.grid[rr][cc] = cid; t.cells[cid].hidden = false; t.cells[cid].rowSpan = 1; t.cells[cid].colSpan = 1; } } cell.rowSpan = 1; cell.colSpan = 1; return t; }
+function tableSplitAnchor(t, r, c){ const id = t.grid[r][c]; const cell = t.cells[id]; if (!cell) return t; if (cell.rowSpan===1 && cell.colSpan===1) return t; const {row, col, rowSpan, colSpan} = cell; for (let rr=row; rr<row+rowSpan; rr++){ for (let cc=col; cc<col+colSpan; cc++){ const cid = (rr===row && cc===col) ? id : generateId('cell'); if (!t.cells[cid]) t.cells[cid] = { id:cid, row:rr, col:cc, rowSpan:1, colSpan:1, hidden:false, content:"", styles:clone(cell.styles), attrs: clone(cell.attrs||{}) }; t.grid[rr][cc] = cid; t.cells[cid].hidden = false; t.cells[cid].rowSpan = 1; t.cells[cid].colSpan = 1; } } cell.rowSpan = 1; cell.colSpan = 1; return t; }
 function tableNormalizeRange(t, r0,c0,r1,c1){ t = clone(t); const {r0:rr0,c0:cc0,r1:rr1,c1:cc1} = normalizeRange(r0,c0,r1,c1); const seen = new Set(); for (let r=rr0;r<=rr1;r++){ for (let c=cc0;c<=cc1;c++){ const id = t.grid[r][c]; if (!seen.has(id)){ seen.add(id); const a = t.cells[id]; if (a.rowSpan>1 || a.colSpan>1) t = tableSplitAnchor(t, a.row, a.col); } } } return t; }
 function tableMergeRange(t, r0,c0,r1,c1) { t = tableNormalizeRange(t, r0,c0,r1,c1); const { r0:rr0,c0:cc0,r1:rr1,c1:cc1 } = normalizeRange(r0,c0,r1,c1); const anchorId = t.grid[rr0][cc0]; const cell = t.cells[anchorId]; cell.row = rr0; cell.col = cc0; cell.rowSpan = rr1-rr0+1; cell.colSpan = cc1-cc0+1; for (let r=rr0;r<=rr1;r++){ for (let c=cc0;c<=cc1;c++){ const id = t.grid[r][c]; if (id !== anchorId){ t.cells[id].hidden = true; t.grid[r][c] = anchorId; } } } return t; }
 function tableUnmerge(t, r, c) { t = clone(t); const anchorId = t.grid[r][c]; const cell = t.cells[anchorId]; if (!cell || (cell.rowSpan===1 && cell.colSpan===1)) return t; return tableSplitAnchor(t, cell.row, cell.col); }
@@ -165,7 +251,7 @@ function renderTable(elModel, host) {
       const id = elModel.grid[r][c]; const cell = elModel.cells[id];
       // Render only anchor positions of cells (skip duplicates mapped to the anchor id)
       if (!cell || cell.hidden || cell.row !== r || cell.col !== c) continue;
-      const div = document.createElement('div'); div.className = 'table-cell'; div.dataset.tableId = elModel.id; div.dataset.r = r; div.dataset.c = c; div.dataset.id = `${elModel.id}_${r}x${c}`;
+      const div = document.createElement('div'); div.className = 'table-cell'; div.dataset.tableId = elModel.id; div.dataset.r = r; div.dataset.c = c; div.dataset.id = id;
       div.setAttribute('role', 'gridcell');
       div.setAttribute('aria-rowindex', String(r+1));
       div.setAttribute('aria-colindex', String(c+1));
@@ -173,7 +259,10 @@ function renderTable(elModel, host) {
       // Roving tabindex: active cell focusable, others -1
       const isActive = tableSel ? (tableSel.tableId===elModel.id && r===Math.min(tableSel.r0, tableSel.r1) && c===Math.min(tableSel.c0, tableSel.c1)) : (r===0 && c===0);
       div.tabIndex = isActive ? 0 : -1;
-      div.style.gridColumn = `span ${cell.colSpan}`; div.style.gridRow = `span ${cell.rowSpan}`;
+      div.style.gridColumnStart = (c + 1);
+      div.style.gridRowStart = (r + 1);
+      div.style.gridColumnEnd = `span ${cell.colSpan}`;
+      div.style.gridRowEnd = `span ${cell.rowSpan}`;
       // Apply per-cell attributes (including inline event handlers like onclick)
       try {
         const attrs = cell.attrs || {};
@@ -764,7 +853,21 @@ function onTableGridKeydown(e, tableId){
   }
 }
 function cmdTableAddRow(after=true){ withActiveTable((id, t)=>{ const at = tableSel ? (after ? tableSel.r1+1 : tableSel.r0) : t.rows; updateElement(id, tableAddRow(t, at)); renderPage(getCurrentPage()); highlightTableSelection(); }); }
-function cmdTableAddColumn(after=true){ withActiveTable((id, t)=>{ const at = tableSel ? (after ? tableSel.c1+1 : tableSel.c0) : t.cols; updateElement(id, tableAddColumn(t, at)); renderPage(getCurrentPage()); highlightTableSelection(); }); }
+function cmdTableAddColumn(after=true){
+  withActiveTable((id, t)=>{
+    const at = tableSel ? (after ? tableSel.c1+1 : tableSel.c0) : t.cols;
+    // Add column without triggering block/page reflow side-effects
+    if (typeof window.__SUPPRESS_REFLOW__ === 'number') window.__SUPPRESS_REFLOW__++;
+    else window.__SUPPRESS_REFLOW__ = 1;
+    try {
+      updateElement(id, tableAddColumn(t, at));
+      renderPage(getCurrentPage());
+    } finally {
+      window.__SUPPRESS_REFLOW__ = Math.max(0, (window.__SUPPRESS_REFLOW__||0) - 1);
+    }
+    highlightTableSelection();
+  });
+}
 function cmdTableDeleteRow(){ withActiveTable((id, t)=>{ const at = tableSel ? tableSel.r0 : t.rows-1; updateElement(id, tableDeleteRow(t, at)); renderPage(getCurrentPage()); clearTableSelection(); }); }
 function cmdTableDeleteColumn(){ withActiveTable((id, t)=>{ const at = tableSel ? tableSel.c0 : t.cols-1; updateElement(id, tableDeleteColumn(t, at)); renderPage(getCurrentPage()); clearTableSelection(); }); }
 function cmdTableMerge(){ if (!tableSel) return; const {tableId,r0,c0,r1,c1} = tableSel; const t = getElementById(tableId); updateElement(tableId, tableMergeRange(t, r0,c0,r1,c1)); renderPage(getCurrentPage()); setTableSelection(tableId, r0,c0,r1,c1); }
