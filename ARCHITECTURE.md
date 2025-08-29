@@ -1,3 +1,213 @@
+## CertificateMaker Architecture
+
+This document describes the current, refactored architecture of CertificateMaker: the runtime model, pure update layer, rendering, controllers, table module, services, and conventions. It is meant to be an accurate, implementation-level map of how the editor works today.
+
+### High-level
+- **Single model source of truth**: The in-memory `Model.document` (in `editor.core.js`) represents the entire document (pages, elements, selection-related flags).
+- **Pure update layer**: All model writes go through small, pure helpers (`core.update.js`) that return new document snapshots. UI code wraps those calls with history, re-render, and selection preservation.
+- **Idempotent rendering**: Rendering functions (`app.view.render.js`) update the DOM from the model and never mutate the model.
+- **Controllers and gestures**: `editor.app.js` wires interactions/gestures and calls the pure update layer. A `Controller` state object contains ephemeral controller-only data (snapping, transient reflow suppression).
+- **Tables contained**: Table data model, pure ops, rendering, selection, clipboard, and actions live in `editor.tables.js` (with an exported ops surface via `tables.ops.js`).
+- **Services**: Persistence (`persistence.service.js`) and export (`export.service.js`) are accessed behind small facades.
+- **Types & schema**: Lightweight JSDoc typedefs and schema-versioned serialization are used to keep the document contract explicit and migratable.
+
+
+## Modules and responsibilities
+
+### `editor.core.js` (core model)
+- **Model**: 
+  - `Model.document`: `{ pages: Page[], currentPageId: string, nextElementId: number, editMode: boolean }`
+  - `SCHEMA_VERSION = 1`, `APP_VERSION` (string)
+- **History**: `commitHistory`, `undo`, `redo`, `HISTORY_LIMIT`, and button state updates
+- **IDs**: `generateId`, `isElementIdInUse`
+- **Clone/merge**: `deepClone`, `deepMerge`
+- **Zoom**: `getZoom`, `setZoomScale`, `setZoomPercent`, and zoom-at-point helpers
+- **Page management**: create/remove/duplicate/move current page
+- **DOM refs**: tiny helpers for key UI elements (toolbar, lists, overlays)
+
+Intended behavior:
+- Model is the single source of truth; rendering reflects the model.
+- One history entry per user-visible operation.
+- Zoom sets CSS `--zoom` and keeps overlays aligned.
+
+### `core.update.js` (pure updates)
+Pure, side-effect-free helpers that operate on a `DocumentModel` and return a new one:
+- `applyPatchToElements(document, elementIds, patch)`
+- `applyPatchToTableCells(document, tableId, range, stylePatch)`
+- `applyPatchBySelector(document, selector, patch)`
+
+These functions do not access the DOM, history, or selection. UI wraps them with history commits, re-render, and selection preservation.
+
+### `app.view.render.js` (view-only rendering)
+Idempotent DOM-updaters:
+- `getPageNode(id?)`
+- `ensureElementNode(elModel)`
+- `applyElementStyles(node, model)`
+- `renderPage(page)`
+
+Rules:
+- Never mutate the model here; only update DOM from model.
+- Delegate table rendering to `renderTable` from `editor.tables.js`.
+
+### `editor.app.js` (composition/controllers)
+Coordinates rendering, updates, interactions, toolbar sync, properties, export, persistence, and bootstrap.
+
+- **Controller state**: `Controller = { snapState: {x,y}, suppressReflow: number }` replaces magic globals (`snapState`, `__SUPPRESS_REFLOW__`).
+- **Rendering**: `renderAll()` rebuilds pages list and clears selection; per-page rendering is delegated to `renderPage`.
+- **Updates**: `updateElement(idOrSelectorOrNull, patch)` is the UI entry point that:
+  - Resolves CSS selectors and table cell tokens when needed
+  - Calls pure helpers in `core.update.js`
+  - Commits history once (`update-element`/`update-multi`)
+  - Re-renders and preserves element/table selections
+- **Gestures**: Mouse down/move/up for move/resize/rotate/lasso; snapping uses `Controller.snapState`. A single history entry per gesture; DOM may be updated live during drag and normalized on mouseup.
+- **Toolbar & properties**: Floating toolbar and properties panel sync from selection; align buttons toggle per element types and table cell context.
+- **Bootstrap**: Delegates loading to `Persistence.tryAutoLoad()`, renders, binds global/window events (centralized), initializes panels and color picker.
+
+### `editor.selection.js` (element selection)
+Element-level selection and overlays:
+- **State/UI**: `selectedIds` set, `clearSelection`, `setSelection`, `addToSelection`, `toggleSelection`, `isSelected`
+- **Overlay**: `updateSelectionUI`, `updateFormatToolbarVisibility`, `positionElementActions`, `updateSelectionBox`, `alignOverlays`
+- **Interplay with tables**: When a table cell range is active, element selection is suppressed/cleared where appropriate; toolbar reflects anchor cell styles.
+
+### `editor.tables.js` (tables)
+All table behavior stays contained:
+- **Data model**: `rows, cols, rowHeights, colWidths, grid, cells, border`
+- **Pure ops**: add/delete rows/cols, merge/unmerge, normalize ranges, distribute/resize bands, per-cell style appliers, clipboard helpers
+- **Rendering**: `renderTable(elModel, host)` with a11y roles and roving focus
+- **Selection**: `tableSel`, `setTableSelection`, `clearTableSelection`, `highlightTableSelection`, `onTableGridKeydown`
+- **Clipboard**: Global copy/paste (TSV/CSV/semicolon) grows and unmerges target area on paste
+- **Controller coupling**: Uses `Controller.suppressReflow` during column/row add operations that would otherwise trigger block reflow during in-progress gestures
+
+### `tables.ops.js` (ops surface)
+Re-exports the pure table operations as a single `TableOps` surface for callers outside the tables module.
+
+### `persistence.service.js` (persistence facade)
+Small façade that wraps OPFS, localStorage, and File System Access API:
+- `tryAutoLoad()` — precedence: embedded `<pre#__doc__>` → OPFS autosave → localStorage
+- `saveDocument()` — tries OPFS → localStorage → FS Access handle → download fallback
+- `saveDocumentAs()` — FS Access picker or download fallback
+
+UI code calls the façade; it stays agnostic about the storage mechanism.
+
+### `export.service.js` (export facade)
+Single entry point for export with preflight:
+- `exportDocumentToPdf({ filename, dpi, orientation })`
+- Ensures web fonts are loaded and normalizes zoom; captures pages via `html2canvas`, assembles multipage PDFs using `jsPDF`.
+
+### `selection.store.js` (selection scaffold)
+Minimal store API intended to centralize selection state and eventing in the future. Current element selection remains in `editor.selection.js`; migration can be incremental.
+
+### `style.map.js` (style normalization)
+Centralized element/table style keys and conversions, e.g. mapping `styles.fill` to table per-cell `bg`, and collecting per-cell style keys.
+
+### `userFunctions.js` (extensibility)
+User-defined helpers that can be bound to DOM events via attributes on elements or table cells. Contains simple examples and style helpers.
+
+### `index.html` (composition)
+Loads scripts in an order that honors the above boundaries: core → pure updates → selection store → style map → selection, tables, table ops → persistence/export services → view renderers → app.
+
+
+## Data model (contract)
+
+### Document
+```
+Model.document = {
+  pages: Page[],
+  currentPageId: string,
+  nextElementId: number,
+  editMode: boolean
+}
+```
+
+### Page
+```
+Page = {
+  id: string,
+  name: string,
+  elements: Element[]
+}
+```
+
+### Element (base + per-type additions)
+- Base keys: `id, type, x, y, w, h, z, styles, content?, src?, x2?, y2?, parentId?, groupId?, attrs?`
+- `styles` (common): `fill, strokeColor, strokeWidth, radius, textColor, fontFamily, fontSize, bold, italic, underline, textAlignH, textAlignV, rotate`
+- `line`: uses `x,y,x2,y2` and `styles.stroke*`
+- `image`: uses `src`
+- `block`: `stackChildren: boolean`, `stackByPage: boolean`
+- `table`: see Tables section (rows/cols/grid/cells, border)
+
+Constraints:
+- Element ids must be unique across the document.
+- Table min `w/h` should not be smaller than the sum of column widths/row heights.
+- When `editMode` is false, selection UI is hidden and text/rect editing is disabled (fields remain editable-only).
+
+### Serialization format
+```
+{
+  schema: 1,
+  app: "v1.x.x",
+  document: Model.document
+}
+```
+- `deserializeDocument` normalizes and migrates the `document` payload by `schema` when necessary.
+
+
+## Core flows
+
+### Initialization (bootstrap)
+1. `Persistence.tryAutoLoad()` attempts: embedded `#__doc__` → OPFS autosave → localStorage autosave
+2. If none found, create an initial document with one page and set it as current
+3. `renderAll()`; bind UI (panels, toolbar, clipboard), global listeners, and initialize zoom
+
+### Render and update
+- `renderAll()` builds page wrappers and calls `renderPage` for each
+- `renderPage(page)` renders elements (parents first, then children), delegates tables to `renderTable`
+- `updateElement` wraps pure update helpers:
+  - Selector/DOM tokens → resolve element ids or table cell ids and apply in one history entry
+  - `null` id: apply to current selection or active table cell range
+  - Element id: deep-merge patch into the element
+- Re-render the current page and re-apply selections to avoid context loss
+
+### Selection and gestures
+- Element selection lives in `editor.selection.js` and drives the toolbar/properties
+- Gestures provide one history entry per gesture; snapping uses `Controller.snapState`
+- Overlays are aligned via a single `requestAnimationFrame` scheduler
+
+### Tables
+- Click to anchor cell; drag to select range; F2/dblclick to edit (plaintext)
+- Copy/paste TSV/CSV; paste grows table and unmerges target
+- Column/row resizing shows ghost lines, respects zoom, updates dimensions live; commit on mouseup
+
+### Persistence and export
+- Saves go through `Persistence.saveDocument()` / `.saveDocumentAs()`; callers do not depend on storage mechanism
+- Export uses `ExportService.exportDocumentToPdf()` with font readiness and zoom normalization preflight
+
+
+## Event model (summary)
+- Global:
+  - `DOMContentLoaded` → `bootstrap()` + panel controls + custom color picker
+  - Window listeners (centralized): `mousemove`, `mouseup`, `resize` (overlays/toolbar), `scroll` (overlay alignment)
+- Canvas:
+  - `mousedown` on page/viewport → selection, lasso, place elements, start gestures
+- Table:
+  - Cell `mousedown/dblclick/keydown`; document `copy/paste` when a table anchor exists
+- Toolbar/Properties:
+  - `input/click` mapped to element patches or table cell ops depending on context
+
+
+## Conventions and guardrails
+- One history entry per gesture or bulk action; do not stack history inside drag loops
+- Never mutate the model from inside rendering functions
+- Keep element vs table selection mutually aware; the toolbar must not style the table container when a cell selection is intended
+- Always re-apply selections after re-render to avoid user context loss
+- Keep table operations pure; only commit once and re-render afterwards
+
+
+## Known notes and future work
+- Element selection is still implemented in `editor.selection.js`; `selection.store.js` exists to support centralization if/when needed
+- Table UI/ops are still in one file (`editor.tables.js`); `tables.ops.js` exposes an explicit ops surface for the rest of the app
+- Continue migrating ad-hoc style mappings to `style.map.js` where appropriate
+
 ## CertificateMaker Architecture Overview
 
 This document summarizes the current structure and behavior of the app to make future refactors safer and easier. It focuses on what the core parts are, how they fit together, and what each part is supposed to do.
@@ -187,167 +397,4 @@ Constraints:
   - Cell `mousedown/dblclick/keydown`; document `copy/paste` when a table anchor exists.
 - Toolbar/Properties:
   - `input/click` events mapped to either table cell style ops or element patching.
-
-
-## Known risks and brittle areas
-- **Overloaded `updateElement`**: Handles selector resolution, element updates, and table cell mapping. High coupling and branching increase regression risk.
-- **Global mutable state**: `selectedIds`, `tableSel`, `snapState`, `lastTableSel`, `__SUPPRESS_REFLOW__` are shared across modules and flows.
-- **Render side-effects**: Some functions update DOM directly during gestures and re-render on mouseup; mixing in-place DOM writes with model updates can drift if an exception occurs.
-- **Block reflow coupling**: `reflowStacks` mutates element positions based on visibility and flags; callers must remember to skip it in specific cases (e.g., table column add uses `__SUPPRESS_REFLOW__`).
-- **No schema/versioned migrations**: `serializeDocument` stores raw JSON without versioning; future model changes risk breaking old saved files.
-- **Custom attributes passthrough**: `getCustomAttributesFromModel` treats unknown top-level keys as `attrs.*`, which can hide typos or collide with future model fields.
-- **Duplicate listener attachment risk**: Most listeners are bound in `bootstrap` (once). A second call to `bootstrap` could double-bind (guarded by DOMContentLoaded, but worth keeping in mind).
-
-
-## Refactor roadmap (prioritized)
-
-1) Stabilize contracts + types
-- Add lightweight JSDoc typedefs for `Document`, `Page`, `Element`, `Table`, and cell structures. Export these typedefs in one place.
-- Introduce a `SCHEMA_VERSION` in the serialized document; add a small migration hook in `deserializeDocument`.
-
-2) Extract pure model layer
-- Move all model-only helpers (ID generation, history, selectors like `getElementById`, `getCurrentPage`, deep clones) into a `core/` module.
-- Split `updateElement` into pure functions:
-  - `applyPatchToElements(document, elementIds, patch)`
-  - `applyPatchToTableCells(document, tableId, range, stylePatch)`
-  - `applyPatchBySelector(document, selector, patch)`
-  The UI layer wraps these with history, render, and selection preservation.
-
-3) Isolate rendering from controllers
-- Move `renderPagesList`, `renderPage`, `applyElementStyles`, and table rendering into a `view/` folder. Keep rendering idempotent and side-effect free except for DOM updates.
-- Ensure gesture handlers do not mutate DOM except through `applyElementStyles` or a small set of helpers.
-
-4) Unify selection state
-- Create a small selection store with explicit getters/setters/events for element selection and table cell selection; avoid cross-file mutation. Drive overlays via a single `requestAnimationFrame` scheduler.
-
-5) Contain table module
-- Keep all table pure ops in `tables/ops.js` and all table UI in `tables/view.js` and `tables/controller.js`. The rest of the app calls an explicit table controller API.
-
-6) Safer persistence and exports
-- Wrap OPFS/localStorage/File System Access in a `persistence/` service. Keep UI code oblivious to the storage mechanism.
-- Add a pre-export preflight (fonts ready, zoom normalization, etc.) behind a single `exportDocumentToPdf(options)` function.
-
-7) Incremental cleanups
-- Replace magic globals (`__SUPPRESS_REFLOW__`, `snapState`) with local controller state.
-- Centralize event binding/unbinding; guard against duplicate registrations.
-- Normalize element style names and mapping in one place.
-
-Non-goals (now): Converting to a framework. The above can be done as modular plain JS with JSDoc types and small files to reduce coupling.
-
-
-## Conventions and guardrails
-- One history entry per gesture or bulk action; do not stack history inside move/resize/drag loops.
-- Never mutate the model from inside rendering functions; restrict to visual updates.
-- Keep selection/table selection mutually aware; the toolbar should never style the table container when a cell selection is intended.
-- Always re-apply selections after re-render to avoid user context loss.
-- Keep table operations pure; only commit once and re-render afterwards.
-
-
-## Where to start (quick wins)
-- Add JSDoc typedefs and `SCHEMA_VERSION`.
-- Split `updateElement` into smaller helpers behind a thin wrapper.
-- Move `getElementById`, `getCurrentPage`, `deepMerge`, `deepClone` to a shared `core/` file.
-- Extract `renderTable` and table ops into `tables/` folder (already close to this).
-- Wrap persistence (OPFS/localStorage/File System Access) in a `persistence/` module with a single façade.
-
-These changes reduce cross-module knowledge, make responsibilities clear, and let you refactor further without breaking working parts.
-
-
-## Planned split of editor.app.js
-
-Goal: reduce `editor.app.js` into cohesive, testable modules with clear boundaries while keeping runtime behavior identical. Below is a proposed minimal split you can do incrementally.
-
-Proposed files (suggested names/roles):
-- `app/render/pages.js`
-  - `renderAll`, `renderPagesList`, `renderPage`, `ensureElementNode`, `applyElementStyles`
-  - Depends on: `core/model` API (`getCurrentPage`, `getPageNode`, `deepClone`), table view (`tables/view`)
-
-- `app/update/element.js`
-  - `updateElement`, `deepMerge`, `applyPatchToSelection`, `toPatch`, `getByPath`
-  - Internals split: selector resolution, element-id updates, table-cell mapping
-  - Depends on: `app/render/pages` for `renderPage`, selection store, table ops
-
-- `app/interaction/gestures.js`
-  - Mouse down/move/up, lasso, move/resize/rotate, snapping (`snapSelectionBounds`, `showGuidesForBounds`, `getGuidesForCurrentPage`), resize helpers
-  - Exposes hooks to update model via `updateElement`/direct page mutation during gesture, then final `renderPage`
-  - Depends on: selection store, `app/render/pages`, `core/model`
-
-- `app/ui/toolbar.js`
-  - Floating toolbar wiring (`bindFloatingToolbar`, `syncFormatToolbar`), align buttons, Z-order helpers
-  - Depends on: selection store, `update/element`, table ops, `app/render/pages`
-
-- `app/ui/properties.js`
-  - `renderProperties`, `onPropsInput`, `showAddPropRow`, `getCustomAttributesFromModel`, constants like `RESERVED_MODEL_KEYS`
-  - Depends on: selection store, `update/element`
-
-- `app/bootstrap/index.js`
-  - `bootstrap`, event registrations (global listeners, panel init, color picker init, clipboard binding), zoom init
-  - Imports the above modules and coordinates startup
-
-- `persistence/storage.js`
-  - OPFS helpers, localStorage helpers, File System Access helpers, `serializeDocument`, `deserializeDocument`, `buildSaveHtml`, `saveDocument`, `saveDocumentAs`
-  - Exports a small façade used by UI
-
-- `export/pdf.js`
-  - `exportPdf`, `ensureHtml2Canvas`, `ensureJsPDF`, `loadExternalScript`
-
-Supporting module:
-- `core/model.js`
-  - `Model`, `History`, `commitHistory/undo/redo`, `getCurrentPage`, `getPageNode`, `generateId`, `deepClone`, zoom helpers, constants
-
-Incremental steps (safe order):
-1. Extract `core/model.js` with readonly exports first (helpers + typedefs). Update imports in-place.
-2. Move `render*` and `applyElementStyles` into `app/render/pages.js`. Keep API identical; re-export from `editor.app.js` temporarily for compatibility.
-3. Extract `export/pdf.js` (self-contained) and `persistence/storage.js` (keep existing save buttons calling through façade).
-4. Move toolbar/properties into `app/ui/*`. Wire from `bootstrap`.
-5. Finally, split `updateElement` into `app/update/element.js` and replace usages.
-6. Extract gestures/snapping into `app/interaction/gestures.js`.
-
-Guidelines:
-- Preserve function names and signatures; export them from new files and import where used.
-- Keep one history entry per action; do not change gesture sequencing.
-- After each move, run a quick manual test: load, select, move, resize, table edit, copy/paste, save, export.
-- Prefer small PRs: one logical extraction per change.
-
-
-## UX and Usability Enhancements
-
-Practical improvements to make the editor easier, clearer, and faster to use. Each item notes priority and likely module(s).
-
-- **Add tips for the buttons**: Add tips for the buttons.
-
-- **Fit/zoom controls (Now)**: Fit page, fit width, 100% toggle, spacebar pan, zoom to selection. Modules: `core/model` (zoom), `app/ui/toolbar`.
-- **Smart alignment and spacing (Now)**: Distribute spacing, equalize sizes, show measured distances when dragging. Modules: `app/interaction/gestures`, `app/ui/toolbar`.
-- **Snap/grid toggles (Next)**: Toggle snap; show/hide grid; set grid size. Modules: `app/interaction/gestures`, `app/render/pages`.
-- **Layers/outline panel (Now)**: Minimal list of elements with hide/lock/rename/reorder. Modules: `app/ui/properties` or new `app/ui/layers`.
-- **Lock/Hide elements (Now)**: Quick lock/unlock and visibility toggle in action bubble and properties. Modules: `app/ui/toolbar`, `app/ui/properties`.
-- **Better number/color inputs (Now)**: Shift+Arrow steps, unit hints (pt/px), accessible color inputs with history (already present) + eyedropper fallback. Modules: `app/ui/properties`.
-- **Selection clarity (Now)**: Indeterminate states for multi-select; show common vs mixed values; batch apply safely. Modules: `app/ui/properties`, `update/element`.
-- **Keyboard shortcuts help (Now)**: “?” to open a shortcuts sheet; surface common combos (copy/paste, align, zoom). Modules: `app/bootstrap`, `app/ui/*`.
-- **History panel (Next)**: Visible undo stack labels; optional named checkpoints. Modules: `core/model` (labels), `app/ui/*`.
-- **Status and toasts (Now)**: Non-blocking toasts for save/export/errors; last saved timestamp and autosave indicator. Modules: `persistence/storage`, `app/ui/*`.
-- **Accessibility (Next)**: Tabbable controls, visible focus, ARIA on toolbars/panels, high-contrast theme toggle. Modules: `app/ui/*`, `style.css`.
-
-
-## Feature Backlog (Candidate roadmap)
-
-Priorities reflect effort vs. impact. All should respect the model/render separation and single-entry `updateElement` contract.
-
-### Now (high impact, low/med effort)
-- **Fit and zoom suite**: Fit page/width, 100%, zoom to selection, spacebar/middle-mouse pan.
-- **Distribute/align/size tools**: Distribute spacing horizontally/vertically; match width/height across selection.
-- **Layers/outline MVP**: List elements on the current page with lock/hide/reorder and rename.
-- **PNG export**: Export selected page(s) as PNG at chosen DPI (reuse html2canvas pipeline). Modules: `export/pdf` → new `export/png`.
-- **Shortcuts overlay**: “?” opens a modal with context-aware shortcuts and tips.
-
-### Next (medium effort)
-
-- **Style presets**: Named style tokens (colors, text styles, borders) applied from toolbar. Modules: `app/ui/toolbar`, `update/element`.
-- **QR/Barcode element**: Generate from text/URL using a small client lib. Modules: new `elements/qr`, `render/pages`.
-- **Table enhancements**: Header row flag, number formatting, CSV import to table, simple formulas (SUM/AVG over range). Modules: `editor.tables.js` split into ops/ui.
-
-
-Implementation notes
-- Map each item to the planned module split (render, update, interaction, ui, persistence, export) to avoid cross-cutting changes.
-- Prefer feature flags and incremental rollouts to minimize regression risk.
 

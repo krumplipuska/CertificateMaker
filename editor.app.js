@@ -8,9 +8,7 @@ function renderAll() {
   clearSelection();
 }
 
-function getPageNode(id = Model.document.currentPageId) {
-  return document.querySelector(`.page-wrapper[data-page-id="${id}"] .page`);
-}
+// getPageNode moved to app.view.render.js
 
 function renderPagesList() {
   const list = pagesList();
@@ -105,177 +103,15 @@ function renderPagesList() {
   });
 }
 
-function ensureElementNode(elModel) {
-  const pageNode = getPageNode(elModel.pageId || Model.document.currentPageId);
-  let node = pageNode.querySelector(`[data-id="${elModel.id}"]`);
-  if (!node) {
-    node = document.createElement('div');
-    node.className = `element ${elModel.type}`;
-    node.dataset.id = elModel.id;
-    pageNode.appendChild(node);
-    // Resizable via hit-testing on edges/corners
-    node.addEventListener('mousemove', (e) => updateResizeCursor(e, node));
-    node.addEventListener('mouseleave', () => { node.style.cursor = ''; });
-  }
-  return node;
-}
+// ensureElementNode moved to app.view.render.js
 
 // Attach user-defined action listeners to an element node
 // Deprecated binder (kept no-op for compatibility with older documents that may carry an actions array)
 function bindElementActions(){ /* no-op: using inline attributes approach */ }
 
-function applyElementStyles(node, m) {
-  // Coordinates are stored absolute on the page model.
-  // If the element has a parentId (inside a Block), render relative to parent.
-  let relX = m.x, relY = m.y;
-  if (m.parentId){
-    const parent = getElementById(m.parentId);
-    if (parent){ relX = (m.x - parent.x); relY = (m.y - parent.y); }
-  }
-  node.style.left = relX + 'px';
-  node.style.top = relY + 'px';
-  if (m.type !== 'line') {
-    // Enforce table's intrinsic min size so selection box can't shrink below content
-    if (m.type === 'table'){
-      const minW = (m.colWidths || []).reduce((a,b)=>a+b, 0) || 0;
-      const minH = (m.rowHeights || []).reduce((a,b)=>a+b, 0) || 0;
-      m.w = Math.max(m.w || 0, minW);
-      m.h = Math.max(m.h || 0, minH);
-    }
-    node.style.width = (m.w || 0) + 'px';
-    node.style.height = (m.h || 0) + 'px';
-    node.style.borderRadius = (m.styles.radius || 0) + 'px';
-    // Don't apply background color to image elements to avoid covering the picture
-    if (m.type !== 'image') {
-      node.style.background = m.styles.fill || 'transparent';
-    }
-    node.style.border = `${m.styles.strokeWidth || 0}px solid ${m.styles.strokeColor || 'transparent'}`;
-    node.style.color = m.styles.textColor || '#111827';
-    node.style.fontFamily = m.styles.fontFamily || 'system-ui';
-    node.style.fontSize = (m.styles.fontSize || 14) + 'pt';
-    node.style.fontWeight = m.styles.bold ? '700' : '400';
-    node.style.fontStyle = m.styles.italic ? 'italic' : 'normal';
-    node.style.textDecoration = m.styles.underline ? 'underline' : 'none';
-    const rot = Number(m.styles.rotate || 0);
-    node.style.transformOrigin = '50% 50%';
-    node.style.transform = rot ? `rotate(${rot}deg)` : '';
-    if (m.type === 'text' || m.type === 'field' || m.type === 'rect'){
-      node.style.display = 'flex';
-      node.style.flexDirection = 'column';
-      const h = m.styles.textAlignH || 'left';
-      const v = m.styles.textAlignV || 'top';
-      node.style.alignItems = h === 'left' ? 'flex-start' : (h === 'center' ? 'center' : 'flex-end');
-      node.style.justifyContent = v === 'top' ? 'flex-start' : (v === 'middle' ? 'center' : 'flex-end');
-      // Ensure wrapped text follows toolbar horizontal alignment
-      node.style.textAlign = h === 'left' ? 'left' : (h === 'center' ? 'center' : 'right');
-    }
-    if (m.type === 'text' || m.type === 'field') {
-      if (m.content) {
-        node.textContent = m.content;
-        node.classList.remove('has-placeholder');
-      } else {
-        const placeholder = m.type === 'text' ? 'Text' : 'Field';
-        node.textContent = placeholder;
-        node.classList.add('has-placeholder');
-      }
-    } else if (m.type === 'rect') {
-      // Rectangles can display editable text but have no placeholder
-      node.textContent = m.content || '';
-      node.classList.remove('has-placeholder');
-    }
-  } else {
-    // line: use rotated div like before
-    let x1 = m.x, y1 = m.y, x2 = (m.x2 ?? m.x), y2 = (m.y2 ?? m.y);
-    if (m.parentId){
-      const parent = getElementById(m.parentId);
-      if (parent){ x1 -= parent.x; y1 -= parent.y; x2 -= parent.x; y2 -= parent.y; }
-    }
-    const dx = x2 - x1; const dy = y2 - y1;
-    const len = Math.hypot(dx, dy) || 1;
-    const angleRad = Math.atan2(dy, dx);
-    node.style.left = x1 + 'px';
-    node.style.top = y1 + 'px';
-    node.style.width = len + 'px';
-    node.style.height = (m.styles.strokeWidth || 2) + 'px';
-    node.style.background = m.styles.strokeColor || '#111827';
-    node.style.transformOrigin = '0 0';
-    node.style.transform = `rotate(${angleRad}rad)`;
-  }
-  node.style.zIndex = String(m.z || 1);
-  if (m.type === 'text' || m.type === 'field' || m.type === 'rect') {
-    if (!node.hasAttribute('contenteditable')) node.setAttribute('contenteditable', 'false');
-  }
-  // Apply any custom attributes defined on the model
-  try {
-    const attrs = getCustomAttributesFromModel(m);
-    Object.keys(attrs).forEach((name) => {
-      const val = attrs[name];
-      if (val === false || val == null || val === '') node.removeAttribute(name);
-      else if (val === true) node.setAttribute(name, '');
-      else node.setAttribute(name, String(val));
-    });
-  } catch {}
-}
+// applyElementStyles moved to app.view.render.js
 
-function renderPage(page) {
-  const container = getPageNode(page.id);
-  if (!container) return;
-  // remove old elements except guides
-  Array.from(container.querySelectorAll('.element')).forEach(n => n.remove());
-  if (!page) return;
-  // Render parents (no parentId) first, then children inside their parents
-  const roots = page.elements.filter(e => !e.parentId);
-  const childrenByParent = new Map();
-  page.elements.filter(e => e.parentId).forEach(e => {
-    if (!childrenByParent.has(e.parentId)) childrenByParent.set(e.parentId, []);
-    childrenByParent.get(e.parentId).push(e);
-  });
-  const renderOne = (elm, parentNode) => {
-    const node = ensureElementNode({ ...elm, pageId: page.id });
-    applyElementStyles(node, elm);
-    // Special rendering for image element
-    if (elm.type === 'image') {
-      if (!node.querySelector('img')) {
-        const img = document.createElement('img');
-        img.alt = '';
-        // Remove inline styles - let CSS handle the styling
-        node.appendChild(img);
-        node.addEventListener('dblclick', async () => {
-          if (!Model.document.editMode) return; // pick only in edit mode
-          const input = document.createElement('input');
-          input.type = 'file'; input.accept = 'image/*';
-          input.onchange = () => {
-            const file = input.files?.[0]; if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => { 
-              const src = String(reader.result || '');
-              img.src = src;
-              // Store image source in the element model
-              updateElement(elm.id, { src: src });
-            };
-            reader.readAsDataURL(file);
-          };
-          input.click();
-        });
-      }
-      // Set image source from the model if it exists
-      const img = node.querySelector('img');
-      if (img && elm.src) {
-        img.src = elm.src;
-      }
-    } else if (elm.type === 'table') {
-      renderTable(elm, node);
-    }
-    // Inline HTML event handlers (e.g., onclick) are set via attributes by render
-    (parentNode || container).appendChild(node);
-
-    // If this is a block, render its children inside
-    const kids = childrenByParent.get(elm.id) || [];
-    if (kids.length){ kids.forEach(k => renderOne(k, node)); }
-  };
-  roots.forEach(r => renderOne(r, null));
-  updateSelectionBox();
-}
+// renderPage moved to app.view.render.js
 
 /* ----------------------- Updates ----------------------- */
 function updateElement(id, patch) {
@@ -324,23 +160,23 @@ function updateElement(id, patch) {
         if (container?.dataset?.id) addElementId(container.dataset.id);
       });
 
-      // Apply to normal elements in one batch, mirroring selection multi-update
-      if (targets.elementIds.size){
+      // Apply to elements and specific table cells in a single history entry
+      if (targets.elementIds.size || targets.cells.length){
         commitHistory('update-multi');
-        [...targets.elementIds].forEach(selId => {
-          const sIdx = page.elements.findIndex(e => e.id === selId);
-          if (sIdx !== -1) page.elements[sIdx] = deepMerge(page.elements[sIdx], patch);
-        });
-        renderPage(page);
+        let doc = Model.document;
+        if (targets.elementIds.size){
+          doc = applyPatchToElements(doc, [...targets.elementIds], patch);
+        }
+        if (targets.cells.length){
+          const styles = (patch && patch.styles) || {};
+          // Apply per-cell to preserve original semantics
+          targets.cells.forEach(({ tableId, r, c }) => {
+            doc = applyPatchToTableCells(doc, tableId, { r0:r, c0:c, r1:r, c1:c }, styles);
+          });
+        }
+        Model.document = doc;
+        renderPage(getCurrentPage());
         updateSelectionUI();
-      }
-
-      // Apply to specific table cells via temporary selection
-      if (targets.cells.length){
-        targets.cells.forEach(({ tableId, r, c }) => {
-          if (typeof setTableSelection === 'function') setTableSelection(tableId, r, c, r, c);
-          updateElement(null, patch);
-        });
       }
 
       // Restore previous selections
@@ -358,49 +194,27 @@ function updateElement(id, patch) {
   if (id == null) {
     // If there is an active table cell selection, apply patch via table helpers
     if (tableSel) {
-      const tModel = getElementById(tableSel.tableId);
-      if (!tModel) return;
       commitHistory('update-element');
-      let next = tModel;
-      const styles = (patch && patch.styles) || {};
-      // Map model styles to table cell operations
-      if (styles.fill != null) next = tableApplyCellBg(next, tableSel, styles.fill);
-      if (styles.textColor != null) next = tableApplyTextColor(next, tableSel, styles.textColor);
-      const alignH = (styles.textAlignH != null) ? styles.textAlignH : undefined;
-      const alignV = (styles.textAlignV != null) ? styles.textAlignV : undefined;
-      if (alignH || alignV) next = tableApplyAlign(next, tableSel, alignH, alignV);
-      const perCellKeys = ['strokeColor','strokeWidth','fontFamily','fontSize','bold','italic','underline'];
-      perCellKeys.forEach(k => { if (styles[k] != null) next = tableApplyCellStyle(next, tableSel, k, styles[k]); });
-      // Commit updated table model
-      const tIdx = page.elements.findIndex(e => e.id === tModel.id);
-      if (tIdx === -1) return;
-      page.elements[tIdx] = next;
-      renderPage(page);
-      // Preserve current table selection
+      Model.document = applyPatchToTableCells(Model.document, tableSel.tableId, tableSel, (patch && patch.styles) || {});
+      renderPage(getCurrentPage());
       setTableSelection(tableSel.tableId, tableSel.r0, tableSel.c0, tableSel.r1, tableSel.c1);
       return;
     }
     // Otherwise, apply to all currently selected elements (multi-update)
     if (selectedIds.size === 0) return;
     commitHistory('update-multi');
-    [...selectedIds].forEach(selId => {
-      const sIdx = page.elements.findIndex(e => e.id === selId);
-      if (sIdx !== -1) page.elements[sIdx] = deepMerge(page.elements[sIdx], patch);
-    });
-    renderPage(page);
+    Model.document = applyPatchToElements(Model.document, [...selectedIds], patch);
+    renderPage(getCurrentPage());
     updateSelectionUI();
     return;
   }
 
   // Original behavior: update a single element by id
-  const idx = page.elements.findIndex(e => e.id === id);
-  if (idx === -1) return;
   commitHistory('update-element');
   // Preserve table cell selection if we're updating the same table
   const prevTableSel = (tableSel && tableSel.tableId === id) ? { ...tableSel } : null;
-  const merged = Object.assign({}, page.elements[idx], deepMerge(page.elements[idx], patch));
-  page.elements[idx] = merged;
-  renderPage(page);
+  Model.document = applyPatchToElements(Model.document, [id], patch);
+  renderPage(getCurrentPage());
   
   if (prevTableSel) {
     // Re-apply table cell selection after re-render (don't change element selection)
@@ -466,17 +280,7 @@ function syncFormatToolbar(m){
   const tbg = document.getElementById('bgTransparentToggle');
   if (tbg) tbg.checked = m.styles.fill === 'transparent';
 }
-function deepMerge(target, patch){
-  const out = deepClone(target);
-  Object.keys(patch).forEach(k => {
-    if (patch[k] && typeof patch[k] === 'object' && !Array.isArray(patch[k])) {
-      out[k] = deepMerge(out[k] || {}, patch[k]);
-    } else {
-      out[k] = patch[k];
-    }
-  });
-  return out;
-}
+/* deepMerge moved to editor.core.js */
 
 /* ----------------------- Adding elements ----------------------- */
 let pendingAddType = null; // 'text'|'rect'|'line' for single insertion
@@ -535,7 +339,7 @@ function getCanvasPoint(evt, pageNode = getPageNode()){
 let drag = null; // {id, start:{x,y}, orig:{...}, descendants?: Map}
 let dragMaybe = null; // tentative single-element drag starter
 let resize = null; // {id, start:{x,y}, orig:{...}, mode:'n|s|e|w|ne|nw|se|sw'}
-let snapState = { x: null, y: null }; // sticky snapping memory
+const Controller = { snapState: { x:null, y:null }, suppressReflow: 0 };
 let dragSelection = null; // { startBounds, starts: Map }
 let resizeSelectionState = null; // { handle, startBounds, starts: Map }
 let rotateSelectionState = null; // { startBounds, center:{x,y}, startAngle, starts: Map(id->startRotate) }
@@ -843,11 +647,11 @@ function onMouseUp(){
   // hide guides and reshow actions
   hideGuides();
   positionElementActions();
-  snapState = { x: null, y: null };
+  Controller.snapState = { x: null, y: null };
   updateSelectionBox();
 
   if (!hadGesture) return; // don't re-render/reflow on mere clicks or dblclicks
-  if (window.__SUPPRESS_REFLOW__ > 0) { renderPage(getCurrentPage()); return; }
+  if (Controller.suppressReflow > 0) { renderPage(getCurrentPage()); return; }
 
   // After any move/resize, re-evaluate parenting for selected element(s)
   // If an element is inside a Block bounds, set parentId; else clear it.
@@ -1088,25 +892,25 @@ function snapSelectionBounds(b, excludeIds = [], prefer, options){
   const nx = findNearest(v, targetsX, threshold); const ny = findNearest(h, targetsY, threshold);
   let outX = b.x, outY = b.y;
   // Only apply sticky snapping when no preference is set (i.e., moving) or when sticky matches preferred edge
-  const canStickX = !disableSticky && (!prefer || (Math.min(...targetsX.map(t => Math.abs(t - (snapState.x ?? Infinity)))) <= stickyRange));
-  const canStickY = !disableSticky && (!prefer || (Math.min(...targetsY.map(t => Math.abs(t - (snapState.y ?? Infinity)))) <= stickyRange));
-  if (nx || (snapState.x!=null && canStickX)){
-    const [c,whichIdx] = nx || [snapState.x, (targetsX.length===1?0:1)];
+  const canStickX = !disableSticky && (!prefer || (Math.min(...targetsX.map(t => Math.abs(t - (Controller.snapState.x ?? Infinity)))) <= stickyRange));
+  const canStickY = !disableSticky && (!prefer || (Math.min(...targetsY.map(t => Math.abs(t - (Controller.snapState.y ?? Infinity)))) <= stickyRange));
+  if (nx || (Controller.snapState.x!=null && canStickX)){
+    const [c,whichIdx] = nx || [Controller.snapState.x, (targetsX.length===1?0:1)];
     // Map whichIdx back to left/center/right index against [left,cx,right]
     let which = whichIdx;
     if (targetsX.length !== 3){
       // derive which from preferred
       which = prefer?.x === 'left' ? 0 : prefer?.x === 'center' ? 1 : prefer?.x === 'right' ? 2 : 1;
     }
-    outX = which===0? c : (which===1? c - b.w/2 : c - b.w); snapState.x = c;
+    outX = which===0? c : (which===1? c - b.w/2 : c - b.w); Controller.snapState.x = c;
   }
-  if (ny || (snapState.y!=null && canStickY)){
-    const [c,whichIdx] = ny || [snapState.y, (targetsY.length===1?0:1)];
+  if (ny || (Controller.snapState.y!=null && canStickY)){
+    const [c,whichIdx] = ny || [Controller.snapState.y, (targetsY.length===1?0:1)];
     let which = whichIdx;
     if (targetsY.length !== 3){
       which = prefer?.y === 'top' ? 0 : prefer?.y === 'middle' ? 1 : prefer?.y === 'bottom' ? 2 : 1;
     }
-    outY = which===0? c : (which===1? c - b.h/2 : c - b.h); snapState.y = c;
+    outY = which===0? c : (which===1? c - b.h/2 : c - b.h); Controller.snapState.y = c;
   }
   return { x: outX, y: outY, w: b.w, h: b.h };
 }
@@ -1131,8 +935,8 @@ function showGuidesForBounds(b, pageNode){
            : preferTop ? findNearest(hg, [top], SNAP_THRESHOLD)
            : findNearest(hg, [top, cy, bottom], SNAP_THRESHOLD);
 
-  const vx = nx ? nx[0] : (snapState.x != null ? snapState.x : (preferRight ? right : (preferLeft ? left : cx)));
-  const vy = ny ? ny[0] : (snapState.y != null ? snapState.y : (preferBottom ? bottom : (preferTop ? top : cy)));
+  const vx = nx ? nx[0] : (Controller.snapState.x != null ? Controller.snapState.x : (preferRight ? right : (preferLeft ? left : cx)));
+  const vy = ny ? ny[0] : (Controller.snapState.y != null ? Controller.snapState.y : (preferBottom ? bottom : (preferTop ? top : cy)));
 
   v.style.left = vx + 'px'; v.style.top = '0px'; v.style.height = pageNode.clientHeight + 'px';
   h.style.left = '0px'; h.style.top = vy + 'px'; h.style.width = pageNode.clientWidth + 'px';
@@ -1152,10 +956,7 @@ function findNearest(candidates, targets, threshold){
 }
 
 /* ----------------------- Selection utilities ----------------------- */
-function getElementById(id){
-  const page = getCurrentPage();
-  return page.elements.find(e => e.id === id);
-}
+/* getElementById moved to editor.core.js */
 
 function getSelectionBounds(){
   const els = [...selectedIds].map(getElementById).filter(Boolean);
@@ -2200,7 +2001,7 @@ function sendSelectionBackward(){
 
 /* ===== PDF Export Utilities ===== */
 //onclick of the export pdf button, export the page to pdf
-document.getElementById('savePdfBtn').addEventListener('click', exportPdf);
+document.getElementById('savePdfBtn').addEventListener('click', () => ExportService.exportDocumentToPdf());
 
 
 
@@ -2227,110 +2028,47 @@ async function loadExternalScript(src){
   });
 }
 
-async function ensureHtml2Canvas(){
-  if (typeof window.html2canvas === 'function') return window.html2canvas;
-  // Load standalone html2canvas in case the html2pdf bundle didn't expose it globally
-  await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
-  if (typeof window.html2canvas === 'function') return window.html2canvas;
-  throw new Error('html2canvas is not available');
-}
-
-async function ensureJsPDF(){
-  // Prefer modern UMD namespace first
-  if (window.jspdf && typeof window.jspdf.jsPDF === 'function') return window.jspdf.jsPDF;
-  if (typeof window.jsPDF === 'function') return window.jsPDF;
-  await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-  if (window.jspdf && typeof window.jspdf.jsPDF === 'function') return window.jspdf.jsPDF;
-  if (typeof window.jsPDF === 'function') return window.jsPDF;
-  throw new Error('jsPDF is not available');
-}
-
-async function exportPdf({ filename = 'myfile.pdf', dpi = 220, orientation = 'portrait' } = {}) {
-  // Multi-page PDF export: export all .page elements as PDF pages
-  const pages = Array.from(document.querySelectorAll('.page'));
-  if (!pages.length) return;
-
-  // Save and normalize current zoom so export always uses real dimensions
-  const originalZoom = typeof getZoom === 'function' ? getZoom() : 1;
-  if (typeof setZoomScale === 'function') setZoomScale(1);
-
-  // Ensure web fonts are fully loaded to avoid reflow during capture
-  try { if (document.fonts && document.fonts.ready) { await document.fonts.ready; } } catch {}
-
-  // Ensure libs up-front
-  const html2canvasFn = await ensureHtml2Canvas();
-
-  // Helper to capture a page as canvas
-  async function capturePageCanvas(page, scale, scrollX, scrollY) {
-    // Temporarily remove visual effects that extend outside the page box
-    const prevShadow = page.style.boxShadow;
-    const prevRadius = page.style.borderRadius;
-    page.style.boxShadow = 'none';
-    page.style.borderRadius = '0';
-
-    // Use html2canvas directly for per-page capture
-    const canvas = await html2canvasFn(page, {
-      scale,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      scrollX,
-      scrollY
-    });
-
-    // Restore styles
-    page.style.boxShadow = prevShadow;
-    page.style.borderRadius = prevRadius;
-
-    return canvas;
-  }
-
-  // Prefer integer render scales to reduce sub-pixel rounding artifacts
-  const scale = Math.max(1, Math.round(dpi / 96));
-  // Neutralize viewport scroll so the capture isn't shifted
-  const canvasScrollX = -window.scrollX || -7; // keep the -7!!!
-  const canvasScrollY = -window.scrollY || 0;
-
-  // Get dimensions from the first page for PDF size
-  const firstPage = pages[0];
-  const widthPx = firstPage.offsetWidth;
-  const heightPx = firstPage.offsetHeight;
-
-  // Ensure jsPDF is loaded
-  const jsPDF = await ensureJsPDF();
-
-  // Create jsPDF instance
-  const pdf = new jsPDF({
-    unit: 'px',
-    format: [widthPx, heightPx],
-    orientation,
-    compress: true
-  });
-
-  for (let i = 0; i < pages.length; i++) {
-    const page = pages[i];
-    const canvas = await capturePageCanvas(page, scale, canvasScrollX, canvasScrollY);
-    const imgData = canvas.toDataURL('image/jpeg', 0.75);
-
-    if (i > 0) {
-      pdf.addPage([widthPx, heightPx], orientation);
-    }
-    pdf.addImage(imgData, 'JPEG', 0, 0, widthPx, heightPx);
-  }
-
-  // Save the PDF
-  pdf.save(filename);
-
-  // Restore zoom after export
-  if (typeof setZoomScale === 'function') setZoomScale(originalZoom);
-}
-
-/* -------------------End of PDF Export Utilities ------------------- */
+// Export implementation moved to export.service.js
 
 function serializeDocument(){
-  return JSON.stringify(Model.document);
+  const payload = {
+    schema: (typeof SCHEMA_VERSION === 'number' ? SCHEMA_VERSION : 1),
+    app: (typeof APP_VERSION === 'string' ? APP_VERSION : ''),
+    document: Model.document
+  };
+  return JSON.stringify(payload);
+}
+function normalizeDocument(doc){
+  const out = (doc && typeof doc === 'object') ? doc : { pages: [], currentPageId:'', nextElementId:1, editMode:true };
+  if (!Array.isArray(out.pages)) out.pages = [];
+  if (typeof out.currentPageId !== 'string') out.currentPageId = out.pages[0]?.id || '';
+  if (typeof out.nextElementId !== 'number') out.nextElementId = 1;
+  if (typeof out.editMode !== 'boolean') out.editMode = true;
+  return out;
+}
+function migrateDocument(doc, fromVersion){
+  let d = normalizeDocument(doc);
+  const to = (typeof SCHEMA_VERSION === 'number' ? SCHEMA_VERSION : 1);
+  // For now schemas are identical. Place future migrations here.
+  if (fromVersion === to) return d;
+  // Example: if (fromVersion === 0) { /* mutate d to new shape */ }
+  return d;
 }
 function deserializeDocument(json){
-  Model.document = JSON.parse(json);
+  const parsed = JSON.parse(json);
+  // Back-compat: older saves stored raw document object
+  if (parsed && Array.isArray(parsed.pages)) {
+    Model.document = normalizeDocument(parsed);
+    return;
+  }
+  // New format wrapper
+  if (parsed && parsed.document) {
+    const fromSchema = Number(parsed.schema || 1);
+    const doc = migrateDocument(parsed.document, fromSchema);
+    Model.document = normalizeDocument(doc);
+    return;
+  }
+  // Fallback: keep existing in-memory document
 }
 function download(filename, content, type='text/html'){
   const blob = new Blob([content], { type });
@@ -2448,41 +2186,10 @@ async function writeFile(handle, content){
 
 async function saveDocument(){
   indicateSaving();
-  // Prefer OPFS silent save if available
-  if (supportsOPFS()) {
-    try {
-      const json = serializeDocument();
-      await opfsWriteFile(getOpfsAutosaveName(), json);
-      indicateSaved();
-      return;
-    } catch (_) {}
-  }
-
-  // Next, silently persist to localStorage
-  if (localSaveDocument()) {
-    indicateSaved();
-    return;
-  }
-
-  // If we have a picked file and FS Access is supported, overwrite silently
-  if (supportsFileSystemAccess() && currentFileHandle) {
-    try {
-      const saveHtml = buildSaveHtml();
-      await writeFile(currentFileHandle, saveHtml);
-      indicateSaved();
-      return;
-    } catch (e) {
-      // fall through to legacy behavior
-    }
-  }
-
-  // Legacy behavior: read filename from URL and trigger a download
-  const currentFilename = getCurrentFilename();
-  if (currentFilename) {
-    const saveHtml = buildSaveHtml();
-    download(currentFilename, saveHtml, 'text/html');
-    indicateSaved();
-  }
+  try {
+    const res = await Persistence.saveDocument();
+    if (res && res.ok) { indicateSaved(); return; }
+  } catch {}
 }
 
 function getCurrentFilename(){
@@ -2500,66 +2207,18 @@ function getCurrentFilename(){
 
 async function saveDocumentAs(){
   indicateSaving();
-  // Prefer File System Access API if available for future silent saves
-  if (supportsFileSystemAccess()) {
-    try {
-      const defaultName = `certificate-maker-${new Date().toISOString().slice(0,19).replace(/[:.]/g,'-')}.html`;
-      const handle = await window.showSaveFilePicker({
-        suggestedName: defaultName,
-        types: [{
-          description: 'HTML',
-          accept: { 'text/html': ['.html', '.htm'] }
-        }]
-      });
-      currentFileHandle = handle;
-      const saveHtml = buildSaveHtml();
-      await writeFile(currentFileHandle, saveHtml);
-      indicateSaved();
-      return;
-    } catch (e) {
-      // If user cancels or API fails, fall back to download below
-    }
-  }
-
-  // Fallback: Use browser download
-  const defaultName = `certificate-maker-${new Date().toISOString().slice(0,19).replace(/[:.]/g,'-')}.html`;
-  const saveHtml = buildSaveHtml();
-  download(defaultName, saveHtml, 'text/html');
-  indicateSaved();
+  try {
+    const res = await Persistence.saveDocumentAs();
+    if (res && res.ok) { indicateSaved(); return; }
+  } catch {}
 }
 
 
 /* ----------------------- Init & Events ----------------------- */
 async function bootstrap(){
-  // Prefer embedded document from the current file first
+  // Use persistence facade to load
   let loaded = false;
-  const saved = document.getElementById('__doc__');
-  if (saved && saved.textContent) {
-    try { deserializeDocument(saved.textContent.replaceAll('&lt;','<')); loaded = true; } catch {}
-  }
-
-  // Next, try OPFS autosave scoped to this file
-  if (!loaded && supportsOPFS()) {
-    try {
-      const text = await opfsReadTextIfExists(getOpfsAutosaveName());
-      if (text) {
-        deserializeDocument(text);
-        loaded = true;
-      }
-      // Reduce eviction risk (best-effort)
-      if (navigator.storage && navigator.storage.persist) {
-        try { await navigator.storage.persist(); } catch {}
-      }
-    } catch (_) {}
-  }
-
-  // Finally, try localStorage autosave scoped to this file
-  if (!loaded){
-    const ls = localLoadDocument();
-    if (ls) {
-      try { deserializeDocument(ls); loaded = true; } catch {}
-    }
-  }
+  try { const res = await Persistence.tryAutoLoad(); loaded = !!(res && res.ok); } catch {}
 
   // If nothing loaded, create an initial document
   if (!loaded){
@@ -2677,8 +2336,9 @@ async function bootstrap(){
       window.addEventListener('mouseup', onUp);
     });
   }
-  window.addEventListener('mousemove', onMouseMove);
-  window.addEventListener('mouseup', onMouseUp);
+  // Centralized window listeners (bound once)
+  window.addEventListener('mousemove', onMouseMove, { passive: true });
+  window.addEventListener('mouseup', onMouseUp, { passive: true });
   window.addEventListener('resize', () => { updateFormatToolbarVisibility(); alignOverlays(); });
   window.addEventListener('scroll', () => { alignOverlays(); }, true);
 

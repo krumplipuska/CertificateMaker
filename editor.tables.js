@@ -857,13 +857,12 @@ function cmdTableAddColumn(after=true){
   withActiveTable((id, t)=>{
     const at = tableSel ? (after ? tableSel.c1+1 : tableSel.c0) : t.cols;
     // Add column without triggering block/page reflow side-effects
-    if (typeof window.__SUPPRESS_REFLOW__ === 'number') window.__SUPPRESS_REFLOW__++;
-    else window.__SUPPRESS_REFLOW__ = 1;
+    if (typeof Controller === 'object') Controller.suppressReflow++;
     try {
       updateElement(id, tableAddColumn(t, at));
       renderPage(getCurrentPage());
     } finally {
-      window.__SUPPRESS_REFLOW__ = Math.max(0, (window.__SUPPRESS_REFLOW__||0) - 1);
+      if (typeof Controller === 'object') Controller.suppressReflow = Math.max(0, (Controller.suppressReflow||0) - 1);
     }
     highlightTableSelection();
   });

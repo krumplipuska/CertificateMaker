@@ -4,6 +4,71 @@
 
 // Minimal editor logic refactor: model-driven, side panels, floating toolbar, edit mode, pages
 
+/**
+ * @typedef {Object} Cell
+ * @property {string} id
+ * @property {number} row
+ * @property {number} col
+ * @property {number} rowSpan
+ * @property {number} colSpan
+ * @property {boolean} hidden
+ * @property {string} [content]
+ * @property {Object} [styles]
+ * @property {Object} [attrs]
+ */
+/**
+ * @typedef {Object} TableElement
+ * @property {string} id
+ * @property {"table"} type
+ * @property {number} x
+ * @property {number} y
+ * @property {number} w
+ * @property {number} h
+ * @property {number} rows
+ * @property {number} cols
+ * @property {number[]} rowHeights
+ * @property {number[]} colWidths
+ * @property {{ inner:number, outer:number, color:string, style:string }} border
+ * @property {Object.<string, Cell>} cells
+ * @property {string[][]} grid
+ * @property {Object} [styles]
+ * @property {Object} [attrs]
+ */
+/**
+ * @typedef {Object} BaseElement
+ * @property {string} id
+ * @property {"text"|"field"|"rect"|"line"|"image"|"block"|"table"} type
+ * @property {number} x
+ * @property {number} y
+ * @property {number} [w]
+ * @property {number} [h]
+ * @property {number} [z]
+ * @property {Object} styles
+ * @property {string} [content]
+ * @property {string} [src]
+ * @property {number} [x2]
+ * @property {number} [y2]
+ * @property {string} [parentId]
+ * @property {string} [groupId]
+ * @property {Object} [attrs]
+ */
+/**
+ * @typedef {BaseElement|TableElement} Element
+ */
+/**
+ * @typedef {Object} Page
+ * @property {string} id
+ * @property {string} name
+ * @property {Element[]} elements
+ */
+/**
+ * @typedef {Object} DocumentModel
+ * @property {Page[]} pages
+ * @property {string} currentPageId
+ * @property {number} nextElementId
+ * @property {boolean} editMode
+ */
+
 /* ----------------------- Model ----------------------- */
 const Model = {
   document: {
@@ -18,6 +83,8 @@ const Model = {
 const HISTORY_LIMIT = 10;
 const History = { past: [], future: [] };
 const APP_VERSION = 'v1.0.0';
+// Schema for serialized document payloads
+const SCHEMA_VERSION = 1;
 
 function isElementIdInUse(id){
   try {
@@ -87,6 +154,17 @@ const savePdfBtn = () => document.getElementById('savePdfBtn');
 
 /* ----------------------- Utilities ----------------------- */
 function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+function deepMerge(target, patch){
+	const out = deepClone(target);
+	Object.keys(patch || {}).forEach(k => {
+		if (patch[k] && typeof patch[k] === 'object' && !Array.isArray(patch[k])) {
+			out[k] = deepMerge(out[k] || {}, patch[k]);
+		} else {
+			out[k] = patch[k];
+		}
+	});
+	return out;
+}
 function nowSnapshot() { return deepClone(Model.document); }
 function commitHistory(label) {
   History.past.push(nowSnapshot());
@@ -128,6 +206,12 @@ function createPage(name = `Page ${Model.document.pages.length + 1}`) {
 
 function getCurrentPage() {
   return Model.document.pages.find(p => p.id === Model.document.currentPageId);
+}
+
+/** Return element model by id from the current page. */
+function getElementById(id){
+	const page = getCurrentPage();
+	return page && page.elements ? page.elements.find(e => e.id === id) : null;
 }
 
 function addPage() {
