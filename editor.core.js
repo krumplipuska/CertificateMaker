@@ -75,7 +75,7 @@ const Model = {
     pages: [],
     currentPageId: '',
     nextElementId: 1,
-    editMode: true,
+    editMode: false,
   },
 };
 
@@ -147,7 +147,7 @@ function zoomAtViewportCenter(nextScale){
 
 const undoBtn = () => document.getElementById('undoBtn');
 const redoBtn = () => document.getElementById('redoBtn');
-const editToggle = () => document.getElementById('editToggle');
+const editToggleBtn = () => document.getElementById('editToggleBtn');
 const saveBtn = () => document.getElementById('saveBtn');
 const saveAsBtn = () => document.getElementById('saveAsBtn');
 const savePdfBtn = () => document.getElementById('savePdfBtn');
@@ -196,6 +196,37 @@ function setEditMode(on) {
   document.body.classList.toggle('edit-off', !on);
   // hide selection and toolbar if turning off
   if (!on) clearSelection();
+  // Instead of re-rendering from scratch (which can reset some visibility),
+  // update only inline event attributes to reflect mode.
+  try {
+    if (typeof window.applyEventAttributesForMode === 'function') window.applyEventAttributesForMode(getCurrentPage());
+  } catch {}
+  // Re-apply element styles to honor edit-mode visibility policy without rebuilding all pages
+  try {
+    const page = getCurrentPage();
+    if (page) page.elements.forEach(el => {
+      const node = document.querySelector(`.page-wrapper[data-page-id="${page.id}"] .page .element[data-id="${el.id}"]`);
+      if (node) applyElementStyles(node, el);
+    });
+  } catch {}
+  // Sync the toggle button UI (icon, text, pressed state)
+  try {
+    const btn = (typeof editToggleBtn === 'function') ? editToggleBtn() : null;
+    if (btn){
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      if (on){
+        btn.innerHTML = '<svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"></path><path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"></path></svg><span>Edit mode</span>';
+        btn.title = 'Edit mode';
+        btn.setAttribute('aria-label', 'Edit mode');
+      } else {
+        btn.innerHTML = '<svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" fill="none" stroke="currentColor" stroke-width="2"></path><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg><span>View mode</span>';
+        btn.title = 'View mode';
+        btn.setAttribute('aria-label', 'View mode');
+      }
+    }
+  } catch {}
+  // Update padding after mode change
+  if (typeof window.updateWorkspacePadding === 'function') window.updateWorkspacePadding();
 }
 
 /* ----------------------- Page & Elements ----------------------- */

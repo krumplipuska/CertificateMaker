@@ -7,11 +7,13 @@ let selectedIds = new Set();
 
 function clearSelection(){ 
   selectedIds.clear(); 
+  console.log('[SELECTION] clear');
   clearTableSelection(); 
   updateSelectionUI(); 
 }
 function setSelection(ids){ 
   selectedIds = new Set((ids||[]).filter(Boolean)); 
+  console.log('[SELECTION] set', Array.from(selectedIds));
   // Clear table selection unless we're selecting the same table that has active cell selection
   if (tableSel && (selectedIds.size !== 1 || !selectedIds.has(tableSel.tableId))) {
     clearTableSelection();
@@ -21,6 +23,7 @@ function setSelection(ids){
 function addToSelection(id){ 
   if (!id) return; 
   selectedIds.add(id); 
+  console.log('[SELECTION] add', id, '→', Array.from(selectedIds));
   // Clear table selection when adding non-table elements or different tables
   if (tableSel && (!selectedIds.has(tableSel.tableId) || selectedIds.size > 1)) {
     clearTableSelection();
@@ -30,6 +33,7 @@ function addToSelection(id){
 function toggleSelection(id){ 
   if (!id) return; 
   selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id); 
+  console.log('[SELECTION] toggle', id, '→', Array.from(selectedIds));
   // Clear table selection when toggling creates a multi-selection or removes the table
   if (tableSel && (!selectedIds.has(tableSel.tableId) || selectedIds.size > 1)) {
     clearTableSelection();
@@ -39,6 +43,7 @@ function toggleSelection(id){
 function isSelected(id){ return selectedIds.has(id); }
 
 function updateSelectionUI(){
+  console.log('[SELECTION] updateUI size=', selectedIds.size);
   document.querySelectorAll('.page .element').forEach(el => {
     const isTableElement = el.classList.contains('table');
     const should = selectedIds.has(el.dataset.id) && !isTableElement;
@@ -68,7 +73,7 @@ function updateSelectionUI(){
   if (typeof updateGroupToggleButton === 'function') updateGroupToggleButton();
   // NEW: keep the action bubble in sync with selection
   positionElementActions();
-}
+}  
 
 function updateFormatToolbarVisibility(){
   const bar = formatToolbar();

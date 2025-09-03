@@ -37,7 +37,24 @@ const ExportService = (function(){
 		if (typeof setZoomScale === 'function') setZoomScale(originalZoom);
 	}
 
-	return { exportDocumentToPdf };
+	// Export only the current page as an image (PNG/JPEG)
+	async function exportCurrentPageToImage({ filename, format = 'png', quality = 0.9 } = {}){
+		const page = (typeof getPageNode === 'function') ? getPageNode() : document.querySelector('.page');
+		if (!page) return;
+		const html2canvasFn = await ensureHtml2Canvas();
+		// Temporarily remove page shadows/radius to avoid artifacts in capture
+		const prevShadow = page.style.boxShadow; const prevRadius = page.style.borderRadius; page.style.boxShadow = 'none'; page.style.borderRadius = '0';
+		const canvas = await html2canvasFn(page, { scale: Math.max(1, Math.round( (typeof getZoom === 'function' ? 96*getZoom() : 96) / 96 )), useCORS:true, backgroundColor:'#ffffff' });
+		page.style.boxShadow = prevShadow; page.style.borderRadius = prevRadius;
+		const mime = (String(format).toLowerCase() === 'jpg' || String(format).toLowerCase() === 'jpeg') ? 'image/jpeg' : 'image/png';
+		const dataUrl = canvas.toDataURL(mime, quality);
+		const name = filename || `page-${new Date().toISOString().replace(/[:.]/g,'-')}.${mime === 'image/png' ? 'png' : 'jpg'}`;
+		// Trigger download
+		const a = document.createElement('a'); a.href = dataUrl; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+		return dataUrl;
+	}
+
+	return { exportDocumentToPdf, exportCurrentPageToImage };
 })();
 
 

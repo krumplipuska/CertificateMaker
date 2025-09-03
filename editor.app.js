@@ -6,6 +6,35 @@
 function renderAll() {
   renderPagesList();
   clearSelection();
+  // Do not force visibility when editing; users expect all elements visible in edit mode
+  if (!(Model && Model.document && Model.document.editMode)) enforceVisibilityForAllPages();
+}
+
+function enforceVisibilityForAllPages(){
+  try {
+    // Skip global visibility enforcement in edit mode to avoid re-applying view-mode hidden flags
+    if (Model && Model.document && Model.document.editMode) return;
+    (Model.document.pages || []).forEach((p) => {
+      const container = document.querySelector(`.page-wrapper[data-page-id="${p.id}"] .page`);
+      if (!container) return;
+      (p.elements || []).forEach((elm) => {
+        const node = container.querySelector(`.element[data-id="${elm.id}"]`);
+        if (!node) return;
+        const attrs = (elm && elm.attrs) ? elm.attrs : {};
+        let isHidden = false;
+        try {
+          if (attrs.hidden === true || attrs.hidden === 'true') isHidden = true;
+          const st = String(attrs.style || '');
+          if (/display\s*:\s*none/i.test(st)) isHidden = true;
+        } catch {}
+        if (isHidden) {
+          node.style.display = 'none';
+        } else {
+          node.style.display = (elm.type === 'text' || elm.type === 'field' || elm.type === 'rect') ? 'flex' : '';
+        }
+      });
+    });
+  } catch {}
 }
 
 // getPageNode moved to app.view.render.js
@@ -313,11 +342,15 @@ function placePendingAt(x, y, pageId = Model.document.currentPageId){
     base.styles.strokeWidth = 1;
     base.styles.radius = 8;
     base.stackChildren = true;
-    base.stackByPage = false;
+    base.stackByPage = true;
   }
   const page = Model.document.pages.find(p => p.id === pageId) || getCurrentPage();
   page.elements.push(base);
   Model.document.currentPageId = page.id;
+  // If dropped inside a block, parent it before reflow
+  try { reparentIntoBlocks(page, [base.id]); } catch {}
+  // Immediately reflow page stacks so newly added elements snap into place
+  try { reflowStacks(page); } catch {}
   pendingAddType = null; // single insertion
   renderPage(page);
   setSelection([base.id]);
@@ -383,10 +416,10 @@ function reflowStacks(page){
     let y = 8;
     kids.forEach(k => { k.y = b.y + y; y += (k.h||0) + 8; });
   });
-  // Reflow blocks on page for those opted-in
-  const pageBlocksToStack = page.elements.filter(e => e.type === 'block' && e.stackByPage === true && !isElementHidden(e));
-  if (pageBlocksToStack.length){
-    const sorted = [...pageBlocksToStack].sort((a,b) => a.y - b.y);
+  // Reflow any elements that opt-in to page stacking (not just blocks)
+  const pageElemsToStack = page.elements.filter(e => e.stackByPage === true && !isElementHidden(e));
+  if (pageElemsToStack.length){
+    const sorted = [...pageElemsToStack].sort((a,b) => a.y - b.y);
     let y = 16;
     sorted.forEach(b => { b.y = y; y += (b.h||0) + 16; });
   }
@@ -394,6 +427,43 @@ function reflowStacks(page){
 
 // expose for userFunctions
 window.reflowStacks = reflowStacks;
+
+// ---------- Block parenting helpers ----------
+function elementBounds(el){ return { x: el.x || 0, y: el.y || 0, w: el.w || 0, h: el.h || 0 }; }
+function rectContainsPoint(r, px, py){ return px >= r.x && px <= (r.x + r.w) && py >= r.y && py <= (r.y + r.h); }
+/** Assign parentId for given element ids when their centers fall inside a block; clear when outside. */
+function reparentIntoBlocks(page, ids){
+  if (!page) page = getCurrentPage();
+  const blocks = page.elements.filter(e => e.type === 'block');
+  if (!blocks.length) return;
+  // Prefer visually topmost (highest z) when multiple blocks overlap
+  const pickHost = (cx, cy) => {
+    let host = null; let bestZ = -Infinity;
+    for (const b of blocks){
+      const r = elementBounds(b);
+      if (rectContainsPoint(r, cx, cy)){
+        const z = Number(b.z || 0);
+        if (z >= bestZ){ bestZ = z; host = b; }
+      }
+    }
+    return host;
+  };
+  ids.forEach(id => {
+    const idx = page.elements.findIndex(e => e.id === id);
+    if (idx === -1) return;
+    const el = page.elements[idx];
+    if (!el || el.type === 'block') return; // don't parent blocks into blocks here
+    const r = elementBounds(el);
+    const cx = r.x + r.w/2; const cy = r.y + r.h/2;
+    const host = pickHost(cx, cy);
+    const nextParentId = host ? host.id : null;
+    if ((el.parentId || null) !== nextParentId){
+      // Mutate in place to be consistent with live gesture updates
+      el.parentId = nextParentId;
+      page.elements[idx] = el;
+    }
+  });
+}
 
 function onMouseDown(e){
   // Ignore canvas interactions while a picker is active (element/style picker)
@@ -415,8 +485,24 @@ function onMouseDown(e){
   if (pendingAddType){ placePendingAt(pt.x, pt.y); return; }
   if (target){
     const id = target.dataset.id;
+    console.log('[MOUSE] down on element', id);
     const page = getCurrentPage();
     const model = page.elements.find(el => el.id === id);
+    // Respect locked layers
+    if (model && model.attrs && (model.attrs.locked === true || model.attrs.locked === 'true')){
+      // Allow selection but block drag/resize
+      setSelection([id]);
+      e.preventDefault();
+      return;
+    }
+    // Alt-drag duplicate: when starting a drag with Alt pressed, clone selection first
+    if ((e.altKey || e.metaKey && e.shiftKey) && (selectedIds.has(id) || selectedIds.size === 0)){
+      // If nothing selected, select target first then clone
+      if (!selectedIds.has(id)) setSelection([id]);
+      copySelection(0); // duplicate at same position
+      // Keep newly created clones selected and start dragging them
+      // Offset start so immediate movement will be visible
+    }
     const append = e.shiftKey || e.ctrlKey || e.metaKey;
     const toggle = e.ctrlKey || e.metaKey;
     if (!append && !toggle && model?.groupId) { setSelection(getElementsByGroup(model.groupId).map(e=>e.id)); }
@@ -434,6 +520,7 @@ function onMouseDown(e){
       // snapshot before resize starts for undo
       commitHistory('resize');
       resize = { id, start: pt, orig: deepClone(model), mode };
+      console.log(`[GESTURE] resize:start id=${id} mode=${mode}`);
     } else {
       if (selectedIds.has(id) && selectedIds.size > 1){
         const starts = new Map();
@@ -444,6 +531,7 @@ function onMouseDown(e){
         // keep pointer offset to avoid jumping to top-left
         const pointerOffset = { ox: pt.x - startBounds.x, oy: pt.y - startBounds.y };
         dragSelection = { startBounds, starts, pointerOffset };
+        console.log(`[GESTURE] multi-drag:start count=${selectedIds.size}`);
       } else {
         // Defer starting a drag until the pointer actually moves beyond a threshold
         // Capture possible descendants for blocks to move them together
@@ -455,6 +543,7 @@ function onMouseDown(e){
           descendants = map;
         }
         dragMaybe = { id, start: pt, orig: deepClone(model), descendants };
+        console.log(`[GESTURE] drag:maybe id=${id} x=${pt.x} y=${pt.y}`);
       }
     }
     // hide actions while dragging
@@ -466,6 +555,11 @@ function onMouseDown(e){
 }
 
 function onMouseMove(e){
+  // Safety: if no mouse button is down but a gesture is active, end it
+  if ((e.buttons === 0 || e.type === 'mouseleave') && (drag || resize || dragSelection || resizeSelectionState || rotateSelectionState || dragMaybe)){
+    onMouseUp();
+    return;
+  }
   // If editing text/content and no gesture is active, ignore move events
   const activeEl = document.activeElement;
   const isEditing = !!(activeEl && (activeEl.isContentEditable || activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA'));
@@ -478,6 +572,7 @@ function onMouseMove(e){
     const dx0 = Math.abs(pt.x - dragMaybe.start.x);
     const dy0 = Math.abs(pt.y - dragMaybe.start.y);
     if (dx0 >= 3 || dy0 >= 3){
+      console.log(`[GESTURE] drag:promote id=${dragMaybe.id}`);
       commitHistory('move');
       drag = dragMaybe; dragMaybe = null;
     }
@@ -639,62 +734,33 @@ function onMouseMove(e){
 function onMouseUp(){
   // Detect whether a gesture actually occurred (move/resize/rotate)
   const hadGesture = !!drag || !!resize || !!dragSelection || !!resizeSelectionState || !!rotateSelectionState;
+  const type = dragSelection ? 'multi-drag' : (resize ? 'resize' : (drag ? 'drag' : (rotateSelectionState ? 'rotate' : (dragMaybe ? 'dragMaybe' : 'none'))));
+  if (hadGesture) {
+    console.log(`[GESTURE] ${type}:end`);
+  } else if (dragMaybe) {
+    console.log('[GESTURE] drag:cancel');
+  }
+  // After a move/resize/rotate, reparent elements into blocks (if applicable) and reflow stacks
+  if (hadGesture){
+    const page = getCurrentPage();
+    try {
+      reparentIntoBlocks(page, [...selectedIds]);
+      reflowStacks(page);
+      renderPage(page);
+      if (selectedIds.size) setSelection([...selectedIds]);
+    } catch {}
+  }
   // History was already captured at gesture start
   if (drag){ drag = null; }
   if (resize){ resize = null; }
   if (dragSelection){ dragSelection = null; }
   if (rotateSelectionState){ rotateSelectionState = null; }
+  // Clear any pending, not-yet-promoted drag from a prior click to avoid accidental moves
+  if (dragMaybe){ dragMaybe = null; }
   // hide guides and reshow actions
   hideGuides();
   positionElementActions();
   Controller.snapState = { x: null, y: null };
-  updateSelectionBox();
-
-  if (!hadGesture) return; // don't re-render/reflow on mere clicks or dblclicks
-  if (Controller.suppressReflow > 0) { renderPage(getCurrentPage()); return; }
-
-  // After any move/resize, re-evaluate parenting for selected element(s)
-  // If an element is inside a Block bounds, set parentId; else clear it.
-  const page = getCurrentPage();
-  const blocks = page.elements.filter(e => e.type === 'block');
-  const ids = selectedIds.size ? [...selectedIds] : [];
-  function isDescendant(childId, ancestorId){
-    let cur = getElementById(childId);
-    let guard = 0;
-    while (cur && cur.parentId && guard++ < 1000){
-      if (cur.parentId === ancestorId) return true;
-      cur = getElementById(cur.parentId);
-    }
-    return false;
-  }
-  ids.forEach(id => {
-    const m = getElementById(id); if (!m) return;
-    // compute center point
-    const cx = m.x + (m.w||0)/2; const cy = m.y + (m.h||0)/2;
-    // Exclude self and its descendants as potential parents
-    const candidates = blocks.filter(b => b.id !== m.id && !isDescendant(b.id, m.id));
-    const containing = candidates.filter(b => cx >= b.x && cx <= b.x + (b.w||0) && cy >= b.y && cy <= b.y + (b.h||0));
-    // choose the smallest containing block (deepest)
-    const within = containing.sort((a,b) => (a.w*a.h) - (b.w*b.h))[0];
-    const newParent = within ? within.id : null;
-    if (m.parentId !== newParent){
-      // Prevent cycles: do not set parent to one of its descendants
-      let cyc = false;
-      if (newParent){
-        let cur = newParent;
-        while (cur){
-          if (cur === m.id) { cyc = true; break; }
-          const p = getElementById(cur);
-          cur = p && p.parentId ? p.parentId : null;
-        }
-      }
-      if (!cyc){ m.parentId = newParent || undefined; }
-    }
-  });
-
-  // Reflow after move/resize; respects visibility and flags
-  reflowStacks(page);
-  renderPage(page);
 }
 
 /* ----------------------- Resize helpers ----------------------- */
@@ -882,6 +948,10 @@ function getBoundsForModel(m){
   return { x:m.x, y:m.y, w:m.w || 0, h:m.h || 0 };
 }
 function snapSelectionBounds(b, excludeIds = [], prefer, options){
+  // Allow toggling snap off via UI
+  if (typeof SNAP_ENABLED !== 'undefined' && !SNAP_ENABLED) {
+    return { x: b.x, y: b.y, w: b.w, h: b.h };
+  }
   const { v, h } = getGuidesForCurrentPage(excludeIds);
   const threshold = options?.threshold ?? SNAP_THRESHOLD;
   const stickyRange = options?.sticky ?? STICKY_RANGE;
@@ -915,6 +985,7 @@ function snapSelectionBounds(b, excludeIds = [], prefer, options){
   return { x: outX, y: outY, w: b.w, h: b.h };
 }
 function showGuidesForBounds(b, pageNode){
+  if (typeof GUIDES_ENABLED !== 'undefined' && !GUIDES_ENABLED) { hideGuides(); return; }
   const { v, h } = getGuidesNodes(pageNode); if (!v || !h) return;
   // Compute nearest guides and prefer the currently active resize edge if any
   const left = b.x, cx = b.x + b.w/2, right = b.x + b.w;
@@ -977,6 +1048,51 @@ function applyPatchToSelection(patch, historyLabel = 'update-multi'){
     if (idx !== -1) page.elements[idx] = deepMerge(page.elements[idx], patch);
   });
   renderPage(page); updateSelectionUI();
+}
+
+/* ----------------------- Align/Distribute ----------------------- */
+function alignSelection(where){
+  if (selectedIds.size < 2) return;
+  const p = getCurrentPage(); const ids = [...selectedIds];
+  const bounds = getSelectionBounds(); if (!bounds) return;
+  commitHistory('align');
+  ids.forEach(id => {
+    const m = getElementById(id); if (!m) return; const out = deepClone(m);
+    if (where === 'left') out.x = bounds.x;
+    if (where === 'center') out.x = Math.round(bounds.x + (bounds.w - (m.w||0)) / 2);
+    if (where === 'right') out.x = bounds.x + bounds.w - (m.w||0);
+    if (where === 'top') out.y = bounds.y;
+    if (where === 'middle') out.y = Math.round(bounds.y + (bounds.h - (m.h||0)) / 2);
+    if (where === 'bottom') out.y = bounds.y + bounds.h - (m.h||0);
+    const idx = p.elements.findIndex(e => e.id === id); if (idx !== -1) p.elements[idx] = out;
+  });
+  renderPage(p); updateSelectionUI();
+}
+function distributeSelection(axis){
+  if (selectedIds.size < 3) return;
+  const p = getCurrentPage(); const ids = [...selectedIds];
+  // Order by position along axis
+  const ordered = ids.map(id => getElementById(id)).filter(Boolean).sort((a,b)=> (axis==='h'?a.x:b.y) - (axis==='h'?b.x:a.y));
+  if (ordered.length < 3) return;
+  commitHistory('distribute');
+  if (axis === 'h'){
+    const left = Math.min(...ordered.map(e=>e.x));
+    const right = Math.max(...ordered.map(e=>e.x + (e.w||0)));
+    const totalW = ordered.reduce((s,e)=> s + (e.w||0), 0);
+    const gap = (right - left - totalW) / (ordered.length - 1);
+    let cur = left;
+    ordered.forEach((el, i) => {
+      const out = deepClone(el); out.x = Math.round(cur); cur += (el.w||0) + gap; const idx = p.elements.findIndex(e=>e.id===el.id); if (idx!==-1) p.elements[idx]=out; });
+  } else {
+    const top = Math.min(...ordered.map(e=>e.y));
+    const bottom = Math.max(...ordered.map(e=>e.y + (e.h||0)));
+    const totalH = ordered.reduce((s,e)=> s + (e.h||0), 0);
+    const gap = (bottom - top - totalH) / (ordered.length - 1);
+    let cur = top;
+    ordered.forEach((el, i) => {
+      const out = deepClone(el); out.y = Math.round(cur); cur += (el.h||0) + gap; const idx = p.elements.findIndex(e=>e.id===el.id); if (idx!==-1) p.elements[idx]=out; });
+  }
+  renderPage(p); updateSelectionUI();
 }
 
 /* ----------------------- Grouping helpers & actions ----------------------- */
@@ -1353,6 +1469,7 @@ function getCustomAttributesFromModel(model){
 
 function renderProperties(){
   const box = propertiesContent();
+  try { console.log('[RENDER] renderProperties: selectionSize=', selectedIds.size, 'tableSel=', !!tableSel); } catch {}
   box.innerHTML = '';
   if (selectedIds.size === 0 && !tableSel) return;
   const page = getCurrentPage();
@@ -1451,13 +1568,16 @@ function renderProperties(){
     box.appendChild(row);
   });
 
-  // Block-specific: stacking toggle
+  // Block-specific: stacking children toggle
   if (m && m.type === 'block'){
     const row = document.createElement('div'); row.className = 'row';
     const lab = document.createElement('label'); lab.textContent = 'stackChildren';
     const ctl = document.createElement('input'); ctl.type='checkbox'; ctl.dataset.prop = 'stackChildren'; ctl.checked = !!m.stackChildren;
     row.appendChild(lab); row.appendChild(ctl); box.appendChild(row);
+  }
 
+  // Generic: stackByPage toggle available for all element types
+  if (m){
     const row2 = document.createElement('div'); row2.className = 'row';
     const lab2 = document.createElement('label'); lab2.textContent = 'stackByPage';
     const ctl2 = document.createElement('input'); ctl2.type='checkbox'; ctl2.dataset.prop = 'stackByPage'; ctl2.checked = !!m.stackByPage;
@@ -1923,6 +2043,10 @@ function onPropsInput(e){
   const isReserved = RESERVED_MODEL_KEYS.has(topKey) || key.startsWith('styles.');
   const path = isReserved ? key : `attrs.${key}`;
   applyPatchToSelection(toPatch(path, val));
+  // If stackByPage was toggled on/off, reflow immediately so element jumps in place
+  if (key === 'stackByPage') {
+    try { reflowStacks(getCurrentPage()); } catch {}
+  }
   propertiesContent().addEventListener('change', onPropsInput, { once: true });
 }
 
@@ -2039,11 +2163,11 @@ function serializeDocument(){
   return JSON.stringify(payload);
 }
 function normalizeDocument(doc){
-  const out = (doc && typeof doc === 'object') ? doc : { pages: [], currentPageId:'', nextElementId:1, editMode:true };
+  const out = (doc && typeof doc === 'object') ? doc : { pages: [], currentPageId:'', nextElementId:1, editMode:false };
   if (!Array.isArray(out.pages)) out.pages = [];
   if (typeof out.currentPageId !== 'string') out.currentPageId = out.pages[0]?.id || '';
   if (typeof out.nextElementId !== 'number') out.nextElementId = 1;
-  if (typeof out.editMode !== 'boolean') out.editMode = true;
+  if (typeof out.editMode !== 'boolean') out.editMode = false;
   return out;
 }
 function migrateDocument(doc, fromVersion){
@@ -2225,6 +2349,8 @@ async function bootstrap(){
     Model.document.pages = [createPage('Page 1')];
     Model.document.currentPageId = Model.document.pages[0].id;
   }
+  // Apply initial mode before rendering to avoid flicker
+  setEditMode(!!Model.document.editMode);
   renderAll();
 
   // elements panel
@@ -2250,6 +2376,9 @@ async function bootstrap(){
     }
     const targetEl = e.target.closest('.element');
     if (!targetEl){
+      // Starting a lasso selection: cancel any pending element drag promotion from a prior click
+      dragMaybe = null;
+      drag = null;
       // lasso on drag only; click without movement just clears/keeps selection
       const start = { x: e.clientX, y: e.clientY };
       const lasso = document.getElementById('lasso');
@@ -2302,6 +2431,8 @@ async function bootstrap(){
       if (tblMenu && tblMenu.contains && tblMenu.contains(e.target)) return;
 
       // Start lasso selection similar to inside-page behavior
+      // Cancel any pending single-element drag from previous clicks
+      dragMaybe = null; drag = null;
       const start = { x: e.clientX, y: e.clientY };
       const lasso = document.getElementById('lasso');
       let additive = e.shiftKey || e.ctrlKey || e.metaKey;
@@ -2342,6 +2473,73 @@ async function bootstrap(){
   window.addEventListener('resize', () => { updateFormatToolbarVisibility(); alignOverlays(); });
   window.addEventListener('scroll', () => { alignOverlays(); }, true);
 
+  // Snap/Guides toggles
+  const snapToggle = document.getElementById('snapToggle');
+  const guidesToggle = document.getElementById('guidesToggle');
+  const rulersToggle = document.getElementById('rulersToggle');
+  const minimapToggle = document.getElementById('minimapToggle');
+  let SNAP_ENABLED = true;
+  let GUIDES_ENABLED = false; // default off per request
+  function updateSnapGuides(){
+    SNAP_ENABLED = !snapToggle || !!snapToggle.checked;
+    GUIDES_ENABLED = !!(guidesToggle && guidesToggle.checked);
+  }
+  snapToggle?.addEventListener('change', updateSnapGuides);
+  guidesToggle?.addEventListener('change', updateSnapGuides);
+  updateSnapGuides();
+
+  // Rulers visibility
+  const rulers = document.getElementById('rulers');
+  const rulerH = document.getElementById('rulerH');
+  const rulerV = document.getElementById('rulerV');
+  rulersToggle?.addEventListener('change', () => {
+    if (!rulers) return;
+    rulers.classList.toggle('hidden', !rulersToggle.checked);
+    if (rulersToggle.checked) drawRulers();
+  });
+  if (rulers && rulersToggle && rulersToggle.checked) rulers.classList.remove('hidden');
+
+  // Minimap visibility
+  const minimap = document.getElementById('minimap');
+  minimapToggle?.addEventListener('change', () => {
+    if (!minimap) return;
+    minimap.classList.toggle('hidden', !minimapToggle.checked);
+    if (minimapToggle.checked) drawMinimap();
+  });
+  if (minimap && minimapToggle && minimapToggle.checked) minimap.classList.remove('hidden');
+
+  function drawRulers(){
+    if (!rulers || !rulerH || !rulerV) return;
+    // Simple tick marks using background gradients for performance
+    const mmPerPx = 1; // not calibrated; placeholder scale
+    rulerH.style.backgroundImage = `linear-gradient(to right, transparent 0, transparent 9px, #ddd 9px, #ddd 10px)`;
+    rulerH.style.backgroundSize = '10px 100%';
+    rulerV.style.backgroundImage = `linear-gradient(to bottom, transparent 0, transparent 9px, #ddd 9px, #ddd 10px)`;
+    rulerV.style.backgroundSize = '100% 10px';
+  }
+
+  function drawMinimap(){
+    if (!minimap) return; const ctx = minimap.getContext('2d'); if (!ctx) return;
+    const page = getPageNode(); if (!page) { ctx.clearRect(0,0,minimap.width,minimap.height); return; }
+    const pr = page.getBoundingClientRect();
+    const scale = Math.min(minimap.width / pr.width, minimap.height / pr.height);
+    ctx.clearRect(0,0,minimap.width,minimap.height);
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,minimap.width,minimap.height);
+    ctx.strokeStyle = '#ddd'; ctx.strokeRect(0.5,0.5,Math.round(pr.width*scale)-1,Math.round(pr.height*scale)-1);
+    // Draw elements
+    const p = getCurrentPage(); if (!p) return;
+    p.elements.forEach(el => {
+      const x = Math.round(el.x * scale); const y = Math.round(el.y * scale);
+      const w = Math.max(1, Math.round((el.w||1) * scale)); const h = Math.max(1, Math.round((el.h||1) * scale));
+      ctx.fillStyle = '#8888ff';
+      ctx.globalAlpha = 0.5; ctx.fillRect(x, y, w, h); ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#6666cc'; ctx.strokeRect(x+0.5, y+0.5, w-1, h-1);
+    });
+  }
+
+  // Keep rulers/minimap in sync
+  ['scroll','resize'].forEach(evt => window.addEventListener(evt, () => { drawRulers(); if (minimap && !minimap.classList.contains('hidden')) drawMinimap(); }, { passive:true }));
+
   // text/field/rect editing (field editable even when edit mode is off)
   pagesList().addEventListener('dblclick', (e) => {
     const active = getPageNode();
@@ -2367,7 +2565,8 @@ async function bootstrap(){
       elNode.classList.remove('has-placeholder');
     }
 
-    elNode.setAttribute('contenteditable', 'true');
+    // Use plaintext-only to ensure Enter inserts a newline and no HTML is injected
+    elNode.setAttribute('contenteditable', 'plaintext-only');
     elNode.classList.add('editing');
     elNode.focus();
 
@@ -2386,8 +2585,11 @@ async function bootstrap(){
     elNode.addEventListener('blur', onBlur);
   });
 
-  // edit mode
-  editToggle().addEventListener('change', () => setEditMode(editToggle().checked));
+  // edit mode toggle button
+  const etb = (typeof editToggleBtn === 'function') ? editToggleBtn() : document.getElementById('editToggleBtn');
+  if (etb){
+    etb.addEventListener('click', () => setEditMode(!Model.document.editMode));
+  }
 
   // per-page controls exist inside each wrapper; no global page strip
 
@@ -2424,9 +2626,15 @@ async function bootstrap(){
   // save and export
   saveBtn().addEventListener('click', saveDocument);
   saveAsBtn().addEventListener('click', saveDocumentAs);
+  const pngBtn = document.getElementById('exportPngBtn');
+  const jpgBtn = document.getElementById('exportJpgBtn');
+  if (pngBtn) pngBtn.addEventListener('click', () => ExportService.exportCurrentPageToImage({ format: 'png' }));
+  if (jpgBtn) jpgBtn.addEventListener('click', () => ExportService.exportCurrentPageToImage({ format: 'jpg', quality: 0.85 }));
   
   // floating toolbar wiring
   bindFloatingToolbar();
+
+  // Layers UI removed per request (keep app logic intact)
 
   // table clipboard handlers
   bindTableClipboard();
@@ -2471,13 +2679,15 @@ async function bootstrap(){
       panel.classList.toggle('hidden');
       return;
     }
-    const btn = e.target.closest('[data-action],[data-z],[data-group],[data-group-toggle]'); if (!btn) return;
+    const btn = e.target.closest('[data-action],[data-z],[data-group],[data-group-toggle],[data-align],[data-distribute]'); if (!btn) return;
     if (btn.hasAttribute('data-group-toggle')) { toggleGroupSelection(); updateGroupToggleButton(); return; }
     if (selectedIds.size===0) return;
     if (btn.dataset.action === 'copy') {
       copySelection();
     } else if (btn.dataset.action === 'delete') {
       deleteSelection();
+    } else if (btn.dataset.action === 'duplicate') {
+      copySelection();
     } else if (btn.dataset.z) {
       if (btn.dataset.z === 'front') sendSelectionToFront();
       else if (btn.dataset.z === 'back') sendSelectionToBack();
@@ -2485,6 +2695,10 @@ async function bootstrap(){
       else if (btn.dataset.z === 'down') sendSelectionBackward();
       // close dropdown after action
       const open = actions.querySelector('[data-menu-panel]'); if (open) open.classList.add('hidden');
+    } else if (btn.dataset.align) {
+      alignSelection(btn.dataset.align);
+    } else if (btn.dataset.distribute) {
+      distributeSelection(btn.dataset.distribute);
     }
   });
 
@@ -2494,6 +2708,37 @@ async function bootstrap(){
     if (!panel) return; if (panel.classList.contains('hidden')) return;
     if (!actions.contains(e.target)) panel.classList.add('hidden');
   });
+
+  // Command palette (Ctrl/Cmd+K)
+  const cp = document.getElementById('commandPalette');
+  const ci = document.getElementById('commandInput');
+  const cl = document.getElementById('commandList');
+  const COMMANDS = [
+    { id:'duplicate', label:'Duplicate selection (Ctrl+D)', run: ()=> copySelection() },
+    { id:'delete', label:'Delete selection (Del)', run: ()=> deleteSelection() },
+    { id:'group', label:'Group selection', run: ()=> groupSelection() },
+    { id:'ungroup', label:'Ungroup selection', run: ()=> ungroupSelection() },
+    { id:'align-left', label:'Align Left', run: ()=> alignSelection('left') },
+    { id:'align-center', label:'Align Center', run: ()=> alignSelection('center') },
+    { id:'align-right', label:'Align Right', run: ()=> alignSelection('right') },
+    { id:'align-top', label:'Align Top', run: ()=> alignSelection('top') },
+    { id:'align-middle', label:'Align Middle', run: ()=> alignSelection('middle') },
+    { id:'align-bottom', label:'Align Bottom', run: ()=> alignSelection('bottom') },
+    { id:'distribute-h', label:'Distribute Horizontally', run: ()=> distributeSelection('h') },
+    { id:'distribute-v', label:'Distribute Vertically', run: ()=> distributeSelection('v') },
+    { id:'export-png', label:'Export current page (PNG)', run: ()=> ExportService.exportCurrentPageToImage({format:'png'}) },
+    { id:'export-jpg', label:'Export current page (JPG)', run: ()=> ExportService.exportCurrentPageToImage({format:'jpg'}) },
+    { id:'export-pdf', label:'Export document (PDF)', run: ()=> ExportService.exportDocumentToPdf() },
+  ];
+  function openPalette(){ if (!cp) return; cp.classList.remove('hidden'); ci.value=''; renderCmds(''); ci.focus(); }
+  function closePalette(){ if (!cp) return; cp.classList.add('hidden'); }
+  function renderCmds(q){ if (!cl) return; const qq = q.trim().toLowerCase(); cl.innerHTML=''; COMMANDS.filter(c=>c.label.toLowerCase().includes(qq)).forEach(c=>{ const b=document.createElement('button'); b.className='btn'; b.textContent=c.label; b.style.justifyContent='flex-start'; b.addEventListener('click', ()=>{ c.run(); closePalette(); }); cl.appendChild(b); }); }
+  document.addEventListener('keydown', (e)=>{
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); }
+    if (cp && !cp.classList.contains('hidden') && e.key === 'Escape') { e.preventDefault(); closePalette(); }
+  });
+  ci?.addEventListener('input', ()=> renderCmds(ci.value));
+  cp?.addEventListener('click', (e)=>{ if (e.target === cp) closePalette(); });
   // Deselect elements when clicking anywhere outside of a page (but ignore editor overlays)
   document.addEventListener('mousedown', (e) => {
     const t = e.target;
@@ -2518,15 +2763,59 @@ async function bootstrap(){
     // Otherwise, clear element selection
     if (selectedIds && selectedIds.size > 0) clearSelection();
   });
+
+  // Element context menu (right-click)
+  (function bindElementContextMenu(){
+    const menu = document.getElementById('elementMenu'); if (!menu) return;
+    document.addEventListener('contextmenu', (e) => {
+      const el = e.target.closest?.('.element');
+      if (!el) return; // let default elsewhere
+      e.preventDefault();
+      const id = el.dataset.id;
+      if (!selectedIds.has(id)) setSelection([id]);
+      menu.style.left = e.clientX+'px'; menu.style.top = e.clientY+'px';
+      menu.classList.remove('hidden');
+    });
+    document.addEventListener('click', (e)=>{ if (!menu.contains(e.target)) menu.classList.add('hidden'); });
+    document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') menu.classList.add('hidden'); });
+    menu.addEventListener('click', (e)=>{
+      const b = e.target.closest('[data-em]'); if (!b) return; const act = b.dataset.em;
+      if (act === 'duplicate') { copySelection(); }
+      else if (act === 'delete') { deleteSelection(); }
+      else if (act === 'group') { groupSelection(); }
+      else if (act === 'ungroup') { ungroupSelection(); }
+      else if (act === 'z-front') { sendSelectionToFront(); }
+      else if (act === 'z-back') { sendSelectionToBack(); }
+      else if (act === 'align-left') { alignSelection('left'); }
+      else if (act === 'align-center') { alignSelection('center'); }
+      else if (act === 'align-right') { alignSelection('right'); }
+      else if (act === 'align-top') { alignSelection('top'); }
+      else if (act === 'align-middle') { alignSelection('middle'); }
+      else if (act === 'align-bottom') { alignSelection('bottom'); }
+      else if (act === 'distribute-h') { distributeSelection('h'); }
+      else if (act === 'distribute-v') { distributeSelection('v'); }
+      menu.classList.add('hidden');
+    });
+  })();
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       const panel = actions.querySelector('[data-menu-panel]'); if (panel) panel.classList.add('hidden');
+      // Also deselect elements when Esc is pressed and not editing text or table cell
+      const active = document.activeElement;
+      const isEditing = active && (active.isContentEditable || active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+      if (!isEditing && (!window.tableSel)) { clearSelection(); }
     }
     // Delete selection via keyboard when not typing in inputs
     if (e.key === 'Delete' || e.key === 'Backspace'){
       const active = document.activeElement;
       const isEditing = active && (active.isContentEditable || active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
       if (!isEditing && selectedIds.size > 0){ e.preventDefault(); deleteSelection(); }
+    }
+    // Duplicate selection: Ctrl/Cmd + D
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')){
+      const active = document.activeElement;
+      const isEditing = active && (active.isContentEditable || active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+      if (!isEditing && selectedIds.size > 0){ e.preventDefault(); copySelection(); }
     }
   });
 
@@ -2561,6 +2850,7 @@ const MAX_COLOR_HISTORY = 8;
 
 let currentColorInput = null;
 let customColorPicker = null;
+let deferredHistoryColor = null; // remember last chosen color while the picker is open
 
 function getColorHistory() {
   try {
@@ -2646,6 +2936,11 @@ function updateCustomColorPickerHistory() {
     circle.dataset.color = color;
     
     circle.addEventListener('click', () => {
+      // When picking a recent color, also sync the custom color input UI
+      const colorInput = document.getElementById('customColorInput');
+      const hexInput = document.getElementById('colorHexInput');
+      if (colorInput) colorInput.value = color;
+      if (hexInput) hexInput.value = color;
       selectColor(color);
     });
     
@@ -2667,8 +2962,12 @@ function selectColor(color) {
   if (!currentColorInput) return;
   // Apply immediately without closing, so the first click takes effect
   updateColorWithoutClosing(color);
-  // Then record in history (which may rerender the chips)
-  addToColorHistory(color);
+  // Defer reordering history until the picker closes to avoid chips jumping
+  if (customColorPicker && !customColorPicker.classList.contains('hidden')) {
+    deferredHistoryColor = color;
+  } else {
+    addToColorHistory(color);
+  }
   // Fire a change event to signal commit
   currentColorInput.dispatchEvent(new Event('change', { bubbles: true }));
 }
@@ -2745,6 +3044,11 @@ function hideCustomColorPicker() {
   if (customColorPicker) {
     customColorPicker.classList.add('hidden');
   }
+  // Commit any deferred history update now that the picker is closed
+  if (deferredHistoryColor) {
+    try { addToColorHistory(deferredHistoryColor); } catch {}
+    deferredHistoryColor = null;
+  }
   currentColorInput = null;
 }
 
@@ -2789,6 +3093,12 @@ function updateWorkspacePadding() {
   const viewport = document.getElementById('pageViewport');
   
   if (!viewport) return;
+  
+  if (!Model.document.editMode) {
+    viewport.style.paddingLeft = '0';
+    viewport.style.paddingRight = '0';
+    return;
+  }
   
   const leftCollapsed = leftPanel?.classList.contains('collapsed');
   const rightCollapsed = rightPanel?.classList.contains('collapsed');

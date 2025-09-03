@@ -27,22 +27,83 @@
   <!-- Top bar -->
   <div class="topbar">
     <div class="group">
-      <label class="switch"><input id="editToggle" type="checkbox" checked><span>Edit</span></label>
+      <button id="editToggleBtn" class="btn" aria-pressed="false" title="Toggle Edit/View mode" aria-label="Toggle Edit/View mode">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" fill="none" stroke="currentColor" stroke-width="2"></path>
+          <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
+        </svg>
+        <span>View mode</span>
+      </button>
     </div>
     <div class="group">
-      <button id="undoBtn" class="btn" disabled>Undo</button>
-      <button id="redoBtn" class="btn" disabled>Redo</button>
+      <button id="undoBtn" class="btn" disabled>
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M9 8l-4 4 4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Undo</span>
+      </button>
+      <button id="redoBtn" class="btn" disabled>
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M15 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Redo</span>
+      </button>
     </div>
     <div class="group" id="zoomGroup">
       <input id="zoomSlider" type="range" min="25" max="300" step="1" value="100" style="width:160px">
       <span id="zoomLabel">100%</span>
     </div>
+    <div class="group" id="viewToggles">
+      <label class="switch"><input id="snapToggle" type="checkbox" checked><span>Snap</span></label>
+      <!-- Guides & Minimap toggles temporarily removed per request -->
+      <label class="switch" style="display:none"><input id="guidesToggle" type="checkbox"><span>Guides</span></label>
+      <label class="switch" style="display:none"><input id="minimapToggle" type="checkbox"><span>Minimap</span></label>
+      <label class="switch" style="display:none"><input id="rulersToggle" type="checkbox"><span>Rulers</span></label>
+    </div>
     <div class="spacer"></div>
     <div class="group">
-      
-      <button id="saveBtn" class="btn">Save</button>
-      <button id="saveAsBtn" class="btn">Save As</button>
-      <button id="savePdfBtn" class="btn">Export as PDF</button>
+      <button id="saveBtn" class="btn">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 5h12v14H5z" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M9 5v6h6V5" fill="none" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <span>Save</span>
+      </button>
+      <button id="saveAsBtn" class="btn">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 5h12v14H5z" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M9 5v6h6V5" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 13v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>Save As</span>
+      </button>
+      <button id="savePdfBtn" class="btn">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M8 9l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>Export PDF</span>
+      </button>
+      <button id="exportPngBtn" class="btn">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M8 9l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>Export PNG</span>
+      </button>
+      <button id="exportJpgBtn" class="btn">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M8 9l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>Export JPG</span>
+      </button>
     </div>
   </div>
 
@@ -64,6 +125,8 @@
         <button class="btn add-el" data-add="image">Image</button>
         <button class="btn add-el" data-add="table">Table</button>
         <button class="btn add-el" data-add="block">Block</button>
+
+        <!-- Layers and Brand sections removed per request -->
       </div>
       <div class="panel-resize-handle panel-resize-right" data-panel="elementsPanel"></div>
     </aside>
@@ -216,20 +279,30 @@
     </button>
     <button class="btn mini" data-group-toggle title="Group/Ungroup"></button>
     <div class="menu" style="position:relative">
-      <button class="btn mini" data-menu="layers" title="Layer" aria-label="Layer menu">
+      <button class="btn mini" data-menu="actions" title="More" aria-label="More actions">
         <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="5" cy="12" r="2" fill="currentColor"/>
           <circle cx="12" cy="12" r="2" fill="currentColor"/>
           <circle cx="19" cy="12" r="2" fill="currentColor"/>
         </svg>
       </button>
-      <div class="dropdown hidden" data-menu-panel="layers" style="position:absolute;top:36px;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;gap:6px;min-width:190px">
-        
+      <div class="dropdown hidden" data-menu-panel="actions" style="position:absolute;top:36px;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);padding:8px;display:flex;flex-direction:column;gap:6px;min-width:220px">
+        <button class="btn mini" data-action="duplicate" title="Duplicate" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/></svg><span style="margin-left:6px">Duplicate</span></button>
+        <button class="btn mini" data-action="delete" title="Delete" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span style="margin-left:6px">Delete</span></button>
         <hr/>
-        <button class="btn mini" data-z="up">Bring forward</button>
-        <button class="btn mini" data-z="down">Send backward</button>
-        <button class="btn mini" data-z="front">Bring to front</button>
-        <button class="btn mini" data-z="back">Send to back</button>
+        <button class="btn mini" data-align="left" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 4v16M6 7h12v4H6zM6 15h8v4H6z" fill="currentColor"/></svg><span style="margin-left:6px">Left</span></button>
+        <button class="btn mini" data-align="center" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M12 4v16M4 9h16v4H4z" fill="currentColor"/></svg><span style="margin-left:6px">Center</span></button>
+        <button class="btn mini" data-align="right" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M20 4v16M6 7h12v4H6zM10 15h8v4h-8z" fill="currentColor"/></svg><span style="margin-left:6px">Right</span></button>
+        <hr/>
+        <button class="btn mini" data-align="top" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 4h16M7 6v12h4V6zM15 6v8h4V6z" fill="currentColor"/></svg><span style="margin-left:6px">Top</span></button>
+        <button class="btn mini" data-align="middle" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 12h16M7 6v12h4V6zM15 8v8h4V8z" fill="currentColor"/></svg><span style="margin-left:6px">Middle</span></button>
+        <button class="btn mini" data-align="bottom" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 20h16M7 6v12h4V6zM15 10v8h4v-8z" fill="currentColor"/></svg><span style="margin-left:6px">Bottom</span></button>
+        <hr/>
+        <button class="btn mini" data-distribute="v" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 4h16M4 20h16M6 9v6h12V9z" fill="currentColor"/></svg><span style="margin-left:6px">Vertically</span></button>
+        <button class="btn mini" data-distribute="h" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 4v16M20 4v16M9 6h6v12H9z" fill="currentColor"/></svg><span style="margin-left:6px">Horizontally</span></button>
+        <hr/>
+        <button class="btn mini" data-z="front" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M3 3h8v8H3zM13 13h8v8h-8zM8 16h8v-8H8z" fill="currentColor"/></svg><span style="margin-left:6px">Bring to front</span></button>
+        <button class="btn mini" data-z="back" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M3 3h8v8H3zM13 13h8v8h-8zM10 10h8V2h-8z" fill="currentColor"/></svg><span style="margin-left:6px">Send to back</span></button>
       </div>
     </div>
   </div>
@@ -276,6 +349,46 @@
     <button class="btn mini" data-tm="col-insert-right">Insert column right</button>
     <button class="btn mini" data-tm="col-delete">Delete column</button>
   </div>
+
+  <!-- Element context menu -->
+  <div id="elementMenu" class="hidden" style="position:fixed; z-index:1101; background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); padding:6px; display:flex; flex-direction:column; gap:4px; min-width:200px">
+    <button class="btn mini" data-em="duplicate">Duplicate (Ctrl+D)</button>
+    <button class="btn mini" data-em="delete">Delete (Del)</button>
+    <hr/>
+    <button class="btn mini" data-em="group">Group</button>
+    <button class="btn mini" data-em="ungroup">Ungroup</button>
+    <hr/>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">
+      <button class="btn mini" data-em="align-left">Align Left</button>
+      <button class="btn mini" data-em="align-center">Align Center</button>
+      <button class="btn mini" data-em="align-right">Align Right</button>
+      <button class="btn mini" data-em="align-top">Align Top</button>
+      <button class="btn mini" data-em="align-middle">Align Middle</button>
+      <button class="btn mini" data-em="align-bottom">Align Bottom</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;margin-top:4px">
+      <button class="btn mini" data-em="distribute-h">Distribute H</button>
+      <button class="btn mini" data-em="distribute-v">Distribute V</button>
+    </div>
+    <hr/>
+    <button class="btn mini" data-em="z-front">Bring to front</button>
+    <button class="btn mini" data-em="z-back">Send to back</button>
+  </div>
+
+  <!-- Command Palette -->
+  <div id="commandPalette" class="hidden" role="dialog" aria-modal="true" aria-label="Command palette" style="position:fixed;inset:0;display:grid;place-items:center;z-index:1200;background:rgba(0,0,0,.2)">
+    <div class="cpanel" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);width:min(640px,90vw);">
+      <input id="commandInput" type="text" placeholder="Type a command… (Esc to close)" style="width:100%;box-sizing:border-box;padding:10px 12px;border:0;border-bottom:1px solid var(--border);border-radius:12px 12px 0 0;font-size:14px;outline:none">
+      <div id="commandList" style="max-height:300px;overflow:auto;padding:6px;display:flex;flex-direction:column;gap:4px"></div>
+    </div>
+  </div>
+
+  <!-- Rulers (top/left) and Minimap -->
+  <div id="rulers" class="hidden" aria-hidden="true" style="display:none">
+    <div id="rulerH" class="ruler h"></div>
+    <div id="rulerV" class="ruler v"></div>
+  </div>
+  <canvas id="minimap" class="hidden" width="180" height="120" style="display:none;position:fixed;right:16px;bottom:16px;border:1px solid var(--border);border-radius:6px;background:#fff;box-shadow:var(--shadow);z-index:1050"></canvas>
 
   
 </body>

@@ -53,7 +53,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 /* Top bar */
 .topbar { position: fixed; inset: 0 0 auto 0; height: 35px; background: var(--panel); display: flex; align-items: center; gap: 6px; padding: 0 8px; box-shadow: var(--shadow); z-index: 1100; }
 .topbar .group { display: inline-flex; gap: 4px; border: 1px solid var(--border); border-radius: 10px; padding: 4px; background: #fff; }
-.btn { height: 26px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: border-color .15s, background .15s, color .15s; }
+.btn { height: 26px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: border-color .15s, background .15s, color .15s; }
 .btn:hover{ background:#f9fafb; }
 .btn.mini{ height: 22px; padding: 0 6px; font-size: 12px; }
 .btn.saving{ background: #fef3c7; border-color: #f59e0b; color: #92400e; }
@@ -242,7 +242,17 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 /* Fixed position for format toolbar under topbar */
 #formatToolbar { position: fixed; top: 35px; left: 0; right: 0; margin: 4px auto 0; width: fit-content; z-index: 1100; }
 /* Generic icon sizing for buttons */
-.btn .icon { width:16px; height:16px; display:block; }
+.btn .icon { width:16px; height:16px; display:block; margin:auto; }
+
+/* Layers and Brand kit (left panel) */
+.layers { display:flex; flex-direction:column; gap:4px; font-size:12px; }
+.layer-item { display:grid; grid-template-columns: auto 1fr auto auto; align-items:center; gap:6px; padding:4px 6px; border:1px solid var(--border); border-radius:6px; }
+.layer-item .name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.brand-kit { display:flex; flex-direction:column; gap:8px; }
+.brand-colors { display:grid; grid-template-columns: repeat(8, 1fr); gap:4px; }
+.brand-color { width:18px; height:18px; border-radius:4px; border:1px solid var(--border); cursor:pointer; }
+.brand-fonts { display:flex; flex-wrap:wrap; gap:6px; }
+.brand-font { padding:2px 6px; border:1px solid var(--border); border-radius:6px; cursor:pointer; font-size:12px; }
 
 /* Pages list */
 #pagesList { display: grid; gap: 32px; place-items: start center; width: 100%; }
@@ -269,6 +279,11 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 /* generic hidden utility */
 .hidden { display: none !important; }
 
+/* Rulers */
+.ruler { position:fixed; background:#fff; border:1px solid var(--border); z-index:1050; box-shadow:var(--shadow); }
+.ruler.h { left:12px; right:12px; top:35px; height:20px; }
+.ruler.v { top:64px; bottom:16px; left:12px; width:20px; }
+
 /* circular color inputs */
 input[type="color"].circle { appearance: none; -webkit-appearance: none; border: none; width: 24px; height: 24px; padding: 0; background: none; }
 input[type="color"].circle::-webkit-color-swatch-wrapper { padding: 0; }
@@ -283,7 +298,7 @@ input[type="color"].circle::-webkit-color-swatch { border: 1px solid var(--borde
   box-shadow: 0 8px 32px rgba(0,0,0,0.12);
   padding: 12px;
   z-index: 2100;
-  width: 200px;
+  width: 260px; /* widened to fit recent colors comfortably */
 }
 
 .custom-color-picker.hidden {
@@ -305,14 +320,14 @@ input[type="color"].circle::-webkit-color-swatch { border: 1px solid var(--borde
 
 .color-history-grid {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(10, 1fr); /* more columns for more chips */
+  gap: 6px;
   margin-bottom: 12px;
 }
 
 .color-history-circle {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;

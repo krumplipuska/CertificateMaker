@@ -220,56 +220,124 @@ function parseStyleString(styleString){
 
 function toggleVisibility(targetSelector){
     try {
-        const norm = (v) => String(v == null ? '' : v).trim().replace(/^['"]|['"]$/g, '');
-        const sel = norm(targetSelector);
+        if (typeof Model === 'undefined' || !Model.document) return;
+        const normalizeArg = (v) => String(v == null ? '' : v).trim().replace(/^['"]|['"]$/g, '');
+        const sel = normalizeArg(targetSelector);
         const page = (typeof getCurrentPage === 'function') ? getCurrentPage() : null;
         if (!page || typeof updateElement !== 'function') return;
-        const flipFromModel = (m) => {
-            const attrs = Object.assign({}, m?.attrs || {});
-            const styleStr = String(attrs.style || '');
-            const hasNone = /display\s*:\s*none/i.test(styleStr);
-            const cleaned = styleStr.replace(/display\s*:\s*none\s*;?/ig, '').trim();
-            const nextStyle = hasNone ? cleaned : (cleaned ? cleaned + '; display:none' : 'display:none');
-            return { attrs: { ...attrs, style: nextStyle } };
-        };
+
+        // Preserve current selection (updateElement would otherwise select the last updated id)
+        const prevSelIds = Array.from(document.querySelectorAll('.page .element.selected'))
+            .map(n => n && n.getAttribute('data-id'))
+            .filter(Boolean);
+        const prevTableSel = (typeof tableSel !== 'undefined' && tableSel) ? { ...tableSel } : null;
+
+        // Identify the triggering element (button) so we can keep selection on it
+        let clickedId = null;
+        try {
+            const clickedNode = (this && this.nodeType === 1) ? (this.closest ? this.closest('.element[data-id]') : this) : null;
+            clickedId = clickedNode && clickedNode.getAttribute ? clickedNode.getAttribute('data-id') : null;
+        } catch {}
+
+        // Resolve target element ids from selector, triggering node, or current selection
         const ids = [];
         if (sel){
             try {
                 const nodes = Array.from(document.querySelectorAll(sel));
-                nodes.forEach(n => { const id = n && n.getAttribute('data-id'); if (id) ids.push(id); });
+                nodes.forEach(n => {
+                    const el = (n && n.closest) ? n.closest('.element[data-id]') || n : n;
+                    const id = el && el.getAttribute && el.getAttribute('data-id');
+                    if (id) ids.push(id);
+                });
             } catch {}
             if (ids.length === 0 && sel.startsWith('#')){
                 const node = document.querySelector(`.page [data-id="${sel.slice(1)}"]`);
                 const id = node && node.getAttribute('data-id'); if (id) ids.push(id);
             }
         } else if (this && this.nodeType === 1) {
-            const id = this.getAttribute('data-id'); if (id) ids.push(id);
+            const el = this.classList && this.classList.contains('element') ? this : this.closest && this.closest('.element[data-id]');
+            const id = el && el.getAttribute('data-id'); if (id) ids.push(id);
         } else {
             Array.from(document.querySelectorAll('.page .element.selected')).forEach(n => { const id = n.getAttribute('data-id'); if (id) ids.push(id); });
         }
         if (ids.length === 0) { console.warn('toggleVisibility: no targets'); return; }
+
         ids.forEach(id => {
-            const m = (typeof getElementById === 'function') ? getElementById(id) : null;
-            if (!m) return;
-            const patch = flipFromModel(m);
-            updateElement(id, patch);
+            const model = (typeof getElementById === 'function') ? getElementById(id) : null;
+            if (!model) return;
+
+            // Determine current hidden state (prefer helper if available)
+            let isHidden = false;
+            try {
+                if (typeof isElementHidden === 'function') isHidden = !!isElementHidden(model);
+                else {
+                    const a = model?.attrs || {};
+                    if (a.hidden === true || a.hidden === 'true') isHidden = true;
+                    const st = String(a.style || '');
+                    if (/display\s*:\s*none/i.test(st)) isHidden = true;
+                }
+            } catch {}
+
+            // Toggle only the hidden flag; renderer enforces display state last
+            const nextAttrs = Object.assign({}, model?.attrs || {});
+            if (isHidden) {
+                nextAttrs.hidden = false;
+                if (typeof nextAttrs.style === 'string') {
+                    nextAttrs.style = nextAttrs.style.replace(/display\s*:\s*none\s*;?/ig, '').trim();
+                }
+            } else {
+                nextAttrs.hidden = true;
+            }
+            updateElement(id, { attrs: nextAttrs });
         });
-        if (typeof window.reflowStacks === 'function') {
-            try { window.reflowStacks(page); } catch {}
+
+        if (typeof window.reflowStacks === 'function') { try { window.reflowStacks(page); } catch {} }
+        if (typeof renderPage === 'function') { try { renderPage(page); } catch {} }
+        // If we are in edit mode, apply styles again so edit-mode visibility policy (always show) wins without flipping state
+        if (Model.document.editMode) {
+            try {
+                (page.elements || []).forEach(el => {
+                    const node = document.querySelector(`.page-wrapper[data-page-id="${page.id}"] .page .element[data-id="${el.id}"]`);
+                    if (node) applyElementStyles(node, el);
+                });
+            } catch {}
+        }
+
+        // Selection behavior
+        if (!Model.document.editMode) {
+            // In view mode, ensure no selection box is shown
+            if (typeof clearSelection === 'function') try { clearSelection(); } catch {}
+        } else {
+            // Keep selection on the button that triggered the action if available
+            if (clickedId && typeof setSelection === 'function') { try { setSelection([clickedId]); } catch {} }
+            else if (Array.isArray(prevSelIds) && prevSelIds.length && typeof setSelection === 'function') { try { setSelection(prevSelIds); } catch {} }
+            // Restore table selection if applicable and we didn't switch to button
+            if (!clickedId && prevTableSel && typeof setTableSelection === 'function') {
+                try { setTableSelection(prevTableSel.tableId, prevTableSel.r0, prevTableSel.c0, prevTableSel.r1, prevTableSel.c1); } catch {}
+            }
         }
     } catch(err){ console.warn('toggleVisibility failed', err); }
 }
 
 // Ensure global for inline onclick
-try { window.toggleVisibility = toggleVisibility; } catch {}
+try {
+    window.toggleVisibility = toggleVisibility;
+    window.simpleConsoleLogFunction = simpleConsoleLogFunction;
+    window.coloringFunction = coloringFunction;
+    window.conditionalFormatByOffset = conditionalFormatByOffset;
+} catch {}
 
 
 function simpleConsoleLogFunction(message){
-    console.log(message);
+    try {
+        if (typeof Model === 'undefined' || !Model.document || Model.document.editMode) return;
+        console.log(message);
+    } catch {}
 }
 
 function coloringFunction(targetSelector, styleString){
     try {
+        if (typeof Model === 'undefined' || !Model.document || Model.document.editMode) return;
         // Normalize inputs (strip wrapping quotes if any)
         const normalizeArg = (v) => String(v == null ? '' : v).trim().replace(/^['"]|['"]$/g, '');
         const sel = normalizeArg(targetSelector);
@@ -332,6 +400,7 @@ function modelPatchToCellStyle(patchStyles){
 // Conditional formatting using relative column offsets within the same row
 function conditionalFormatByOffset(minColOffset, maxColOffset, styleIfOk, styleIfNok){
     try {
+        if (typeof Model === 'undefined' || !Model.document || Model.document.editMode) return;
         const normalizeArg = (v) => String(v == null ? '' : v).trim().replace(/^['"]|['"]$/g, '');
         const offMin = parseInt(minColOffset, 10); const offMax = parseInt(maxColOffset, 10);
         const dMin = Number.isFinite(offMin) ? offMin : 0;
