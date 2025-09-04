@@ -256,9 +256,10 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 
 /* Pages list */
 #pagesList { display: grid; gap: 32px; place-items: start center; width: 100%; }
-.page-wrapper { display: grid; gap: 8px; }
-.page-title { color: var(--muted); font-size: 13px; }
-.page-stage { position: relative; width: calc(var(--page-w) * var(--zoom)); height: calc(var(--page-h) * var(--zoom)); }
+.page-wrapper { display: grid; gap: 8px; justify-items: center; }
+.page-title { color: var(--muted); font-size: 13px; display:flex; align-items:center; gap:6px; width: calc(var(--page-w) * var(--zoom)); }
+.page-title .title-actions { margin-left: auto; float: none !important; }
+.page-stage { position: relative; width: calc(var(--page-w) * var(--zoom)); height: calc(var(--page-h) * var(--zoom)); justify-self: center; }
 .page-controls { display: inline-flex; gap: 6px; }
 
 /* Element actions bubble */
