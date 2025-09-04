@@ -20,10 +20,17 @@ function ensureElementNode(elModel) {
 	return node;
 }
 
-function applyElementStyles(node, m) {
+function applyElementStyles(node, m, pageForParentLookup) {
 	let relX = m.x, relY = m.y;
 	if (m.parentId){
-		const parent = getElementById(m.parentId);
+		let parent = null;
+		try {
+			if (pageForParentLookup && Array.isArray(pageForParentLookup.elements)){
+				parent = pageForParentLookup.elements.find(e => e && e.id === m.parentId) || null;
+			} else {
+				parent = getElementById(m.parentId);
+			}
+		} catch {}
 		if (parent){ relX = (m.x - parent.x); relY = (m.y - parent.y); }
 	}
 	node.style.left = relX + 'px';
@@ -181,7 +188,7 @@ function renderPage(page) {
 	});
 	const renderOne = (elm, parentNode) => {
 		const node = ensureElementNode({ ...elm, pageId: page.id });
-		applyElementStyles(node, elm);
+		applyElementStyles(node, elm, page);
 		try { console.log('[RENDER] applyElementStyles', elm.id, elm.type); } catch {}
 		// Populate content for text-like elements so edits persist after re-render
 		if (elm.type === 'text' || elm.type === 'field' || elm.type === 'rect') {

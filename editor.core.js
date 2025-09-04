@@ -267,9 +267,22 @@ function duplicateCurrentPage() {
   const page = getCurrentPage();
   commitHistory('duplicate-page');
   const clone = deepClone(page);
-  clone.id = createPage(page.name + ' copy').id;
-  // ensure unique element ids
-  clone.elements = clone.elements.map(e => ({ ...e, id: generateId() }));
+  // Create a fresh page shell to get a new id and name
+  const fresh = createPage(page.name + ' copy');
+  clone.id = fresh.id;
+  clone.name = fresh.name;
+  // Remap element ids and fix parentId references so all elements (including hidden ones) are preserved
+  const idMap = new Map();
+  clone.elements = (clone.elements || []).map(e => {
+    const newId = generateId();
+    idMap.set(e.id, newId);
+    return { ...e, id: newId };
+  });
+  clone.elements = clone.elements.map(e => {
+    const pid = e.parentId;
+    if (pid && idMap.has(pid)) return { ...e, parentId: idMap.get(pid) };
+    return e;
+  });
   const idx = Model.document.pages.findIndex(p => p.id === page.id);
   Model.document.pages.splice(idx + 1, 0, clone);
   Model.document.currentPageId = clone.id;

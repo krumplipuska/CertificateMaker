@@ -175,8 +175,9 @@ function updateElement(id, patch) {
       try { nodes = Array.from(document.querySelectorAll(id)); } catch {}
       if (!nodes.length) {
         const token = String(id).replace(/^#/, '');
-        const byData = document.querySelector(`.page [data-id="${token}"]`);
-        if (byData) nodes.push(byData);
+        // Look for element with data-id across all pages
+        const byData = document.querySelectorAll(`.page [data-id="${token}"]`);
+        if (byData && byData.length) nodes.push(...byData);
       }
       nodes.forEach(node => {
         if (!node) return;
@@ -194,17 +195,19 @@ function updateElement(id, patch) {
         commitHistory('update-multi');
         let doc = Model.document;
         if (targets.elementIds.size){
-          doc = applyPatchToElements(doc, [...targets.elementIds], patch);
+          // Apply across any page, not just current
+          doc = applyPatchToElementsAnyPage(doc, [...targets.elementIds], patch);
         }
         if (targets.cells.length){
           const styles = (patch && patch.styles) || {};
-          // Apply per-cell to preserve original semantics
+          // Apply per-cell (table might be on any page)
           targets.cells.forEach(({ tableId, r, c }) => {
-            doc = applyPatchToTableCells(doc, tableId, { r0:r, c0:c, r1:r, c1:c }, styles);
+            doc = applyPatchToTableCellsAnyPage(doc, tableId, { r0:r, c0:c, r1:r, c1:c }, styles);
           });
         }
         Model.document = doc;
-        renderPage(getCurrentPage());
+        // Re-render all pages because the change may be off the current page
+        renderAll();
         updateSelectionUI();
       }
 
@@ -242,7 +245,10 @@ function updateElement(id, patch) {
   commitHistory('update-element');
   // Preserve table cell selection if we're updating the same table
   const prevTableSel = (tableSel && tableSel.tableId === id) ? { ...tableSel } : null;
-  Model.document = applyPatchToElements(Model.document, [id], patch);
+  // If the id is not on the current page, patch it by searching across all pages
+  const curHas = !!(page && page.elements && page.elements.some(e => e.id === id));
+  Model.document = curHas ? applyPatchToElements(Model.document, [id], patch)
+                          : applyPatchToElementsAnyPage(Model.document, [id], patch);
   renderPage(getCurrentPage());
   
   if (prevTableSel) {

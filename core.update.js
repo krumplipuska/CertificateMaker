@@ -16,6 +16,19 @@ function applyPatchToElements(documentModel, elementIds, patch){
 	return doc;
 }
 
+/** Apply element patch to matching ids across all pages (used for cross-page selectors). */
+function applyPatchToElementsAnyPage(documentModel, elementIds, patch){
+	const doc = deepClone(documentModel);
+	if (!doc || !Array.isArray(doc.pages)) return doc;
+	const ids = new Set((elementIds || []).filter(Boolean));
+	if (ids.size === 0) return doc;
+	doc.pages.forEach(p => {
+		if (!Array.isArray(p.elements)) return;
+		p.elements = p.elements.map(el => ids.has(el.id) ? deepMerge(el, patch || {}) : el);
+	});
+	return doc;
+}
+
 /**
  * Apply per-cell style patch to a rectangular range in a table element.
  * stylePatch accepts model style keys, mapped to table cell helpers internally.
@@ -37,6 +50,28 @@ function applyPatchToTableCells(documentModel, tableId, range, stylePatch){
 	const perCellKeys = ['strokeColor','strokeWidth','fontFamily','fontSize','bold','italic','underline', 'borderColor', 'borderWidth'];
 	perCellKeys.forEach(k => { if (styles[k] != null) next = tableApplyCellStyle(next, range, k, styles[k]); });
 	page.elements[idx] = next;
+	return doc;
+}
+
+/** Apply table-cell style patch, locating the table by id in any page. */
+function applyPatchToTableCellsAnyPage(documentModel, tableId, range, stylePatch){
+	const doc = deepClone(documentModel);
+	if (!doc || !Array.isArray(doc.pages)) return doc;
+	for (let p of doc.pages){
+		const idx = p.elements.findIndex(e => e.id === tableId);
+		if (idx === -1) continue;
+		let next = p.elements[idx];
+		const styles = stylePatch || {};
+		if (styles.fill != null) next = tableApplyCellBg(next, range, styles.fill);
+		if (styles.textColor != null) next = tableApplyTextColor(next, range, styles.textColor);
+		const alignH = (styles.textAlignH != null) ? styles.textAlignH : undefined;
+		const alignV = (styles.textAlignV != null) ? styles.textAlignV : undefined;
+		if (alignH || alignV) next = tableApplyAlign(next, range, alignH, alignV);
+		const perCellKeys = ['strokeColor','strokeWidth','fontFamily','fontSize','bold','italic','underline', 'borderColor', 'borderWidth'];
+		perCellKeys.forEach(k => { if (styles[k] != null) next = tableApplyCellStyle(next, range, k, styles[k]); });
+		p.elements[idx] = next;
+		break;
+	}
 	return doc;
 }
 
