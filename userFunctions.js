@@ -29,6 +29,7 @@ function getUserFunctionChoices(){
         ensure({ name:'simpleConsoleLogFunction', label:'Console log', inputs:1, placeholders:["message to log"], triggers:['click','change','input','dblclick','focus','blur'] });
         ensure({ name:'coloringFunction', label:'coloringFunction', inputs:2, placeholders:["selected element (css selector)", "style string e.g. background:#ff0000; color:#fff;"], triggers:['click','change','input','dblclick','focus','blur'] });
         ensure({ name:'toggleVisibility', label:'Toggle visibility', inputs:1, placeholders:["target element (css selector)"], triggers:['click','change','input','dblclick','focus','blur'] });
+        ensure({ name:'setVisibility', label:'Set visibility', inputs:2, placeholders:["target element (css selector)", "visible (true/false)"], triggers:['click','change','input','dblclick','focus','blur'] });
         ensure({
             name:'conditionalFormatByOffset',
             label:'Conditional Format (offsets)',
@@ -218,110 +219,63 @@ function parseStyleString(styleString){
 //your function in here!!
 
 
+// --- Visibility helpers (simple, reusable) ---
+function __resolveTargetIds(targetSelector){
+    const ids = [];
+    try {
+        const pageNode = document.querySelector('.page-wrapper[data-page-id="' + (Model.document.currentPageId || '') + '"] .page');
+        if (typeof targetSelector === 'string' && targetSelector.trim()){
+            const sel = String(targetSelector).trim().replace(/^['"]|['"]$/g, '');
+            let nodes = [];
+            try { nodes = Array.from((pageNode || document).querySelectorAll(sel)); } catch {}
+            if (!nodes.length && sel.startsWith('#')){
+                const n = (pageNode || document).querySelector(`[data-id="${sel.slice(1)}"]`);
+                if (n) nodes.push(n);
+            }
+            nodes.forEach(n => { const el = n.closest?.('.element[data-id]') || n; const id = el?.getAttribute?.('data-id'); if (id) ids.push(id); });
+        } else if (this && this.nodeType === 1){
+            const el = this.closest?.('.element[data-id]') || this;
+            const id = el?.getAttribute?.('data-id'); if (id) ids.push(id);
+        } else {
+            document.querySelectorAll('.page .element.selected').forEach(n => { const id = n.getAttribute('data-id'); if (id) ids.push(id); });
+        }
+    } catch {}
+    return [...new Set(ids)];
+}
+
+function setVisibility(targetSelector, visible){
+    try {
+        if (!Model || !Model.document || typeof updateElement !== 'function') return;
+        const ids = __resolveTargetIds.call(this, targetSelector);
+        if (!ids.length) { console.warn('setVisibility: no targets'); return; }
+        const nextHidden = !Boolean(visible);
+        ids.forEach(id => updateElement(id, { attrs: { hidden: nextHidden } }));
+        try { if (typeof window.reflowStacks === 'function') window.reflowStacks(getCurrentPage()); } catch {}
+        try { if (typeof renderPage === 'function') renderPage(getCurrentPage()); } catch {}
+    } catch(err){ console.warn('setVisibility failed', err); }
+}
+
 function toggleVisibility(targetSelector){
     try {
-        if (typeof Model === 'undefined' || !Model.document) return;
-        const normalizeArg = (v) => String(v == null ? '' : v).trim().replace(/^['"]|['"]$/g, '');
-        const sel = normalizeArg(targetSelector);
-        const page = (typeof getCurrentPage === 'function') ? getCurrentPage() : null;
-        if (!page || typeof updateElement !== 'function') return;
-
-        // Preserve current selection (updateElement would otherwise select the last updated id)
-        const prevSelIds = Array.from(document.querySelectorAll('.page .element.selected'))
-            .map(n => n && n.getAttribute('data-id'))
-            .filter(Boolean);
-        const prevTableSel = (typeof tableSel !== 'undefined' && tableSel) ? { ...tableSel } : null;
-
-        // Identify the triggering element (button) so we can keep selection on it
-        let clickedId = null;
-        try {
-            const clickedNode = (this && this.nodeType === 1) ? (this.closest ? this.closest('.element[data-id]') : this) : null;
-            clickedId = clickedNode && clickedNode.getAttribute ? clickedNode.getAttribute('data-id') : null;
-        } catch {}
-
-        // Resolve target element ids from selector, triggering node, or current selection
-        const ids = [];
-        if (sel){
-            try {
-                const nodes = Array.from(document.querySelectorAll(sel));
-                nodes.forEach(n => {
-                    const el = (n && n.closest) ? n.closest('.element[data-id]') || n : n;
-                    const id = el && el.getAttribute && el.getAttribute('data-id');
-                    if (id) ids.push(id);
-                });
-            } catch {}
-            if (ids.length === 0 && sel.startsWith('#')){
-                const node = document.querySelector(`.page [data-id="${sel.slice(1)}"]`);
-                const id = node && node.getAttribute('data-id'); if (id) ids.push(id);
-            }
-        } else if (this && this.nodeType === 1) {
-            const el = this.classList && this.classList.contains('element') ? this : this.closest && this.closest('.element[data-id]');
-            const id = el && el.getAttribute('data-id'); if (id) ids.push(id);
-        } else {
-            Array.from(document.querySelectorAll('.page .element.selected')).forEach(n => { const id = n.getAttribute('data-id'); if (id) ids.push(id); });
-        }
-        if (ids.length === 0) { console.warn('toggleVisibility: no targets'); return; }
-
+        if (!Model || !Model.document || typeof updateElement !== 'function') return;
+        const ids = __resolveTargetIds.call(this, targetSelector);
+        if (!ids.length) { console.warn('toggleVisibility: no targets'); return; }
         ids.forEach(id => {
-            const model = (typeof getElementById === 'function') ? getElementById(id) : null;
-            if (!model) return;
-
-            // Determine current hidden state (prefer helper if available)
-            let isHidden = false;
-            try {
-                if (typeof isElementHidden === 'function') isHidden = !!isElementHidden(model);
-                else {
-                    const a = model?.attrs || {};
-                    if (a.hidden === true || a.hidden === 'true') isHidden = true;
-                    const st = String(a.style || '');
-                    if (/display\s*:\s*none/i.test(st)) isHidden = true;
-                }
-            } catch {}
-
-            // Toggle only the hidden flag; renderer enforces display state last
-            const nextAttrs = Object.assign({}, model?.attrs || {});
-            if (isHidden) {
-                nextAttrs.hidden = false;
-                if (typeof nextAttrs.style === 'string') {
-                    nextAttrs.style = nextAttrs.style.replace(/display\s*:\s*none\s*;?/ig, '').trim();
-                }
-            } else {
-                nextAttrs.hidden = true;
-            }
-            updateElement(id, { attrs: nextAttrs });
+            const m = typeof getElementById === 'function' ? getElementById(id) : null;
+            if (!m) return;
+            let hidden = false;
+            try { hidden = typeof isElementHidden === 'function' ? !!isElementHidden(m) : !!(m.attrs && (m.attrs.hidden === true || m.attrs.hidden === 'true')); } catch {}
+            updateElement(id, { attrs: { hidden: !hidden } });
         });
-
-        if (typeof window.reflowStacks === 'function') { try { window.reflowStacks(page); } catch {} }
-        if (typeof renderPage === 'function') { try { renderPage(page); } catch {} }
-        // If we are in edit mode, apply styles again so edit-mode visibility policy (always show) wins without flipping state
-        if (Model.document.editMode) {
-            try {
-                (page.elements || []).forEach(el => {
-                    const node = document.querySelector(`.page-wrapper[data-page-id="${page.id}"] .page .element[data-id="${el.id}"]`);
-                    if (node) applyElementStyles(node, el);
-                });
-            } catch {}
-        }
-
-        // Selection behavior
-        if (!Model.document.editMode) {
-            // In view mode, ensure no selection box is shown
-            if (typeof clearSelection === 'function') try { clearSelection(); } catch {}
-        } else {
-            // Keep selection on the button that triggered the action if available
-            if (clickedId && typeof setSelection === 'function') { try { setSelection([clickedId]); } catch {} }
-            else if (Array.isArray(prevSelIds) && prevSelIds.length && typeof setSelection === 'function') { try { setSelection(prevSelIds); } catch {} }
-            // Restore table selection if applicable and we didn't switch to button
-            if (!clickedId && prevTableSel && typeof setTableSelection === 'function') {
-                try { setTableSelection(prevTableSel.tableId, prevTableSel.r0, prevTableSel.c0, prevTableSel.r1, prevTableSel.c1); } catch {}
-            }
-        }
+        try { if (typeof window.reflowStacks === 'function') window.reflowStacks(getCurrentPage()); } catch {}
+        try { if (typeof renderPage === 'function') renderPage(getCurrentPage()); } catch {}
     } catch(err){ console.warn('toggleVisibility failed', err); }
 }
 
 // Ensure global for inline onclick
 try {
     window.toggleVisibility = toggleVisibility;
+    window.setVisibility = setVisibility;
     window.simpleConsoleLogFunction = simpleConsoleLogFunction;
     window.coloringFunction = coloringFunction;
     window.conditionalFormatByOffset = conditionalFormatByOffset;

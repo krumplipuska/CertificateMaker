@@ -250,7 +250,14 @@ function updateElement(id, patch) {
     setTableSelection(prevTableSel.tableId, prevTableSel.r0, prevTableSel.c0, prevTableSel.r1, prevTableSel.c1);
   } else {
     // Only set element selection if we're not preserving table selection
-    setSelection([id]);
+    try {
+      if (!Model.document.editMode) { clearSelection(); }
+      else {
+        const updated = getElementById(id);
+        if (updated && isElementHidden(updated)) { clearSelection(); }
+        else { setSelection([id]); }
+      }
+    } catch { if (Model.document.editMode) setSelection([id]); else clearSelection(); }
   }
 }
 
@@ -411,6 +418,7 @@ function reflowStacks(page){
   const blocks = page.elements.filter(e => e.type === 'block');
   blocks.forEach(b => {
     if (!b.stackChildren) return;
+    // Only include visible kids when stacking
     const kids = page.elements.filter(e => e.parentId === b.id && e.type !== 'line' && !isElementHidden(e))
       .sort((a,bm)=> (a.y - bm.y));
     let y = 8;
@@ -421,7 +429,8 @@ function reflowStacks(page){
   if (pageElemsToStack.length){
     const sorted = [...pageElemsToStack].sort((a,b) => a.y - b.y);
     let y = 16;
-    sorted.forEach(b => { b.y = y; y += (b.h||0) + 16; });
+    // Lay out only visible stackers; skip hidden ones without consuming space
+    sorted.forEach(b => { if (!isElementHidden(b)) { b.y = y; y += (b.h||0) + 16; } });
   }
 }
 
