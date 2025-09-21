@@ -744,7 +744,8 @@ function extractGridFromSelection(t, r0, c0, r1, c1) {
       const cell = t.cells[id];
       if (!cell || cell.hidden) continue;
       if (cell.row === r && cell.col === c) {
-        out[r - r0][c - c0] = String(cell.content ?? '');
+        const f = String(cell?.attrs?.formula || '').trim();
+        out[r - r0][c - c0] = f ? f : String(cell.content ?? '');
       }
     }
   }
@@ -762,7 +763,8 @@ function ensureTableSize(t, needRows, needCols, startR, startC) {
 }
 
 /** Paste a grid into the table starting at (startR,startC); auto-expands and unmerges as needed. */
-function pasteGridIntoTable(t, startR, startC, grid) {
+function pasteGridIntoTable(t, startR, startC, grid, opts) {
+  const valuesOnly = !!(opts && opts.valuesOnly);
   const rows = grid.length;
   const cols = Math.max(...grid.map(r => r.length), 1);
 
@@ -776,7 +778,28 @@ function pasteGridIntoTable(t, startR, startC, grid) {
       const id = next.grid[r][c];
       const cell = next.cells[id];
       if (!cell || cell.hidden) continue;
-      cell.content = String(grid[rr][cc] ?? '');
+      const raw = String(grid[rr][cc] ?? '');
+      if (valuesOnly) {
+        if (raw.trim().startsWith('=')) {
+          try {
+            const ev = (typeof window !== 'undefined' && typeof window.evaluateFormulaExpression === 'function') ? window.evaluateFormulaExpression(raw) : null;
+            cell.content = String(ev && Object.prototype.hasOwnProperty.call(ev, 'value') ? ev.value : raw.replace(/^=/, ''));
+          } catch {
+            cell.content = raw.replace(/^=/, '');
+          }
+        } else {
+          cell.content = raw;
+        }
+        if (cell.attrs && cell.attrs.formula) delete cell.attrs.formula;
+      } else {
+        if (raw.trim().startsWith('=')) {
+          cell.attrs = Object.assign({}, cell.attrs, { formula: raw.trim() });
+          // Content will be recalculated after paste
+        } else {
+          cell.content = raw;
+          if (cell.attrs && cell.attrs.formula && raw.trim() === '') delete cell.attrs.formula;
+        }
+      }
     }
   }
   return next;
@@ -872,12 +895,18 @@ function bindTableClipboard() {
     if (!t) return;
 
     const grid = parseClipboardGrid(text);
-    let next = pasteGridIntoTable(t, anchor.r, anchor.c, grid);
+    const valuesOnly = !!(typeof window !== 'undefined' && window.__valuesOnlyPaste);
+    let next = pasteGridIntoTable(t, anchor.r, anchor.c, grid, { valuesOnly });
 
     // Commit once, rerender, and select the pasted rectangle
     commitHistory('table-paste');
     updateElement(t.id, next);
     setTableSelection(t.id, anchor.r, anchor.c, anchor.r + grid.length - 1, anchor.c + Math.max(...grid.map(r => r.length), 1) - 1);
+    try {
+      if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas();
+      renderPage(getCurrentPage());
+    } catch {}
+    try { window.__valuesOnlyPaste = false; } catch {}
   });
 }
 

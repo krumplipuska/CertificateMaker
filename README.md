@@ -14,3 +14,5 @@ Iam assuming that the code is a mess, but at this pont iam to afraid to check it
 So I will continue developing with the same stupid mentality. 
 
 Iam pretty sure that this will not cause any problem in the future.
+
+You are more then welcome to make any changes in it, and just make it better an more usable.

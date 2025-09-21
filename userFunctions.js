@@ -223,14 +223,15 @@ function parseStyleString(styleString){
 function __resolveTargetIds(targetSelector){
     const ids = [];
     try {
-        const pageNode = document.querySelector('.page-wrapper[data-page-id="' + (Model.document.currentPageId || '') + '"] .page');
         if (typeof targetSelector === 'string' && targetSelector.trim()){
             const sel = String(targetSelector).trim().replace(/^['"]|['"]$/g, '');
+            // Search across the entire document so selectors work on any page
             let nodes = [];
-            try { nodes = Array.from((pageNode || document).querySelectorAll(sel)); } catch {}
+            try { nodes = Array.from(document.querySelectorAll(sel)); } catch {}
             if (!nodes.length && sel.startsWith('#')){
-                const n = (pageNode || document).querySelector(`[data-id="${sel.slice(1)}"]`);
-                if (n) nodes.push(n);
+                const token = sel.slice(1);
+                const byData = Array.from(document.querySelectorAll(`.page [data-id="${token}"]`));
+                if (byData.length) nodes.push(...byData);
             }
             nodes.forEach(n => { const el = n.closest?.('.element[data-id]') || n; const id = el?.getAttribute?.('data-id'); if (id) ids.push(id); });
         } else if (this && this.nodeType === 1){
@@ -249,7 +250,8 @@ function setVisibility(targetSelector, visible){
         const ids = __resolveTargetIds.call(this, targetSelector);
         if (!ids.length) { console.warn('setVisibility: no targets'); return; }
         const nextHidden = !Boolean(visible);
-        ids.forEach(id => updateElement(id, { attrs: { hidden: nextHidden } }));
+        // Use CSS selector targeting so updates re-render all pages
+        ids.forEach(id => updateElement(`[data-id="${id}"]`, { attrs: { hidden: nextHidden } }));
         try { if (typeof window.reflowStacks === 'function') window.reflowStacks(getCurrentPage()); } catch {}
         try { if (typeof renderPage === 'function') renderPage(getCurrentPage()); } catch {}
     } catch(err){ console.warn('setVisibility failed', err); }
@@ -261,11 +263,20 @@ function toggleVisibility(targetSelector){
         const ids = __resolveTargetIds.call(this, targetSelector);
         if (!ids.length) { console.warn('toggleVisibility: no targets'); return; }
         ids.forEach(id => {
-            const m = typeof getElementById === 'function' ? getElementById(id) : null;
+            // Find model on any page so we can invert reliably
+            let m = null;
+            try {
+                const pages = (Model && Model.document && Model.document.pages) || [];
+                for (let i = 0; i < pages.length && !m; i++){
+                    const arr = (pages[i] && pages[i].elements) || [];
+                    m = arr.find(e => e && e.id === id) || null;
+                }
+            } catch {}
             if (!m) return;
             let hidden = false;
             try { hidden = typeof isElementHidden === 'function' ? !!isElementHidden(m) : !!(m.attrs && (m.attrs.hidden === true || m.attrs.hidden === 'true')); } catch {}
-            updateElement(id, { attrs: { hidden: !hidden } });
+            // Apply via selector so cross-page updates trigger renderAll()
+            updateElement(`[data-id="${id}"]`, { attrs: { hidden: !hidden } });
         });
         try { if (typeof window.reflowStacks === 'function') window.reflowStacks(getCurrentPage()); } catch {}
         try { if (typeof renderPage === 'function') renderPage(getCurrentPage()); } catch {}

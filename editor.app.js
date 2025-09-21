@@ -3179,8 +3179,8 @@ async function bootstrap(){
   redoBtn().addEventListener('click', redo);
 
   // keyboard shortcuts for copy/paste (element-level)
-  // IMPORTANT: if a table selection exists, DO NOT intercept here.
-  // Let native copy/paste events handle spreadsheet-style data.
+  // IMPORTANT: if a table selection exists, DO NOT intercept copy/paste here.
+  // But for Ctrl+Shift+V, set a flag to request values-only paste before letting native paste fire.
   document.addEventListener('keydown', (e) => {
     const isEditing = document.activeElement && (
       document.activeElement.contentEditable === 'true' ||
@@ -3191,8 +3191,17 @@ async function bootstrap(){
     if (isEditing) return;
 
     // If a table selection is active, allow default so our 'copy'/'paste' listeners run.
-    if (tableSel && (e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'v')) {
-      return;
+    // For Ctrl+Shift+V, mark values-only paste before letting the paste event proceed.
+    if (tableSel && (e.ctrlKey || e.metaKey)) {
+      if (e.key === 'v' || e.key === 'V') {
+        if (e.shiftKey) {
+          try { window.__valuesOnlyPaste = true; } catch { window.__valuesOnlyPaste = true; }
+        }
+        return;
+      }
+      if (e.key === 'c' || e.key === 'C') {
+        return;
+      }
     }
 
     if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedIds.size > 0) {
@@ -3201,6 +3210,13 @@ async function bootstrap(){
     } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
       e.preventDefault();
       pasteFromClipboard();
+    } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'v' || e.key === 'V')) {
+      // Ctrl+Shift+V: values-only paste for tables; do not intercept table selection copy/paste above
+      if (tableSel) return; // allow table paste listener to handle
+      try { window.__valuesOnlyPaste = true; } catch { window.__valuesOnlyPaste = true; }
+      // Trigger native paste event to reuse table handler if a table anchor exists, otherwise element-level paste
+      const evt = new ClipboardEvent('paste', { bubbles: true });
+      document.dispatchEvent(evt);
     }
   });
 
