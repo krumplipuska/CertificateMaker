@@ -27,8 +27,14 @@ const ExportService = (function(){
 		for (let i=0;i<pages.length;i++){
 			const page = pages[i];
 			const prevShadow = page.style.boxShadow; const prevRadius = page.style.borderRadius; page.style.boxShadow = 'none'; page.style.borderRadius = '0';
+			// Hide editor-only guides (including header/footer bands) while capturing
+			const guides = Array.from(page.querySelectorAll('.guide, .hf-guide'));
+			const prevGuideDisplay = guides.map(n => n.style.display);
+			guides.forEach(n => n.style.display = 'none');
 			const canvas = await html2canvasFn(page, { scale, useCORS:true, backgroundColor:'#ffffff', scrollX: canvasScrollX, scrollY: canvasScrollY });
+			// Restore styles
 			page.style.boxShadow = prevShadow; page.style.borderRadius = prevRadius;
+			guides.forEach((n, idx) => { n.style.display = prevGuideDisplay[idx]; });
 			const imgData = canvas.toDataURL('image/jpeg', 0.75);
 			if (i>0) pdf.addPage([widthPx, heightPx], orientation);
 			pdf.addImage(imgData, 'JPEG', 0, 0, widthPx, heightPx);

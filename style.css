@@ -94,7 +94,8 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 .props { display:grid; grid-template-columns: 1fr; row-gap: 6px; font-size: 12px; }
 .props .row { display: contents; }
 .props .row > label { grid-column: 1 / -1; display:flex; align-items:center; color: var(--muted); font-size: 11px; margin-left: 2px; }
-.props .row input, .props .row select, .props .row textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border:1px solid var(--border); border-radius:8px; font-size: 12px; height: 30px; }
+.props .row input:not([type="checkbox"]):not([type="radio"]), .props .row select, .props .row textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border:1px solid var(--border); border-radius:8px; font-size: 12px; height: 30px; }
+.props .row input[type="checkbox"] { width: 16px; height: 16px; padding: 0; margin: 0; border-radius: 4px; }
 .props .row textarea { height: 60px; resize: vertical; }
 .props .row input[aria-invalid="true"]{ border-color:#ef4444; background:#fee2e2; }
 .props .row .row-hint { grid-column: 1 / -1; font-size: 11px; color: var(--muted); }
@@ -215,6 +216,9 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 .table-resizer.h { height:2px; left:0; right:0; }
 .table-grid.resizing { cursor: col-resize; }
 .table-grid.resizing.row { cursor: row-resize; }
+/* In view mode, force normal cursor inside tables */
+.edit-off .table-grid, .edit-off .table-cell { cursor: default !important; }
+.edit-off .table-grid.resizing, .edit-off .table-grid.resizing.row { cursor: default !important; }
 .rect { border:1px solid var(--border); background:var(--brand-light); border-radius:6px; min-width:10px; min-height:10px; padding:6px 8px; line-height:1.4; overflow:hidden; white-space:pre-wrap; word-break:break-word; }
 .line { height:2px; width:40px; background:#111827; transform-origin:0 0; }
 
@@ -284,6 +288,22 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 .ruler { position:fixed; background:#fff; border:1px solid var(--border); z-index:1050; box-shadow:var(--shadow); }
 .ruler.h { left:12px; right:12px; top:35px; height:20px; }
 .ruler.v { top:64px; bottom:16px; left:12px; width:20px; }
+
+/* Header/Footer guides (edit-mode only) */
+.hf-guide { position:absolute; left:0; right:0; background: transparent; border:1px dashed rgba(59,130,246,.35); box-sizing: border-box; pointer-events: none; z-index: 50; }
+.hf-guide.header { top:0; }
+.hf-guide.footer { bottom:0; }
+.hf-guide .hf-label { position:absolute; left:8px; top:6px; font-size:11px; color:#1f2937; background:transparent; padding:0; border-radius:0; border:none; pointer-events:none; }
+.hf-guide .hf-label::after { content:''; }
+.hf-guide.footer .hf-label { top:auto; bottom:6px; }
+.hf-guide .hf-resize { position:absolute; left:0; right:0; height:8px; background: transparent; cursor: ns-resize; pointer-events: auto; }
+.hf-guide.header .hf-resize { bottom:-4px; }
+.hf-guide.footer .hf-resize { top:-4px; }
+.element.repeated { pointer-events: none !important; }
+
+/* Hide guides in view/export mode and PDF/export */
+.edit-off .hf-guide { display: none !important; }
+.__export_sandbox .hf-guide { display: none !important; }
 
 /* circular color inputs */
 input[type="color"].circle { appearance: none; -webkit-appearance: none; border: none; width: 24px; height: 24px; padding: 0; background: none; }
@@ -386,9 +406,13 @@ input[type="color"].circle::-webkit-color-swatch { border: 1px solid var(--borde
 /* View mode: hide editing UI */
 .edit-off #formatToolbar,
 .edit-off #elementActions,
+.edit-off #tableActions,
+.edit-off .selbox,
+.edit-off #lasso,
 .edit-off .guide { display: none !important; }
 .edit-off .page .element { cursor: default; }
 .edit-off .page .element.selected { box-shadow: none; }
+.edit-off .element.repeated { pointer-events: none; }
 .edit-off .page-title .title-actions { visibility: hidden; }
 .edit-off .side { display: none; }
 .edit-off .app { grid-template-columns: 1fr; }

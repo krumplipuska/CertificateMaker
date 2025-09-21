@@ -197,7 +197,8 @@ function tableDeleteRow(t, at) {
   // Drop cells that have been fully removed
   toDelete.forEach(id => { delete cells[id]; });
 
-  return { ...t, rows: t.rows - 1, grid, rowHeights, cells };
+  const h = rowHeights.reduce((a,b)=>a+b,0);
+  return { ...t, rows: t.rows - 1, grid, rowHeights, cells, h };
 }
 function tableDeleteColumn(t, at) {
   if (t.cols <= 1) return t; t = clone(t);
@@ -229,12 +230,45 @@ function tableDeleteColumn(t, at) {
   // Drop cells that have been fully removed
   toDelete.forEach(id => { delete cells[id]; });
 
-  return { ...t, cols: t.cols - 1, grid, colWidths, cells };
+  const w = colWidths.reduce((a,b)=>a+b,0);
+  return { ...t, cols: t.cols - 1, grid, colWidths, cells, w };
+}
+function tableDeleteRowsRange(t, r0, r1){
+	if (!t) return t;
+	const rr0 = Math.max(0, Math.min(r0, r1));
+	const rr1 = Math.min((t.rows || 0) - 1, Math.max(r0, r1));
+	if (!Number.isFinite(rr0) || !Number.isFinite(rr1) || rr1 < rr0) return t;
+	let next = t;
+	for (let i = rr0; i <= rr1; i++){
+		next = tableDeleteRow(next, rr0);
+		if (next.rows <= 1) break;
+	}
+	// Recompute height after batch
+	if (next && Array.isArray(next.rowHeights)) next.h = next.rowHeights.reduce((a,b)=>a+b,0);
+	return next;
+}
+function tableDeleteColsRange(t, c0, c1){
+	if (!t) return t;
+	const cc0 = Math.max(0, Math.min(c0, c1));
+	const cc1 = Math.min((t.cols || 0) - 1, Math.max(c0, c1));
+	if (!Number.isFinite(cc0) || !Number.isFinite(cc1) || cc1 < cc0) return t;
+	let next = t;
+	for (let i = cc0; i <= cc1; i++){
+		next = tableDeleteColumn(next, cc0);
+		if (next.cols <= 1) break;
+	}
+	// Recompute width after batch
+	if (next && Array.isArray(next.colWidths)) next.w = next.colWidths.reduce((a,b)=>a+b,0);
+	return next;
 }
 function tableSplitAnchor(t, r, c){ const id = t.grid[r][c]; const cell = t.cells[id]; if (!cell) return t; if (cell.rowSpan===1 && cell.colSpan===1) return t; const {row, col, rowSpan, colSpan} = cell; for (let rr=row; rr<row+rowSpan; rr++){ for (let cc=col; cc<col+colSpan; cc++){ const cid = (rr===row && cc===col) ? id : generateId('cell'); if (!t.cells[cid]) t.cells[cid] = { id:cid, row:rr, col:cc, rowSpan:1, colSpan:1, hidden:false, content:"", styles:clone(cell.styles), attrs: clone(cell.attrs||{}) }; t.grid[rr][cc] = cid; t.cells[cid].hidden = false; t.cells[cid].rowSpan = 1; t.cells[cid].colSpan = 1; } } cell.rowSpan = 1; cell.colSpan = 1; return t; }
 function tableNormalizeRange(t, r0,c0,r1,c1){ t = clone(t); const {r0:rr0,c0:cc0,r1:rr1,c1:cc1} = normalizeRange(r0,c0,r1,c1); const seen = new Set(); for (let r=rr0;r<=rr1;r++){ for (let c=cc0;c<=cc1;c++){ const id = t.grid[r][c]; if (!seen.has(id)){ seen.add(id); const a = t.cells[id]; if (a.rowSpan>1 || a.colSpan>1) t = tableSplitAnchor(t, a.row, a.col); } } } return t; }
 function tableMergeRange(t, r0,c0,r1,c1) { t = tableNormalizeRange(t, r0,c0,r1,c1); const { r0:rr0,c0:cc0,r1:rr1,c1:cc1 } = normalizeRange(r0,c0,r1,c1); const anchorId = t.grid[rr0][cc0]; const cell = t.cells[anchorId]; cell.row = rr0; cell.col = cc0; cell.rowSpan = rr1-rr0+1; cell.colSpan = cc1-cc0+1; for (let r=rr0;r<=rr1;r++){ for (let c=cc0;c<=cc1;c++){ const id = t.grid[r][c]; if (id !== anchorId){ t.cells[id].hidden = true; t.grid[r][c] = anchorId; } } } return t; }
 function tableUnmerge(t, r, c) { t = clone(t); const anchorId = t.grid[r][c]; const cell = t.cells[anchorId]; if (!cell || (cell.rowSpan===1 && cell.colSpan===1)) return t; return tableSplitAnchor(t, cell.row, cell.col); }
+function tableUnmergeRange(t, r0, c0, r1, c1){
+	// Unmerge any merged blocks that intersect the range
+	return tableNormalizeRange(t, r0, c0, r1, c1);
+}
 
 // ===== Table rendering =====
 function renderTable(elModel, host) {
@@ -294,6 +328,12 @@ function renderTable(elModel, host) {
   let dragRC = null; // { kind:'row'|'col', index, start, startSizes }
   grid.addEventListener('mousemove', (e)=>{
     if (dragRC) return; // dragging, ghost is driven elsewhere
+    // In view mode, never show resize affordances or cursors
+    if (!Model || !Model.document || !Model.document.editMode){
+      ghostV.style.display='none'; ghostH.style.display='none';
+      grid.classList.remove('resizing','row');
+      return;
+    }
     const hit = hitTableBoundary(host, elModel, e.clientX, e.clientY, 6);
     ghostV.style.display='none'; ghostH.style.display='none';
     grid.classList.remove('resizing','row');
@@ -315,6 +355,8 @@ function renderTable(elModel, host) {
 
   // Allow grabbing the ghost line itself
   function startResizeFromEvent(e){
+    // Block resizing entirely in view mode
+    if (!Model || !Model.document || !Model.document.editMode) return;
     const hit = hitTableBoundary(host, elModel, e.clientX, e.clientY, 6);
     if (!hit) return; e.stopPropagation(); e.preventDefault();
     commitHistory('table-resize'); // single history entry
@@ -364,6 +406,8 @@ function renderTable(elModel, host) {
   grid.addEventListener('mousedown', startResizeFromEvent, true);
   ghostV.addEventListener('mousedown', startResizeFromEvent);
   ghostH.addEventListener('mousedown', startResizeFromEvent);
+  // Also guard touch/pen
+  grid.addEventListener('touchstart', startResizeFromEvent, { passive:false, capture:true });
   // Keyboard navigation per APG grid patterns
   grid.addEventListener('keydown', (e) => onTableGridKeydown(e, elModel.id));
   // Clicking anywhere outside the grid clears the selection
@@ -544,7 +588,19 @@ function startEditCell(e, opts){
   if (div.contentEditable !== 'plaintext-only') div.setAttribute('contenteditable','plaintext-only');
   div.setAttribute('role','textbox');
   div.focus();
+  // If cell has a stored formula, show it while editing
+  try {
+    const t = getElementById(tableId); const id = t.grid[r][c];
+    const cell = t.cells[id]; const ff = String(cell?.attrs?.formula || '').trim();
+    if (ff) div.textContent = ff;
+  } catch {}
   let before = div.textContent || '';
+  // If entering with an existing formula or starts with '=', enable picker
+  try {
+    if ((div.textContent || '').trim().startsWith('=')) {
+      if (typeof window.startInlineFormulaPicker === 'function') window.startInlineFormulaPicker(div);
+    }
+  } catch {}
   // Optional initial overwrite (for single-key typing)
   if (opts && Object.prototype.hasOwnProperty.call(opts, 'initialText')) {
     div.textContent = String(opts.initialText ?? '');
@@ -578,8 +634,17 @@ function startEditCell(e, opts){
   const commit = () => {
     const text = sanitizePlaintext(div.textContent || '');
     const t = getElementById(tableId); const id = t.grid[r][c];
-    // silent update (no extra history spam); merge directly and rerender table only
-    t.cells[id].content = text;
+    // If starts with '=', store into cell.attrs.formula and recalc
+    if (text.trim().startsWith('=')){
+      t.cells[id].attrs = Object.assign({}, t.cells[id].attrs, { formula: text.trim() });
+      try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
+    } else {
+      // direct content
+      t.cells[id].content = text;
+      if (t.cells[id].attrs && t.cells[id].attrs.formula && text.trim() === ''){
+        delete t.cells[id].attrs.formula;
+      }
+    }
     // Fire a synthetic change event so inline onchange handlers on the cell can react after commit
     try {
       const evt = new Event('change', { bubbles: true });
@@ -595,8 +660,15 @@ function startEditCell(e, opts){
   const cancel = () => { div.textContent = before; };
   const onBlur = () => { cleanup(); commit(); };
   const onKey = (ev) => {
-    if (ev.key === 'Enter') { ev.preventDefault(); cleanup(); commit(); }
+    if (ev.key === 'Enter' && ev.shiftKey) { ev.preventDefault(); div.textContent = (div.textContent || '') + "\n"; placeCaret(); }
+    else if (ev.key === 'Enter') { ev.preventDefault(); cleanup(); commit(); }
     else if (ev.key === 'Escape') { ev.preventDefault(); cancel(); cleanup(); renderPage(getCurrentPage()); }
+    else if (ev.key.length === 1 && ev.key === '=' && div.textContent === before){
+      // Start formula mode when first character is '='
+      ev.preventDefault();
+      div.textContent = '=';
+      try { if (typeof window.startInlineFormulaPicker === 'function') window.startInlineFormulaPicker(div); } catch {}
+    }
     else if (ev.key === 'Tab') {
       ev.preventDefault(); const backward = ev.shiftKey;
       cleanup(); commit();
@@ -612,6 +684,17 @@ function startEditCell(e, opts){
   function cleanup(){ div.removeEventListener('blur', onBlur); div.removeEventListener('keydown', onKey); div.setAttribute('contenteditable','false'); div.removeAttribute('role'); }
   div.addEventListener('blur', onBlur);
   div.addEventListener('keydown', onKey);
+
+  // Support inline picker for cell editing via global helper
+  try {
+    // When user clicks other elements while editing a formula, tokens should insert into this cell
+    // The startInlineFormulaPicker returns a done() to stop; store it on node for blur cleanup
+    if ((div.textContent || '').trim().startsWith('=') && typeof window.startInlineFormulaPicker === 'function'){
+      const stop = window.startInlineFormulaPicker(div);
+      div._pickerStop = stop;
+      const prevOnBlur = onBlur;
+    }
+  } catch {}
 }
 
 function sanitizePlaintext(text){
@@ -867,10 +950,10 @@ function cmdTableAddColumn(after=true){
     highlightTableSelection();
   });
 }
-function cmdTableDeleteRow(){ withActiveTable((id, t)=>{ const at = tableSel ? tableSel.r0 : t.rows-1; updateElement(id, tableDeleteRow(t, at)); renderPage(getCurrentPage()); clearTableSelection(); }); }
-function cmdTableDeleteColumn(){ withActiveTable((id, t)=>{ const at = tableSel ? tableSel.c0 : t.cols-1; updateElement(id, tableDeleteColumn(t, at)); renderPage(getCurrentPage()); clearTableSelection(); }); }
+function cmdTableDeleteRow(){ withActiveTable((id, t)=>{ if (tableSel){ const {r0,r1}=tableSel; updateElement(id, tableDeleteRowsRange(t, r0, r1)); } else { const at = t.rows-1; updateElement(id, tableDeleteRow(t, at)); } renderPage(getCurrentPage()); clearTableSelection(); }); }
+function cmdTableDeleteColumn(){ withActiveTable((id, t)=>{ if (tableSel){ const {c0,c1}=tableSel; updateElement(id, tableDeleteColsRange(t, c0, c1)); } else { const at = t.cols-1; updateElement(id, tableDeleteColumn(t, at)); } renderPage(getCurrentPage()); clearTableSelection(); }); }
 function cmdTableMerge(){ if (!tableSel) return; const {tableId,r0,c0,r1,c1} = tableSel; const t = getElementById(tableId); updateElement(tableId, tableMergeRange(t, r0,c0,r1,c1)); renderPage(getCurrentPage()); setTableSelection(tableId, r0,c0,r1,c1); }
-function cmdTableUnmerge(){ if (!tableSel) return; const {tableId,r0,c0} = tableSel; const t = getElementById(tableId); updateElement(tableId, tableUnmerge(t, r0, c0)); renderPage(getCurrentPage()); setTableSelection(tableId, r0, c0); }
+function cmdTableUnmerge(){ if (!tableSel) return; const {tableId,r0,c0,r1,c1} = tableSel; const t = getElementById(tableId); const next = tableUnmergeRange(t, r0, c0, r1, c1); updateElement(tableId, next); renderPage(getCurrentPage()); setTableSelection(tableId, r0, c0, r1, c1); }
 /* removed toolbar-table binding: using context menu instead */
 
 // --- Context menu for table actions
@@ -889,13 +972,13 @@ function cmdTableUnmerge(){ if (!tableSel) return; const {tableId,r0,c0} = table
   menu.addEventListener('click', (e)=>{
     const b = e.target.closest('[data-tm]'); if (!b) return; const act = b.dataset.tm; const s = tableSel; if (!s) return; const t = getElementById(s.tableId);
     if (act==='merge') { updateElement(t.id, tableMergeRange(t, s.r0,s.c0,s.r1,s.c1)); }
-    if (act==='unmerge') { updateElement(t.id, tableUnmerge(t, s.r0,s.c0)); }
+    if (act==='unmerge') { updateElement(t.id, tableUnmergeRange(t, s.r0,s.c0,s.r1,s.c1)); }
     if (act==='row-insert-above') { updateElement(t.id, tableAddRow(t, s.r0)); }
     if (act==='row-insert-below') { updateElement(t.id, tableAddRow(t, s.r1+1)); }
-    if (act==='row-delete') { updateElement(t.id, tableDeleteRow(t, s.r0)); clearTableSelection(); }
+    if (act==='row-delete') { updateElement(t.id, tableDeleteRowsRange(t, s.r0, s.r1)); clearTableSelection(); }
     if (act==='col-insert-left') { updateElement(t.id, tableAddColumn(t, s.c0)); }
     if (act==='col-insert-right') { updateElement(t.id, tableAddColumn(t, s.c1+1)); }
-    if (act==='col-delete') { updateElement(t.id, tableDeleteColumn(t, s.c0)); clearTableSelection(); }
+    if (act==='col-delete') { updateElement(t.id, tableDeleteColsRange(t, s.c0, s.c1)); clearTableSelection(); }
     menu.classList.add('hidden');
   });
 })();
@@ -905,7 +988,9 @@ function cmdTableUnmerge(){ if (!tableSel) return; const {tableId,r0,c0} = table
   if (!bar) return;
 
   function showIfTableSelection() {
-    if (tableSel) bar.classList.remove('hidden');
+    // Hide entirely in view mode
+    const canShow = !!tableSel && (!!Model && !!Model.document && !!Model.document.editMode);
+    if (canShow) bar.classList.remove('hidden');
     else bar.classList.add('hidden');
   }
 
@@ -938,18 +1023,18 @@ function cmdTableUnmerge(){ if (!tableSel) return; const {tableId,r0,c0} = table
         setTableSelection(t.id, tableSel.r0, tableSel.c0 + 1, tableSel.r1, tableSel.c1 + 1);
         break;
       case 'row-del':
-        updateElement(t.id, tableDeleteRow(t, tableSel.r0));
+        updateElement(t.id, tableDeleteRowsRange(t, tableSel.r0, tableSel.r1));
         clearTableSelection();
         break;
       case 'col-del':
-        updateElement(t.id, tableDeleteColumn(t, tableSel.c0));
+        updateElement(t.id, tableDeleteColsRange(t, tableSel.c0, tableSel.c1));
         clearTableSelection();
         break;
       case 'merge':
         updateElement(t.id, tableMergeRange(t, tableSel.r0, tableSel.c0, tableSel.r1, tableSel.c1));
         break;
       case 'unmerge':
-        updateElement(t.id, tableUnmerge(t, tableSel.r0, tableSel.c0));
+        updateElement(t.id, tableUnmergeRange(t, tableSel.r0, tableSel.c0, tableSel.r1, tableSel.c1));
         break;
     }
     showIfTableSelection();

@@ -13,8 +13,8 @@ function ensureElementNode(elModel) {
 		node.className = `element ${elModel.type}`;
 		node.dataset.id = elModel.id;
 		pageNode.appendChild(node);
-		// Keep resize cursor behavior; no state mutations
-		node.addEventListener('mousemove', (e) => updateResizeCursor(e, node));
+		// Keep resize cursor behavior; suppress in view mode (no state mutations)
+		node.addEventListener('mousemove', (e) => { if (!Model || !Model.document || !Model.document.editMode){ node.style.cursor = ''; return; } updateResizeCursor(e, node); });
 		node.addEventListener('mouseleave', () => { node.style.cursor = ''; });
 	}
 	return node;
@@ -114,6 +114,14 @@ function applyElementStyles(node, m, pageForParentLookup) {
 		if (m.type === 'text' || m.type === 'field' || m.type === 'rect') node.style.display = 'flex';
 		else node.style.display = '';
 	}
+
+	// If element repeats in header/footer, make it non-interactive and pinned band-wise
+	try {
+		if (m.repeatInHeader || m.repeatInFooter) {
+			node.classList.add('repeated');
+			// Width/height already applied; leave top adjusted in renderPage for current page
+		}
+	} catch {}
 }
 
 // Toggle only inline event attributes according to edit mode without re-rendering everything
@@ -177,9 +185,38 @@ try { window.applyEventAttributesForMode = applyEventAttributesForMode; } catch 
 function renderPage(page) {
 	const container = getPageNode(page.id);
 	if (!container) return;
+	// Before rendering, recalc formulas so displayed content is up to date
+	try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
 	try { console.log('[RENDER] renderPage', { pageId: page.id, elements: page.elements?.length }); } catch {}
 	Array.from(container.querySelectorAll('.element')).forEach(n => n.remove());
 	if (!page) return;
+
+	// Repeat-in-header/footer elements: clone from the first page's models if needed
+	try {
+		const doc = Model && Model.document ? Model.document : { pages: [] };
+		const first = (doc.pages || [])[0];
+		if (first && page && page.id !== first.id) {
+			const shared = (first.elements || []).filter(e => (e && (e.repeatOnAllPages === true || e.repeatOnAllPages === 'true')));
+			shared.forEach((tpl) => {
+				const clone = Object.assign({}, tpl, { pageId: page.id });
+				let node = ensureElementNode(clone);
+				applyElementStyles(node, clone, page);
+				node.classList.add('repeated');
+				// Populate content for all element types so images/tables/text render in clones
+				if (clone.type === 'text' || clone.type === 'field' || clone.type === 'rect'){
+					const txt = typeof clone.content === 'string' ? clone.content : '';
+					if (node.textContent !== txt) node.textContent = txt;
+				} else if (clone.type === 'image'){
+					if (!node.querySelector('img')){ const img = document.createElement('img'); img.alt=''; node.appendChild(img); }
+					const img = node.querySelector('img'); if (img && clone.src) img.src = clone.src;
+				} else if (clone.type === 'table'){
+					renderTable(clone, node);
+				}
+				container.appendChild(node);
+			});
+		}
+	} catch {}
+
 	const roots = page.elements.filter(e => !e.parentId);
 	const childrenByParent = new Map();
 	page.elements.filter(e => e.parentId).forEach(e => {
@@ -189,6 +226,7 @@ function renderPage(page) {
 	const renderOne = (elm, parentNode) => {
 		const node = ensureElementNode({ ...elm, pageId: page.id });
 		applyElementStyles(node, elm, page);
+		// (no extra clamping needed; header/footer sizing only affects stacking, not rendering)
 		try { console.log('[RENDER] applyElementStyles', elm.id, elm.type); } catch {}
 		// Populate content for text-like elements so edits persist after re-render
 		if (elm.type === 'text' || elm.type === 'field' || elm.type === 'rect') {

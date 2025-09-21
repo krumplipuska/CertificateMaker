@@ -149,6 +149,10 @@
       </div>
       <div class="panel-content">
         <div id="propertiesContent" class="props"></div>
+        <div class="props" style="margin-top:12px;border-top:1px dashed var(--border);padding-top:8px">
+          <div class="row"><label>Header height</label><input id="docHeaderHeight" type="number" min="0" value="10"></div>
+          <div class="row"><label>Footer height</label><input id="docFooterHeight" type="number" min="0" value="10"></div>
+        </div>
       </div>
     </aside>
   </div>
@@ -249,6 +253,10 @@
   </div>
 
   <div id="lasso" hidden></div>
+  <style>
+    /* Suppress lasso only while header/footer resizing is active */
+    .hf-resizing #lasso { display:none !important; }
+  </style>
   <div id="selectionBox" class="selbox hidden">
     <div class="sb-h" data-handle="nw"></div>
     <div class="sb-h" data-handle="n"></div>

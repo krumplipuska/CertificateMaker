@@ -76,6 +76,9 @@ const Model = {
     currentPageId: '',
     nextElementId: 1,
     editMode: false,
+    // Global header/footer reserved heights in logical pixels
+    headerHeight: 10,
+    footerHeight: 10,
   },
 };
 
@@ -195,7 +198,11 @@ function setEditMode(on) {
   Model.document.editMode = on;
   document.body.classList.toggle('edit-off', !on);
   // hide selection and toolbar if turning off
-  if (!on) clearSelection();
+  if (!on) {
+    try { clearSelection(); } catch {}
+    try { const bar = document.getElementById('tableActions'); if (bar) bar.classList.add('hidden'); } catch {}
+    try { const lasso = document.getElementById('lasso'); if (lasso) lasso.hidden = true; } catch {}
+  }
   // Instead of re-rendering from scratch (which can reset some visibility),
   // update only inline event attributes to reflect mode.
   try {
@@ -298,4 +305,117 @@ function moveCurrentPage(delta) {
   Model.document.pages.splice(target, 0, pg);
   renderAll();
 }
+
+/* ----------------------- Formula Engine ----------------------- */
+/**
+ * Evaluate a simple Excel-like formula string.
+ * Supported:
+ *  - Arithmetic: +, -, *, /, %, parentheses
+ *  - Functions: SUM(...), AVG(...), MIN(...), MAX(...), ROUND(x[,d]), FLOOR(x), CEIL(x), ABS(x)
+ *  - References to other elements/cells using #id tokens (e.g., #el-1 or #cell-abc)
+ * Returns { value:string, error?:string } where value is a string suitable for content.
+ */
+function evaluateFormulaExpression(expr){
+  try {
+    if (!expr || typeof expr !== 'string') return { value: '' };
+    const raw = String(expr).trim();
+    if (!raw.startsWith('=')) return { value: raw };
+    const body = raw.slice(1);
+
+    // Support both raw #id tokens and quoted "#id" tokens from picker
+    let toEval = body
+      .replace(/"#([A-Za-z0-9_\-:]+)"/g, (m, id) => `r('${id}')`)
+      .replace(/#([A-Za-z0-9_\-:]+)/g, (m, id) => `r('${id}')`);
+
+    // Helper to resolve a numeric value from an element or table cell by id
+    function r(id){
+      try {
+        for (const p of (Model.document?.pages || [])){
+          const el = (p.elements || []).find(e => e && e.id === id);
+          if (el){
+            const txt = String(el.content ?? '').trim();
+            const num = Number(txt);
+            return Number.isFinite(num) ? num : 0;
+          }
+          const table = (p.elements || []).find(e => e && e.type === 'table' && e.cells && e.cells[id]);
+          if (table){
+            const cell = table.cells[id];
+            const txt = String(cell?.content ?? '').trim();
+            const num = Number(txt);
+            return Number.isFinite(num) ? num : 0;
+          }
+        }
+      } catch {}
+      return 0;
+    }
+
+    // Whitelist functions
+    const SUM = (...args) => args.reduce((a,b)=>a + (Number(b)||0), 0);
+    const AVG = (...args) => { const arr = args.map(v=>Number(v)||0); return arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length) : 0; };
+    const MIN = (...args) => Math.min(...args.map(v=>Number(v)||0));
+    const MAX = (...args) => Math.max(...args.map(v=>Number(v)||0));
+    const ROUND = (x, d=0) => { const n = Number(x)||0; const k = Math.pow(10, Number(d)||0); return Math.round(n*k)/k; };
+    const FLOOR = (x) => Math.floor(Number(x)||0);
+    const CEIL  = (x) => Math.ceil(Number(x)||0);
+    const ABS   = (x) => Math.abs(Number(x)||0);
+
+    // Very light sanitization: allow digits, ops, commas, parentheses, dots, letters, and r('id') calls.
+    // Strip r('...') arguments before checking for disallowed characters so quotes inside r() are permitted.
+    const sanitized = toEval.replace(/r\('\s*[A-Za-z0-9_\-:]+\s*'\)/g, 'r(x)');
+    if (/[^0-9A-Za-z_\-:#(),.\s+\-*\/%%]/.test(sanitized)) {
+      return { value: '', error: 'Invalid characters in formula' };
+    }
+
+    // Evaluate in a restricted scope
+    // eslint-disable-next-line no-new-func
+    const fn = new Function('r','SUM','AVG','MIN','MAX','ROUND','FLOOR','CEIL','ABS', `return (${toEval});`);
+    const num = fn(r, SUM, AVG, MIN, MAX, ROUND, FLOOR, CEIL, ABS);
+    const asNum = Number(num);
+    if (Number.isFinite(asNum)) return { value: String(asNum) };
+    return { value: String(num ?? '') };
+  } catch (err){
+    try { console.warn('evaluateFormulaExpression failed', err); } catch {}
+    return { value: '' , error: String(err && err.message || err) };
+  }
+}
+
+/**
+ * Scan the whole document and update element/cell content from attrs.formula when present.
+ * Mutates Model.document in-place (no history). Safe to call frequently.
+ */
+function recalculateAllFormulas(){
+  try {
+    const doc = Model.document; if (!doc || !Array.isArray(doc.pages)) return;
+    for (let pass=0; pass<2; pass++){
+      for (const p of (doc.pages || [])){
+        for (const el of (p.elements || [])){
+          try {
+            if (el && (el.type === 'text' || el.type === 'field' || el.type === 'rect')){
+              const f = String(el?.attrs?.formula || '').trim();
+              if (f){
+                const out = evaluateFormulaExpression(f);
+                el.content = out.value;
+              }
+            }
+            if (el && el.type === 'table' && el.cells){
+              Object.keys(el.cells).forEach((cid) => {
+                try {
+                  const cell = el.cells[cid]; if (!cell || !cell.attrs) return;
+                  const ff = String(cell.attrs.formula || '').trim();
+                  if (ff){
+                    const out = evaluateFormulaExpression(ff);
+                    cell.content = out.value;
+                  }
+                } catch {}
+              });
+            }
+          } catch {}
+        }
+      }
+    }
+  } catch {}
+}
+
+try { window.evaluateFormulaExpression = evaluateFormulaExpression; } catch {}
+try { window.recalculateAllFormulas = recalculateAllFormulas; } catch {}
 

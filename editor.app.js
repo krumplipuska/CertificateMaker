@@ -99,6 +99,21 @@ function renderPagesList() {
     const guideH = document.createElement('div'); guideH.className = 'guide h hidden';
     page.appendChild(guideV); page.appendChild(guideH);
 
+    // Header/Footer guides
+    const headerGuide = document.createElement('div');
+    headerGuide.className = 'hf-guide header';
+    const headerLabel = document.createElement('div'); headerLabel.className = 'hf-label'; headerLabel.textContent = '';
+    const headerResize = document.createElement('div'); headerResize.className = 'hf-resize';
+    headerGuide.appendChild(headerLabel); headerGuide.appendChild(headerResize);
+    page.appendChild(headerGuide);
+
+    const footerGuide = document.createElement('div');
+    footerGuide.className = 'hf-guide footer';
+    const footerLabel = document.createElement('div'); footerLabel.className = 'hf-label'; footerLabel.textContent = '';
+    const footerResize = document.createElement('div'); footerResize.className = 'hf-resize';
+    footerGuide.appendChild(footerLabel); footerGuide.appendChild(footerResize);
+    page.appendChild(footerGuide);
+
     stage.appendChild(page);
     wrap.appendChild(stage);
 
@@ -129,6 +144,12 @@ function renderPagesList() {
       else if (btn.dataset.act === 'add-below') { Model.document.currentPageId = p.id; addPage(); }
       else if (btn.dataset.act === 'toggle-visibility') { wrap.classList.toggle('hidden'); }
     });
+
+    // Position header/footer guides using document settings
+    try { updateHeaderFooterGuides(page); } catch {}
+
+    // Enable drag-resize for header/footer on this page
+    try { attachHeaderFooterResizers(page, p.id); } catch {}
   });
 }
 
@@ -141,6 +162,67 @@ function bindElementActions(){ /* no-op: using inline attributes approach */ }
 // applyElementStyles moved to app.view.render.js
 
 // renderPage moved to app.view.render.js
+/* ----------------------- Header & Footer Guides ----------------------- */
+function updateHeaderFooterGuides(pageNode){
+  try {
+    if (!pageNode) return;
+    const hh = Number(Model?.document?.headerHeight || 0);
+    const fh = Number(Model?.document?.footerHeight || 0);
+    const header = pageNode.querySelector('.hf-guide.header');
+    const footer = pageNode.querySelector('.hf-guide.footer');
+    if (header){ header.style.height = Math.max(0, hh) + 'px'; header.style.display = hh > 0 ? 'block' : 'none'; }
+    if (footer){ footer.style.height = Math.max(0, fh) + 'px'; footer.style.display = fh > 0 ? 'block' : 'none'; }
+  } catch {}
+}
+
+function setHeaderFooterHeights({ header, footer }){
+  commitHistory('set-header-footer');
+  Model.document.headerHeight = Math.max(0, Number(header || 0));
+  Model.document.footerHeight = Math.max(0, Number(footer || 0));
+  // Update all page guides and reflow stacks for usable height
+  try {
+    document.querySelectorAll('.page').forEach(p => updateHeaderFooterGuides(p));
+  } catch {}
+  try { reflowStacks(getCurrentPage()); } catch {}
+}
+
+function attachHeaderFooterResizers(pageNode, pageId){
+  try {
+    const header = pageNode.querySelector('.hf-guide.header .hf-resize');
+    const footer = pageNode.querySelector('.hf-guide.footer .hf-resize');
+    const z = (typeof getZoom === 'function') ? (getZoom() || 1) : 1;
+    if (header){
+      let startY = 0; let startH = 0; let moving = false;
+      header.addEventListener('mousedown', (e) => {
+        if (!Model.document.editMode) return;
+        moving = true; startY = e.clientY; startH = Number(Model.document.headerHeight || 0);
+        document.body.classList.add('hf-resizing');
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!moving) return;
+        const dy = (e.clientY - startY) / (z || 1);
+        const nh = Math.max(0, Math.round(startH + dy));
+        Model.document.headerHeight = nh;
+        updateHeaderFooterGuides(pageNode);
+      });
+      window.addEventListener('mouseup', () => { if (moving){ moving = false; setHeaderFooterHeights({ header: Model.document.headerHeight, footer: Model.document.footerHeight }); document.body.classList.remove('hf-resizing'); } });
+    }
+    if (footer){
+      let startY = 0; let startH = 0; let moving = false; const pageRect = () => pageNode.getBoundingClientRect();
+      footer.addEventListener('mousedown', (e) => {
+        if (!Model.document.editMode) return; moving = true; startY = e.clientY; startH = Number(Model.document.footerHeight || 0); document.body.classList.add('hf-resizing'); e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!moving) return; const dy = (startY - e.clientY) / (z || 1); const nh = Math.max(0, Math.round(startH + dy)); Model.document.footerHeight = nh; updateHeaderFooterGuides(pageNode);
+      });
+      window.addEventListener('mouseup', () => { if (moving){ moving = false; setHeaderFooterHeights({ header: Model.document.headerHeight, footer: Model.document.footerHeight }); document.body.classList.remove('hf-resizing'); } });
+    }
+  } catch {}
+}
+
 
 /* ----------------------- Updates ----------------------- */
 function updateElement(id, patch) {
@@ -382,6 +464,77 @@ function getCanvasPoint(evt, pageNode = getPageNode()){
   return { x: Math.max(0, Math.min(w, x)), y: Math.max(0, Math.min(h, y)) };
 }
 
+// Compute which page is most visible within the viewport and return its node and id
+function getMostVisiblePageInfo(){
+  try {
+    const vp = document.getElementById('pageViewport');
+    if (!vp) return null;
+    const vpr = vp.getBoundingClientRect();
+    let best = null; let bestArea = 0;
+    document.querySelectorAll('.page-wrapper .page').forEach((page) => {
+      const pr = page.getBoundingClientRect();
+      const left = Math.max(pr.left, vpr.left);
+      const top = Math.max(pr.top, vpr.top);
+      const right = Math.min(pr.right, vpr.right);
+      const bottom = Math.min(pr.bottom, vpr.bottom);
+      const w = Math.max(0, right - left);
+      const h = Math.max(0, bottom - top);
+      const area = w * h;
+      if (area > bestArea){ bestArea = area; best = page; }
+    });
+    if (!best) return null;
+    const wrap = best.closest('.page-wrapper');
+    const pageId = wrap && wrap.dataset ? wrap.dataset.pageId : null;
+    return pageId ? { pageNode: best, pageId } : null;
+  } catch { return null; }
+}
+
+// Return a visible, viewport-aware point (logical coords) on the most visible page
+function getVisibleInsertionPoint(){
+  const info = getMostVisiblePageInfo(); if (!info) return null;
+  const vp = document.getElementById('pageViewport'); if (!vp) return null;
+  const vpr = vp.getBoundingClientRect();
+  const pr = info.pageNode.getBoundingClientRect();
+  const z = (typeof getZoom === 'function') ? (getZoom() || 1) : 1;
+  const left = Math.max(pr.left, vpr.left);
+  const top = Math.max(pr.top, vpr.top);
+  const right = Math.min(pr.right, vpr.right);
+  const bottom = Math.min(pr.bottom, vpr.bottom);
+  let cx = (left + right) / 2;
+  let cy = (top + bottom) / 2;
+  // Fallback to page center if there is no intersection
+  if (!(right > left && bottom > top)) { cx = pr.left + pr.width/2; cy = pr.top + pr.height/2; }
+  let x = (cx - pr.left) / z;
+  let y = (cy - pr.top) / z;
+  // Nudge to stay within visible/safe area, accounting for header/footer
+  try {
+    const header = Number(Model?.document?.headerHeight || 0);
+    const footer = Number(Model?.document?.footerHeight || 0);
+    const w = info.pageNode.clientWidth;
+    const h = info.pageNode.clientHeight;
+    const margin = 20; // logical px
+    const minX = margin;
+    const maxX = Math.max(margin, w - margin);
+    const minY = Math.max(margin, header + margin);
+    const maxY = Math.max(minY, h - footer - margin);
+    x = Math.max(minX, Math.min(maxX, x));
+    y = Math.max(minY, Math.min(maxY, y));
+  } catch {}
+  return { pageId: info.pageId, x, y };
+}
+
+// Add element immediately to the most visible page at a visible point
+function addElementToVisiblePage(type){
+  const pt = getVisibleInsertionPoint();
+  if (!pt) { pendingAddType = type; placePendingAt(40, 40); return; }
+  Model.document.currentPageId = pt.pageId;
+  pendingAddType = type;
+  placePendingAt(pt.x, pt.y, pt.pageId);
+}
+
+// Internal guard to suppress click-add when a drag from the palette just occurred
+let __addingByDrag = false;
+
 let drag = null; // {id, start:{x,y}, orig:{...}, descendants?: Map}
 let dragMaybe = null; // tentative single-element drag starter
 let resize = null; // {id, start:{x,y}, orig:{...}, mode:'n|s|e|w|ne|nw|se|sw'}
@@ -419,25 +572,198 @@ function isElementHidden(el){
 }
 
 function reflowStacks(page){
-  if (!page) page = getCurrentPage();
-  // Reflow children inside blocks
-  const blocks = page.elements.filter(e => e.type === 'block');
-  blocks.forEach(b => {
-    if (!b.stackChildren) return;
-    // Only include visible kids when stacking
-    const kids = page.elements.filter(e => e.parentId === b.id && e.type !== 'line' && !isElementHidden(e))
-      .sort((a,bm)=> (a.y - bm.y));
-    let y = 8;
-    kids.forEach(k => { k.y = b.y + y; y += (k.h||0) + 8; });
-  });
-  // Reflow any elements that opt-in to page stacking (not just blocks)
-  const pageElemsToStack = page.elements.filter(e => e.stackByPage === true && !isElementHidden(e));
-  if (pageElemsToStack.length){
-    const sorted = [...pageElemsToStack].sort((a,b) => a.y - b.y);
-    let y = 16;
-    // Lay out only visible stackers; skip hidden ones without consuming space
-    sorted.forEach(b => { if (!isElementHidden(b)) { b.y = y; y += (b.h||0) + 16; } });
-  }
+  // Cross-page stack reflow for elements that opt-in via stackByPage.
+  // 1) Lay out visible stackers top-to-bottom within each page
+  // 2) If an item would overflow the page, move it to the next page and continue
+  // 3) Allow elements to move forward AND backward across pages based on space
+  // 4) Support an optional pageBreak flag to force element to start on next page
+  // 5) After page-level positions are finalized, reflow children inside block containers
+  try {
+    const doc = Model && Model.document ? Model.document : { pages: [] };
+    if (!Array.isArray(doc.pages) || doc.pages.length === 0) return;
+
+    const PADDING_TOP = 16;
+    const PADDING_GAP = 16;
+    const PADDING_BOTTOM = 16;
+    const HEADER_H = Number((Model && Model.document && Model.document.headerHeight) || 0);
+    const FOOTER_H = Number((Model && Model.document && Model.document.footerHeight) || 0);
+
+    function getLogicalPageHeightPx(p){
+      try {
+        const node = typeof getPageNode === 'function' ? getPageNode(p.id) : null;
+        if (!node) return 0;
+        const z = (typeof getZoom === 'function') ? (getZoom() || 1) : 1;
+        return Math.round(node.getBoundingClientRect().height / (z || 1));
+      } catch { return 0; }
+    }
+
+    function findPageIndexByElementId(eid){
+      for (let i = 0; i < doc.pages.length; i++){
+        const p = doc.pages[i];
+        if ((p.elements || []).some(el => el && el.id === eid)) return i;
+      }
+      return -1;
+    }
+
+    // Collect all descendants (children, grandchildren, …) of a container across all pages
+    function collectDescendants(rootId){
+      const out = [];
+      const queue = [rootId];
+      const seen = new Set([rootId]);
+      while (queue.length){
+        const parent = queue.shift();
+        for (let i = 0; i < doc.pages.length; i++){
+          const pg = doc.pages[i];
+          for (const el of (pg.elements || [])){
+            if (!el) continue;
+            if (el.parentId === parent && !seen.has(el.id)){
+              out.push(el);
+              seen.add(el.id);
+              queue.push(el.id);
+            }
+          }
+        }
+      }
+      return out;
+    }
+
+    const changedPageIds = new Set();
+    let createdPages = false;
+    let deletedPages = false;
+
+    // Build a single, ordered list of all visible root-level stackers across pages.
+    const allStackers = [];
+    for (let pi = 0; pi < doc.pages.length; pi++){
+      const p = doc.pages[pi];
+      const locals = (p.elements || [])
+        .filter(e => e && e.stackByPage === true && !e.parentId && !isElementHidden(e) && !e.repeatOnAllPages)
+        .sort((a,b) => (a.y - b.y));
+      locals.forEach(el => allStackers.push(el));
+    }
+
+    // Helper to ensure a page exists at index and return it
+    const ensurePage = (index) => {
+      while (doc.pages.length <= index){
+        const newPage = createPage(`Page ${doc.pages.length + 1}`);
+        doc.pages.push(newPage);
+        createdPages = true;
+      }
+      return doc.pages[index];
+    };
+
+    // Lay out the global sequence into pages from the start, allowing backward moves
+    let pi = 0;
+    let p = ensurePage(pi);
+    let pageHeight = getLogicalPageHeightPx(p);
+    let limit = Math.max(0, pageHeight - FOOTER_H - PADDING_BOTTOM);
+    let y = PADDING_TOP + HEADER_H;
+
+    for (const el of allStackers){
+      const h = Math.max(0, Number(el.h || 0));
+      const wantsBreak = !!(el.pageBreak === true || el.pageBreak === 'true');
+
+      // Forced page break before this element (unless it's already at the top of a fresh page)
+      if (wantsBreak && y !== (PADDING_TOP + HEADER_H)){
+        pi += 1; p = ensurePage(pi);
+        pageHeight = getLogicalPageHeightPx(p);
+        limit = Math.max(0, pageHeight - FOOTER_H - PADDING_BOTTOM);
+        y = PADDING_TOP + HEADER_H;
+      }
+
+      // If it would overflow, advance pages until it fits or we've started a new page
+      while (y + h > limit){
+        pi += 1; p = ensurePage(pi);
+        pageHeight = getLogicalPageHeightPx(p);
+        limit = Math.max(0, pageHeight - FOOTER_H - PADDING_BOTTOM);
+        y = PADDING_TOP + HEADER_H;
+        // If the element itself is taller than a page, place it at the top and allow overflow
+        if (h > (limit - (PADDING_TOP + HEADER_H))) break;
+      }
+
+      // Move element to the target page if needed
+      const curIdx = findPageIndexByElementId(el.id);
+      if (curIdx !== pi && curIdx !== -1){
+        const from = doc.pages[curIdx];
+        const idx = from.elements.findIndex(x => x && x.id === el.id);
+        if (idx !== -1) from.elements.splice(idx, 1);
+        changedPageIds.add(from.id);
+
+        // Move all descendants with the block as well so they stay visible
+        if (el.type === 'block'){
+          const descendants = collectDescendants(el.id);
+          for (const d of descendants){
+            const dFromIdx = findPageIndexByElementId(d.id);
+            if (dFromIdx !== -1){
+              const fromPg = doc.pages[dFromIdx];
+              const di = fromPg.elements.findIndex(x => x && x.id === d.id);
+              if (di !== -1) fromPg.elements.splice(di, 1);
+              changedPageIds.add(fromPg.id);
+            }
+            if (!p.elements.some(x => x && x.id === d.id)) p.elements.push(d);
+            changedPageIds.add(p.id);
+          }
+        }
+
+        if (!p.elements.some(x => x && x.id === el.id)) p.elements.push(el);
+        changedPageIds.add(p.id);
+      } else {
+        // Element already on target page; ensure it's present in elements list
+        if (!p.elements.some(x => x && x.id === el.id)) {
+          p.elements.push(el);
+          changedPageIds.add(p.id);
+        }
+      }
+
+      // Position element within the page
+      el.y = y;
+      y += h + PADDING_GAP;
+      changedPageIds.add(p.id);
+    }
+
+    // Remove trailing empty pages (only at the end to be safe)
+    for (let i = doc.pages.length - 1; i >= 0 && doc.pages.length > 1; i--){
+      const pg = doc.pages[i];
+      const hasAnyElements = Array.isArray(pg.elements) && pg.elements.length > 0;
+      if (hasAnyElements) break; // stop at first non-empty from the end
+      const removed = doc.pages.pop();
+      deletedPages = true;
+      // Fix currentPageId if we removed the current one
+      if (removed && removed.id === Model.document.currentPageId){
+        const newIdx = Math.min(doc.pages.length - 1, i - 1);
+        const safeIdx = newIdx >= 0 ? newIdx : 0;
+        Model.document.currentPageId = doc.pages[safeIdx]?.id || doc.pages[0].id;
+      }
+    }
+
+    // After page-level reflow, stack children within blocks on affected pages
+    const affectedPages = Array.from(changedPageIds).map(id => doc.pages.find(p => p.id === id)).filter(Boolean);
+    const pagesToProcess = affectedPages.length ? affectedPages : [page || getCurrentPage()];
+    pagesToProcess.forEach((pg) => {
+      const blocks = (pg.elements || []).filter(e => e && e.type === 'block');
+      blocks.forEach(b => {
+        if (!b.stackChildren) return;
+        const kids = pg.elements
+          .filter(e => e && e.parentId === b.id && e.type !== 'line' && !isElementHidden(e))
+          .sort((a,bm) => (a.y - bm.y));
+        let y = 8;
+        kids.forEach(k => { k.y = b.y + y; y += (k.h || 0) + 8; });
+      });
+    });
+
+    // Render only the pages that changed; if structure changed, rebuild the list
+    if (changedPageIds.size || createdPages || deletedPages){
+      try {
+        if (createdPages || deletedPages){
+          renderPagesList();
+        } else {
+          changedPageIds.forEach((pid) => {
+            const pg = doc.pages.find(p => p.id === pid);
+            if (pg) renderPage(pg);
+          });
+        }
+      } catch {}
+    }
+  } catch {}
 }
 
 // expose for userFunctions
@@ -795,6 +1121,8 @@ function getResizeMode(e, node){
 }
 
 function updateResizeCursor(e, node){
+  // In view mode, never show resize cursors
+  if (!Model || !Model.document || !Model.document.editMode){ node.style.cursor = ''; return; }
   const id = node.dataset.id; const page = getCurrentPage();
   const m = page?.elements.find(el => el.id === id) || {};
   const mode = getResizeMode(e, node, m);
@@ -1465,7 +1793,7 @@ function parsePropertyValue(raw){
 }
 
 // Keys that are part of the element model and should not be treated as HTML attributes
-const RESERVED_MODEL_KEYS = new Set(['id','type','groupId','parentId','stackChildren','stackByPage','x','y','w','h','z','x2','y2','content','src','styles','grid','rows','cols','rowHeights','colWidths']);
+const RESERVED_MODEL_KEYS = new Set(['id','type','groupId','parentId','stackChildren','stackByPage','pageBreak','repeatOnAllPages','x','y','w','h','z','x2','y2','content','src','styles','grid','rows','cols','rowHeights','colWidths']);
 
 function getCustomAttributesFromModel(model){
   const attrs = Object.assign({}, model && model.attrs ? model.attrs : {});
@@ -1522,15 +1850,21 @@ function renderProperties(){
   ];
   if (cellId) rows.unshift(['cellId', cellId]);
   
-  // Add editable text content for text-like elements
+  // Add editable text content + formula field for text-like elements
   if (m && (m.type === 'text' || m.type === 'field' || m.type === 'rect')) {
-    rows.push(
-      ['content', m.content || '']
-    );
+    rows.push(['content', m.content || '']);
+    const formula = (m && m.attrs && typeof m.attrs.formula === 'string') ? m.attrs.formula : '';
+    rows.push(['formula', formula]);
   }
   
   // Include custom attributes as flat props for editing
   let customAttrs = getCustomAttributesFromModel(m || {});
+  // Avoid duplicating builtin formula row when attrs also contains formula
+  if (m && (m.type === 'text' || m.type === 'field' || m.type === 'rect')){
+    if (customAttrs && Object.prototype.hasOwnProperty.call(customAttrs, 'formula')){
+      delete customAttrs.formula;
+    }
+  }
   const customAttrKeys = new Set(Object.keys(customAttrs));
   Object.keys(customAttrs).forEach((name) => {
     rows.push([name, customAttrs[name]]);
@@ -1570,11 +1904,37 @@ function renderProperties(){
       control = document.createElement('input'); control.type = 'color'; control.value = v || '#111827'; control.dataset.prop = 'styles.'+k;
     } else if (k === 'bold' || k === 'italic') {
       control = document.createElement('input'); control.type = 'checkbox'; control.checked = !!v; control.dataset.prop = 'styles.'+k;
-    } else if (k === 'content' || (customAttrKeys.has(k) && typeof v === 'string')) {
+    } else if (k === 'content' || k === 'formula' || (customAttrKeys.has(k) && typeof v === 'string')) {
       control = document.createElement('textarea');
       control.rows = 3;
       control.value = v ?? '';
       control.dataset.prop = k;
+      if (k === 'formula'){
+        // Element picker button beside textarea (inline)
+        // Keep simple: when clicking, it inserts a '#id' token at caret
+        const wrap = document.createElement('div'); wrap.style.display='grid'; wrap.style.gridTemplateColumns='1fr 28px'; wrap.style.gap='6px';
+        const pick = document.createElement('button'); pick.type='button'; pick.className='btn mini';
+        pick.innerHTML = '<svg class="icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+        const area = control;
+        wrap.appendChild(area); wrap.appendChild(pick); control = wrap; // replace control with wrap
+        // picker behavior: choose element or table cell and insert token
+        pick.addEventListener('click', () => {
+          // preserve selection
+          const prevSelIds = Array.from(document.querySelectorAll('.page .element.selected')).map(n=>n.getAttribute('data-id')).filter(Boolean);
+          const pageEl = document.querySelector('.page'); if (!pageEl) return;
+          let last; window.__PICKING = true; document.body.classList.add('app-noselect');
+          const block = (ev)=>{ ev.stopPropagation(); ev.preventDefault(); };
+          document.addEventListener('pointerdown', block, true);
+          document.addEventListener('mousedown', block, true);
+          const onMove = (ev)=>{ const cell=ev.target.closest('.table-cell'); const el=cell||ev.target.closest('.page .element'); if (last===el) return; if (last) last.style.outline=''; last=el; if (last) last.style.outline='2px solid var(--primary)'; };
+          const done = ()=>{ document.removeEventListener('mousemove', onMove, true); document.removeEventListener('click', onClick, true); document.removeEventListener('keydown', onKey, true); document.removeEventListener('pointerdown', block, true); document.removeEventListener('mousedown', block, true); if (last) last.style.outline=''; window.__PICKING=false; document.body.classList.remove('app-noselect'); if (Array.isArray(prevSelIds) && prevSelIds.length && typeof setSelection==='function') setSelection(prevSelIds); };
+          const onKey = (e)=>{ if (e.key==='Escape'){ e.preventDefault(); done(); } };
+          const onClick = (e)=>{ const cell=e.target.closest('.table-cell'); const el=cell||e.target.closest('.page .element'); if (!el){ done(); return; } e.preventDefault(); e.stopPropagation(); let token=''; if (cell){ const cid=cell.getAttribute('data-id'); if (cid) token = `#${cid}`; } else { const id=el.getAttribute('data-id'); if (id) token = `#${id}`; } const ta = wrap.querySelector('textarea'); if (ta){ const start = ta.selectionStart ?? ta.value.length; const end = ta.selectionEnd ?? ta.value.length; ta.value = ta.value.slice(0,start) + token + ta.value.slice(end); ta.dispatchEvent(new Event('change', { bubbles:true })); ta.focus(); ta.selectionStart = ta.selectionEnd = start + token.length; } done(); };
+          document.addEventListener('mousemove', onMove, true);
+          document.addEventListener('click', onClick, true);
+          document.addEventListener('keydown', onKey, true);
+        });
+      }
     } else {
       control = document.createElement('input'); control.value = v ?? ''; control.dataset.prop = k;
     }
@@ -1585,7 +1945,7 @@ function renderProperties(){
 
   // Block-specific: stacking children toggle
   if (m && m.type === 'block'){
-    const row = document.createElement('div'); row.className = 'row';
+    const row = document.createElement('div'); row.className = 'row'; row.style.display = 'flex'; row.style.alignItems = 'center';
     const lab = document.createElement('label'); lab.textContent = 'stackChildren';
     const ctl = document.createElement('input'); ctl.type='checkbox'; ctl.dataset.prop = 'stackChildren'; ctl.checked = !!m.stackChildren;
     row.appendChild(lab); row.appendChild(ctl); box.appendChild(row);
@@ -1593,10 +1953,22 @@ function renderProperties(){
 
   // Generic: stackByPage toggle available for all element types
   if (m){
-    const row2 = document.createElement('div'); row2.className = 'row';
+    const row2 = document.createElement('div'); row2.className = 'row'; row2.style.display = 'flex'; row2.style.alignItems = 'center';
     const lab2 = document.createElement('label'); lab2.textContent = 'stackByPage';
     const ctl2 = document.createElement('input'); ctl2.type='checkbox'; ctl2.dataset.prop = 'stackByPage'; ctl2.checked = !!m.stackByPage;
     row2.appendChild(lab2); row2.appendChild(ctl2); box.appendChild(row2);
+
+    // Page break toggle: forces this element to start on a new page
+    const row3 = document.createElement('div'); row3.className = 'row'; row3.style.display = 'flex'; row3.style.alignItems = 'center';
+    const lab3 = document.createElement('label'); lab3.textContent = 'pageBreak';
+    const ctl3 = document.createElement('input'); ctl3.type='checkbox'; ctl3.dataset.prop = 'pageBreak'; ctl3.checked = !!m.pageBreak;
+    row3.appendChild(lab3); row3.appendChild(ctl3); box.appendChild(row3);
+
+    // Repeat flag (single checkbox)
+    const row4 = document.createElement('div'); row4.className = 'row'; row4.style.display = 'flex'; row4.style.alignItems = 'center';
+    const lab4 = document.createElement('label'); lab4.textContent = 'repeatOnAllPages';
+    const ctl4 = document.createElement('input'); ctl4.type='checkbox'; ctl4.dataset.prop = 'repeatOnAllPages'; ctl4.checked = !!m.repeatOnAllPages;
+    row4.appendChild(lab4); row4.appendChild(ctl4); box.appendChild(row4);
   }
 
   // Actions UI (bubble layout): choose function, trigger, and inputs; stack multiple
@@ -1996,6 +2368,17 @@ function renderProperties(){
   if (trigger) trigger.addEventListener('click', () => showAddPropRow(box), { once: true });
   // Apply edits only when the field commits (blur/change)
   box.addEventListener('change', onPropsInput, { once: true });
+  // While typing in content textarea, switch to formula automatically if starts with '='
+  box.addEventListener('input', (ev) => {
+    const t = ev.target; if (!t || !t.matches('textarea[data-prop="content"]')) return;
+    const val = String(t.value || '');
+    if (val.startsWith('=')){
+      // move value to formula field and clear content field
+      const formCtl = box.querySelector('textarea[data-prop="formula"]');
+      if (formCtl && formCtl !== t){ formCtl.value = val; formCtl.dispatchEvent(new Event('change', { bubbles:true })); }
+      t.value = '';
+    }
+  });
 }
 function onPropsInput(e){
   const t = e.target; if (!t.matches('[data-prop]')) return;
@@ -2053,13 +2436,21 @@ function onPropsInput(e){
     return;
   }
 
+  // Special case: 'formula' maps to attrs.formula
+  if (key === 'formula'){
+    applyPatchToSelection(toPatch('attrs.formula', String(val || '')));
+    try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
+    renderPage(getCurrentPage());
+    propertiesContent().addEventListener('change', onPropsInput, { once: true });
+    return;
+  }
   // If editing a reserved key or styles.* keep path, otherwise map to attrs.*
   const topKey = key.split('.')[0];
   const isReserved = RESERVED_MODEL_KEYS.has(topKey) || key.startsWith('styles.');
   const path = isReserved ? key : `attrs.${key}`;
   applyPatchToSelection(toPatch(path, val));
   // If stackByPage was toggled on/off, reflow immediately so element jumps in place
-  if (key === 'stackByPage') {
+  if (key === 'stackByPage' || key === 'pageBreak' || key === 'repeatOnAllPages') {
     try { reflowStacks(getCurrentPage()); } catch {}
   }
   propertiesContent().addEventListener('change', onPropsInput, { once: true });
@@ -2372,10 +2763,23 @@ async function bootstrap(){
   elementsPanel().addEventListener('click', (e) => {
     const btn = e.target.closest('.add-el');
     if (!btn) return;
-    armAdd(btn.dataset.add);
+    // If a drag just completed, ignore the click that follows
+    if (__addingByDrag) { __addingByDrag = false; return; }
+    addElementToVisiblePage(btn.dataset.add);
   });
 
-  // canvas interactions: delegate to clicked page; support add-to-clicked-page
+  // Make element buttons draggable for drag-to-place
+  try {
+    elementsPanel().querySelectorAll('.add-el').forEach((btn) => {
+      btn.setAttribute('draggable', 'true');
+      btn.addEventListener('dragstart', (ev) => {
+        try { ev.dataTransfer.setData('text/plain', btn.dataset.add); } catch {}
+        ev.dataTransfer.effectAllowed = 'copy';
+      });
+    });
+  } catch {}
+
+  // canvas interactions: delegate to clicked page; support add-to-clicked-page and drag-to-place
   pagesList().addEventListener('mousedown', (e) => {
     const page = e.target.closest('.page');
     if (!page) return;
@@ -2391,9 +2795,17 @@ async function bootstrap(){
     }
     const targetEl = e.target.closest('.element');
     if (!targetEl){
+      // Disable lasso in view mode
+      if (!Model || !Model.document || !Model.document.editMode) return;
+      // If user is resizing header/footer, do not start a lasso
+      const isHFResize = !!e.target.closest('.hf-resize');
+      if (isHFResize) { e.preventDefault(); return; }
       // Starting a lasso selection: cancel any pending element drag promotion from a prior click
       dragMaybe = null;
       drag = null;
+      // Prevent accidental UI text selection while lassoing
+      document.body.classList.add('app-noselect');
+      e.preventDefault();
       // lasso on drag only; click without movement just clears/keeps selection
       const start = { x: e.clientX, y: e.clientY };
       const lasso = document.getElementById('lasso');
@@ -2419,6 +2831,7 @@ async function bootstrap(){
       const onUp = () => {
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
+        document.body.classList.remove('app-noselect');
         lasso.hidden = true;
         if (!moved) {
           // click without movement toggles/clears selection
@@ -2431,12 +2844,80 @@ async function bootstrap(){
     }
     if (getPageNode() === page) onMouseDown(e);
   });
+
+  // Drag-over/drop to place element where dropped
+  pagesList().addEventListener('dragover', (e) => {
+    const page = e.target.closest('.page');
+    if (!page) return;
+    const type = (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('text/plain')) ? 'ok' : null;
+    if (!type) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  pagesList().addEventListener('drop', (e) => {
+    const page = e.target.closest('.page');
+    if (!page) return;
+    const wrap = page.closest('.page-wrapper');
+    const pageId = wrap?.dataset.pageId;
+    if (!pageId) return;
+    let type = '';
+    try { type = e.dataTransfer.getData('text/plain'); } catch { type = ''; }
+    if (!type) return;
+    e.preventDefault();
+    const pt = getCanvasPoint(e, page);
+    Model.document.currentPageId = pageId;
+    pendingAddType = type;
+    placePendingAt(pt.x, pt.y, pageId);
+    __addingByDrag = true; // consume immediate click after drop
+  });
   // Allow starting a lasso selection from outside of any page within the viewport
   const viewportEl = document.getElementById('pageViewport');
   if (viewportEl){
+    // Support dropping onto empty viewport areas too (choose most visible page)
+    viewportEl.addEventListener('dragover', (e) => {
+      const hasText = e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('text/plain');
+      if (!hasText) return;
+      // Only allow if pointer is visually over a page or we have any page visible
+      const page = e.target.closest && e.target.closest('.page');
+      if (!page) {
+        const info = getMostVisiblePageInfo();
+        if (!info) return;
+      }
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+    viewportEl.addEventListener('drop', (e) => {
+      let type = '';
+      try { type = e.dataTransfer.getData('text/plain'); } catch { type = ''; }
+      if (!type) return;
+      const page = e.target.closest && e.target.closest('.page');
+      if (page){
+        const wrap = page.closest('.page-wrapper');
+        const pageId = wrap?.dataset.pageId; if (!pageId) return;
+        e.preventDefault();
+        const pt = getCanvasPoint(e, page);
+        Model.document.currentPageId = pageId;
+        pendingAddType = type;
+        placePendingAt(pt.x, pt.y, pageId);
+        __addingByDrag = true;
+      } else {
+        const info = getMostVisiblePageInfo(); if (!info) return;
+        e.preventDefault();
+        const pr = info.pageNode.getBoundingClientRect();
+        const z = (typeof getZoom === 'function') ? (getZoom() || 1) : 1;
+        const cx = e.clientX; const cy = e.clientY;
+        const x = (cx - pr.left) / z; const y = (cy - pr.top) / z;
+        Model.document.currentPageId = info.pageId;
+        pendingAddType = type;
+        placePendingAt(x, y, info.pageId);
+        __addingByDrag = true;
+      }
+    });
     viewportEl.addEventListener('mousedown', (e) => {
       // If inside a page, let the page handler above manage it
       if (e.target.closest && e.target.closest('.page')) return;
+      // Disable outside-page lasso in view mode
+      if (!Model || !Model.document || !Model.document.editMode) return;
       // Ignore clicks on overlays/toolbars within the viewport
       const bar = formatToolbar && formatToolbar();
       if (bar && bar.contains && bar.contains(e.target)) return;
@@ -2448,6 +2929,9 @@ async function bootstrap(){
       // Start lasso selection similar to inside-page behavior
       // Cancel any pending single-element drag from previous clicks
       dragMaybe = null; drag = null;
+      // Prevent accidental UI text selection while lassoing
+      document.body.classList.add('app-noselect');
+      e.preventDefault();
       const start = { x: e.clientX, y: e.clientY };
       const lasso = document.getElementById('lasso');
       let additive = e.shiftKey || e.ctrlKey || e.metaKey;
@@ -2472,6 +2956,7 @@ async function bootstrap(){
       const onUp = () => {
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
+        document.body.classList.remove('app-noselect');
         lasso.hidden = true;
         if (!moved) {
           // click without movement clears selection when outside the page
@@ -2493,6 +2978,8 @@ async function bootstrap(){
   const guidesToggle = document.getElementById('guidesToggle');
   const rulersToggle = document.getElementById('rulersToggle');
   const minimapToggle = document.getElementById('minimapToggle');
+  // Initialize header/footer guides for all pages after bootstrap
+  try { document.querySelectorAll('.page').forEach(p => updateHeaderFooterGuides(p)); } catch {}
   let SNAP_ENABLED = true;
   let GUIDES_ENABLED = false; // default off per request
   function updateSnapGuides(){
@@ -2522,6 +3009,19 @@ async function bootstrap(){
     if (minimapToggle.checked) drawMinimap();
   });
   if (minimap && minimapToggle && minimapToggle.checked) minimap.classList.remove('hidden');
+
+  // Document header/footer inputs
+  const docHeaderInput = document.getElementById('docHeaderHeight');
+  const docFooterInput = document.getElementById('docFooterHeight');
+  if (docHeaderInput) docHeaderInput.value = String(Model?.document?.headerHeight || 0);
+  if (docFooterInput) docFooterInput.value = String(Model?.document?.footerHeight || 0);
+  function onHFChange(){
+    const h = Number(docHeaderInput?.value || 0);
+    const f = Number(docFooterInput?.value || 0);
+    setHeaderFooterHeights({ header: h, footer: f });
+  }
+  docHeaderInput?.addEventListener('change', onHFChange);
+  docFooterInput?.addEventListener('change', onHFChange);
 
   function drawRulers(){
     if (!rulers || !rulerH || !rulerV) return;
@@ -2580,24 +3080,90 @@ async function bootstrap(){
       elNode.classList.remove('has-placeholder');
     }
 
+    // If formula exists, show the formula text while editing; otherwise show content
+    try {
+      const model = getElementById(id);
+      const existingFormula = String(model?.attrs?.formula || '').trim();
+      if (existingFormula){ elNode.textContent = existingFormula; }
+    } catch {}
+
     // Use plaintext-only to ensure Enter inserts a newline and no HTML is injected
     elNode.setAttribute('contenteditable', 'plaintext-only');
     elNode.classList.add('editing');
     elNode.focus();
 
+    // Track cancel to support Esc behavior (discard changes)
+    let cancelled = false;
+    const insertNewlineAtCaret = () => {
+      try {
+        const sel = window.getSelection(); if (!sel) return; if (sel.rangeCount === 0) { elNode.textContent = (elNode.textContent||'') + "\n"; return; }
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const textNode = document.createTextNode("\n");
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.collapse(true);
+        sel.removeAllRanges(); sel.addRange(range);
+      } catch {}
+    };
+
     const onBlur = () => {
       elNode.removeEventListener('blur', onBlur);
+      elNode.removeEventListener('keydown', onKey);
+      // Stop inline picker if active
+      try { if (elNode._pickerDoneRef) { elNode._pickerDoneRef(); } } catch {}
       elNode.setAttribute('contenteditable', 'false');
       elNode.classList.remove('editing');
-      const content = elNode.textContent;
-      updateElement(id, { content: content });
+      if (cancelled){
+        // Re-render to restore original value
+        renderPage(getCurrentPage());
+        return;
+      }
+      const text = elNode.textContent || '';
+      // If starts with '=', treat as formula and store into attrs.formula; otherwise content
+      if (text.trim().startsWith('=')){
+        applyPatchToSelection(toPatch('attrs.formula', text.trim()));
+        // Recalculate now so user sees value
+        try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
+        const m = getElementById(id);
+        updateElement(id, { content: m?.content || '' });
+      } else {
+        updateElement(id, { content: text });
+      }
       
       // Re-render to show placeholder if content is empty
-      if (!content) {
+      if (!text) {
         renderPage(getCurrentPage());
       }
     };
+    const onKey = (ke) => {
+      if (ke.key === 'Enter' && ke.shiftKey){
+        // New line, keep editing
+        ke.preventDefault();
+        insertNewlineAtCaret();
+        return;
+      }
+      if (ke.key === 'Enter' && !ke.shiftKey){
+        // Commit and exit
+        ke.preventDefault();
+        elNode.blur();
+        return;
+      }
+      if (ke.key === 'Escape'){
+        // Cancel and exit
+        ke.preventDefault();
+        cancelled = true;
+        elNode.blur();
+      }
+    };
     elNode.addEventListener('blur', onBlur);
+    elNode.addEventListener('keydown', onKey);
+
+    // If we entered edit mode with an existing formula, auto-enable picker
+    try {
+      const txtNow = String(elNode.textContent || '');
+      if (txtNow.trim().startsWith('=')) { startInlineFormulaPicker(elNode); }
+    } catch {}
   });
 
   // edit mode toggle button
@@ -2637,6 +3203,68 @@ async function bootstrap(){
       pasteFromClipboard();
     }
   });
+
+  // While editing a text/field/rect, if typing begins with '=', switch to formula mode and enable picker
+  pagesList().addEventListener('keydown', (e) => {
+    const elNode = e.target && e.target.closest && e.target.closest('.element.text, .element.field, .element.rect');
+    if (!elNode) return;
+    if (elNode.getAttribute('contenteditable') !== 'plaintext-only') return;
+    if (e.key === '=' && elNode.textContent === ''){
+      // Insert '=' and optionally allow picking elements by clicking while holding Alt
+      e.preventDefault();
+      elNode.textContent = '=';
+      try { startInlineFormulaPicker(elNode); } catch {}
+    }
+  });
+
+  // Inline picker that inserts #id tokens into a contenteditable host while composing a formula
+  function startInlineFormulaPicker(host){
+    if (window.__PICKING) return () => {};
+    const prevSelIds = Array.from(document.querySelectorAll('.page .element.selected'))
+      .map(n => n && n.getAttribute('data-id'))
+      .filter(Boolean);
+    const pageEl = document.querySelector('.page'); if (!pageEl) return;
+    let last;
+    window.__PICKING = true; document.body.classList.add('app-noselect');
+    const blockDown = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+    document.addEventListener('pointerdown', blockDown, true);
+    document.addEventListener('mousedown', blockDown, true);
+    const onMove = (ev) => {
+      const cell = ev.target.closest('.table-cell');
+      const el = cell || ev.target.closest('.page .element');
+      if (last === el) return; if (last) last.style.outline = ''; last = el; if (last) last.style.outline = '2px solid var(--primary)';
+    };
+    const done = () => {
+      document.removeEventListener('mousemove', onMove, true);
+      document.removeEventListener('click', onClick, true);
+      document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('pointerdown', blockDown, true);
+      document.removeEventListener('mousedown', blockDown, true);
+      if (last) last.style.outline = '';
+      window.__PICKING = false; document.body.classList.remove('app-noselect');
+      if (Array.isArray(prevSelIds) && prevSelIds.length && typeof setSelection === 'function') setSelection(prevSelIds);
+      try { host._pickerDoneRef = null; } catch {}
+    };
+    const onKey = (ke) => { if (ke.key === 'Escape'){ ke.preventDefault(); done(); } };
+    const onClick = (ev) => {
+      const cell = ev.target.closest('.table-cell');
+      const el = cell || ev.target.closest('.page .element');
+      if (!el) { done(); return; }
+      ev.preventDefault(); ev.stopPropagation();
+      let token = '';
+      if (cell){ const cid = cell.getAttribute('data-id'); if (cid) token = `"#${cid}"`; }
+      else { const id = el.getAttribute('data-id'); if (id) token = `"#${id}"`; }
+      // Insert token at end (no extra spaces; quotes make it distinct)
+      host.textContent = String(host.textContent || '') + token;
+      host.focus();
+    };
+    document.addEventListener('mousemove', onMove, true);
+    document.addEventListener('click', onClick, true);
+    document.addEventListener('keydown', onKey, true);
+    try { host._pickerDoneRef = done; } catch {}
+    return done;
+  }
+  try { window.startInlineFormulaPicker = startInlineFormulaPicker; } catch {}
 
   // save and export
   saveBtn().addEventListener('click', saveDocument);
