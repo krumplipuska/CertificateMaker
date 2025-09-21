@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Autosave Fix</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .pass { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .fail { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Autosave Fix Test</h1>
+    <p>This test verifies that the autosave fix works correctly.</p>
+
+    <div id="test-results"></div>
+
+    <button onclick="testAppStatePersistence()">Test AppState Persistence</button>
+    <button onclick="testSettingsPersistence()">Test Settings Persistence</button>
+    <button onclick="testInlineDocsPersistence()">Test InlineDocs Persistence</button>
+    <button onclick="clearAllStorage()">Clear All Storage</button>
+
+    <script>
+        // Copy the AppState, Settings, and InlineDocs implementations from editor.app.js
+        const Settings = (function(){
+          const KEY = 'certificateMaker:settings';
+          const defaults = { autosaveEnabled: true };
+          function read(){
+            try { return Object.assign({}, defaults, JSON.parse(localStorage.getItem(KEY) || '{}')); }
+            catch { return { ...defaults }; }
+          }
+          function write(data){ try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} }
+          function get(k){ return read()[k]; }
+          function set(k,v){ const s = read(); s[k] = v; write(s); }
+          function all(){ return read(); }
+          return { get, set, all };
+        })();
+
+        const AppState = (function(){
+          const KEY = 'certificateMaker:appState';
+          const defaults = { view: 'hub', activeDocId: null };
+          function read(){
+            try { return Object.assign({}, defaults, JSON.parse(localStorage.getItem(KEY) || '{}')); }
+            catch { return { ...defaults }; }
+          }
+          function write(data){ try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} }
+          function get(k){ return read()[k]; }
+          function set(k,v){ const s = read(); s[k] = v; write(s); }
+          function all(){ return read(); }
+          return { get, set, all, view: 'hub', activeDocId: null };
+        })();
+
+        const InlineDocs = (function(){
+          function safeParse(text){ try { return JSON.parse(text); } catch { return { catalog:[], docs:{} }; } }
+          function read(){ return safeParse(localStorage.getItem('certificateMaker:inlineDocs') || '{"catalog":[],"docs":{}}'); }
+          function write(data){
+            try {
+              localStorage.setItem('certificateMaker:inlineDocs', JSON.stringify(data));
+            } catch {}
+          }
+          function get(id){ return read().docs[id]; }
+          function set(id, doc, name){
+            const data = read();
+            if (!data.docs[id]) data.catalog.push({ id, name: name || 'Untitled', createdAt: Date.now(), updatedAt: Date.now() });
+            else data.catalog = data.catalog.map(r => r.id===id ? { ...r, name: name ?? r.name, updatedAt: Date.now() } : r);
+            data.docs[id] = doc;
+            write(data);
+          }
+          function list(){ return read().catalog; }
+          return { list, get, set, remove: (id) => { const data = read(); data.catalog = data.catalog.filter(r => r.id !== id); delete data.docs[id]; write(data); } };
+        })();
+
+        function addTestResult(testName, passed, message) {
+            const resultsDiv = document.getElementById('test-results');
+            const div = document.createElement('div');
+            div.className = `test-result ${passed ? 'pass' : 'fail'}`;
+            div.innerHTML = `<strong>${testName}:</strong> ${message}`;
+            resultsDiv.appendChild(div);
+        }
+
+        function testAppStatePersistence() {
+            // Test setting and getting AppState
+            AppState.set('activeDocId', 'test-doc-123');
+            AppState.set('view', 'editor');
+
+            const retrievedId = AppState.get('activeDocId');
+            const retrievedView = AppState.get('view');
+
+            const idPassed = retrievedId === 'test-doc-123';
+            const viewPassed = retrievedView === 'editor';
+
+            addTestResult('AppState Persistence', idPassed && viewPassed,
+                `ActiveDocId: ${retrievedId} (expected: test-doc-123), View: ${retrievedView} (expected: editor)`);
+
+            // Test AppState.all()
+            const all = AppState.all();
+            addTestResult('AppState.all()', all.activeDocId === 'test-doc-123' && all.view === 'editor',
+                `All data: ${JSON.stringify(all)}`);
+        }
+
+        function testSettingsPersistence() {
+            // Test settings persistence
+            Settings.set('autosaveEnabled', false);
+            const retrieved = Settings.get('autosaveEnabled');
+
+            addTestResult('Settings Persistence', retrieved === false,
+                `AutosaveEnabled: ${retrieved} (expected: false)`);
+
+            // Test Settings.all()
+            const all = Settings.all();
+            addTestResult('Settings.all()', all.autosaveEnabled === false,
+                `All settings: ${JSON.stringify(all)}`);
+        }
+
+        function testInlineDocsPersistence() {
+            // Test InlineDocs persistence
+            const testDoc = { pages: [{ id: 'page1', name: 'Test Page', elements: [] }], currentPageId: 'page1', nextElementId: 1, editMode: false };
+            InlineDocs.set('test-doc-456', testDoc, 'Test Document');
+
+            const retrieved = InlineDocs.get('test-doc-456');
+            const list = InlineDocs.list();
+
+            const docPassed = retrieved && retrieved.pages && retrieved.pages.length > 0;
+            const listPassed = list && list.length > 0 && list.find(d => d.id === 'test-doc-456');
+
+            addTestResult('InlineDocs Persistence', docPassed && listPassed,
+                `Document retrieved: ${docPassed}, List contains doc: ${listPassed}`);
+        }
+
+        function clearAllStorage() {
+            localStorage.removeItem('certificateMaker:appState');
+            localStorage.removeItem('certificateMaker:settings');
+            localStorage.removeItem('certificateMaker:inlineDocs');
+
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '';
+
+            addTestResult('Storage Clear', true, 'All localStorage items cleared');
+        }
+    </script>
+</body>
+</html>

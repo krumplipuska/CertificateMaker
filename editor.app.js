@@ -11,7 +11,20 @@ function renderAll() {
 }
 
 /* ----------------------- Hub + Inline Docs ----------------------- */
-const AppState = { view: 'hub', activeDocId: null };
+// Lightweight app state with persistence
+const AppState = (function(){
+  const KEY = 'certificateMaker:appState';
+  const defaults = { view: 'hub', activeDocId: null };
+  function read(){
+    try { return Object.assign({}, defaults, JSON.parse(localStorage.getItem(KEY) || '{}')); }
+    catch { return { ...defaults }; }
+  }
+  function write(data){ try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} }
+  function get(k){ return read()[k]; }
+  function set(k,v){ const s = read(); s[k] = v; write(s); }
+  function all(){ return read(); }
+  return { get, set, all, view: 'hub', activeDocId: null };
+})();
 
 // Lightweight settings store persisted in localStorage
 const Settings = (function(){
@@ -30,6 +43,7 @@ const Settings = (function(){
 
 function setView(name){
   try {
+    AppState.set('view', name);
     AppState.view = name;
     const hv = document.getElementById('hubView');
     const ev = document.getElementById('editorView');
@@ -57,7 +71,7 @@ const InlineDocs = (function(){
   }
   function hydrateFromLocal(){
     try {
-      if (Settings.get('autosaveEnabled') === false) return; // do not hydrate when autosave is off
+      // Always hydrate from localStorage - the autosave setting only affects saving, not loading
       const s = localStorage.getItem('certificateMaker:inlineDocs');
       if (s){ const data = safeParse(s); write(data); }
     } catch {}
@@ -180,6 +194,7 @@ function openDocument(id){
   // Always open in view mode as requested
   setEditMode(false);
   renderAll();
+  AppState.set('activeDocId', id);
   AppState.activeDocId = id;
   setView('editor');
   try {
@@ -192,6 +207,8 @@ function openDocument(id){
 
 function backToHub(){
   // Do not autosave when leaving the doc; navigate only
+  AppState.set('activeDocId', null);
+  AppState.activeDocId = null;
   setView('hub');
   renderHub();
 }
@@ -222,6 +239,13 @@ function initializeHubRouter(){
         titleInput.value = v;
       });
       titleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); titleInput.blur(); } });
+    }
+
+    // Check if we should restore a previously opened document
+    const persistedDocId = AppState.get('activeDocId');
+    if (persistedDocId && InlineDocs.get(persistedDocId)) {
+      // Small delay to ensure everything is initialized
+      setTimeout(() => openDocument(persistedDocId), 100);
     }
   } catch {}
 }
@@ -3558,9 +3582,22 @@ async function bootstrap(){
     moreBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(); });
     document.addEventListener('click', (e) => { if (!moreMenu.contains(e.target) && e.target !== moreBtn) toggleMenu(false); });
   }
+  // Hub view: minimal More menu (Settings only)
+  const hubMoreBtn = document.getElementById('hubMoreMenuBtn');
+  const hubMoreMenu = document.getElementById('hubMoreMenu');
+  if (hubMoreBtn && hubMoreMenu){
+    const toggleHubMenu = (open) => {
+      const willOpen = typeof open === 'boolean' ? open : hubMoreMenu.classList.contains('hidden');
+      hubMoreMenu.classList.toggle('hidden', !willOpen);
+      hubMoreBtn.setAttribute('aria-expanded', String(willOpen));
+    };
+    hubMoreBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleHubMenu(); });
+    document.addEventListener('click', (e) => { if (!hubMoreMenu.contains(e.target) && e.target !== hubMoreBtn) toggleHubMenu(false); });
+  }
   // Settings dialog wiring
   (function bindSettings(){
     const openBtn = document.getElementById('settingsBtn');
+    const hubOpenBtn = document.getElementById('hubSettingsBtn');
     const dialog = document.getElementById('settingsDialog');
     const closeBtn = document.getElementById('settingsCloseBtn');
     const autoToggle = document.getElementById('autosaveToggle');
@@ -3568,6 +3605,7 @@ async function bootstrap(){
     function open(){ if (!dialog) return; sync(); dialog.classList.remove('hidden'); }
     function close(){ if (!dialog) return; dialog.classList.add('hidden'); }
     if (openBtn) openBtn.addEventListener('click', (e)=>{ e.stopPropagation(); open(); });
+    if (hubOpenBtn) hubOpenBtn.addEventListener('click', (e)=>{ e.stopPropagation(); try { hubMoreMenu?.classList.add('hidden'); hubMoreBtn?.setAttribute('aria-expanded','false'); } catch{} open(); });
     if (closeBtn) closeBtn.addEventListener('click', close);
     if (dialog) dialog.addEventListener('click', (e)=>{ if (e.target === dialog) close(); });
     document.addEventListener('keydown', (e)=>{ if (dialog && !dialog.classList.contains('hidden') && e.key === 'Escape') close(); });

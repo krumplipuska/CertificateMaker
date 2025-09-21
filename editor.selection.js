@@ -99,6 +99,9 @@ function positionElementActions(){
   bubble.style.left = (r.left + r.width / 2) + 'px';
   bubble.style.top = (r.top - 8) + 'px';
   bubble.classList.remove('hidden');
+  // Mark the moment of this reposition so clicks immediately following
+  // a selection change don't trigger the actions dropdown unintentionally
+  bubble.setAttribute('data-shown-at', String(Date.now()));
 }
 
 /* ----------------------- Selection box ----------------------- */
