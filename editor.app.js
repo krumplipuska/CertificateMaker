@@ -71,9 +71,23 @@ const InlineDocs = (function(){
   }
   function hydrateFromLocal(){
     try {
-      // Always hydrate from localStorage - the autosave setting only affects saving, not loading
+      // Hydrate from localStorage only when the in-memory store is empty.
+      // This ensures hub changes (when autosave is off) are not overwritten.
+      const current = read();
+      const hasRuntimeData = !!(current && (
+        (Array.isArray(current.catalog) && current.catalog.length > 0) ||
+        (current.docs && Object.keys(current.docs).length > 0)
+      ));
+      if (hasRuntimeData) return;
       const s = localStorage.getItem('certificateMaker:inlineDocs');
-      if (s){ const data = safeParse(s); write(data); }
+      if (s){
+        const data = safeParse(s);
+        const hasPersistentData = !!(data && (
+          (Array.isArray(data.catalog) && data.catalog.length > 0) ||
+          (data.docs && Object.keys(data.docs).length > 0)
+        ));
+        if (hasPersistentData) write(data);
+      }
     } catch {}
   }
   function list(){ return read().catalog; }
