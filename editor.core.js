@@ -174,6 +174,8 @@ function commitHistory(label) {
   if (History.past.length > HISTORY_LIMIT) History.past.shift();
   History.future = [];
   updateUndoRedoButtons();
+  // Trigger inline autosave (debounced in editor.app.js)
+  try { if (typeof autosaveInline === 'function') autosaveInline(); } catch {}
 }
 function undo() {
   if (!History.past.length) return;
@@ -197,6 +199,7 @@ function updateUndoRedoButtons() {
 function setEditMode(on) {
   Model.document.editMode = on;
   document.body.classList.toggle('edit-off', !on);
+  try { const btn = (typeof editToggleBtn === 'function') ? editToggleBtn() : null; if (btn) btn.setAttribute('aria-pressed', on ? 'true' : 'false'); } catch {}
   // hide selection and toolbar if turning off
   if (!on) {
     try { clearSelection(); } catch {}

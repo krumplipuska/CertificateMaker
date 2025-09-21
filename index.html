@@ -24,8 +24,35 @@
   <script src="editor.app.js" defer></script>
 </head>
 <body>
+  <!-- Hub view (hidden by default). All documents are stored inline in __docs__ -->
+  <div id="hubView">
+    <div id="hubHeader" class="hub-header">
+      <div id="hubFileTitle" class="hub-title">The whole file(app) name (like index.html)</div>
+      <button id="hubSaveBtn" class="btn hub-save" title="Save this file">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h12v14H5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 5v6h6V5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <span>Save</span>
+      </button>
+    </div>
+    <div class="hub-panel">
+      <div class="hub-actions">
+        <button id="newDocBtn" class="btn" title="Create new document">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span>New</span>
+        </button>
+      </div>
+      <div id="docList" class="doc-list" aria-label="Documents"></div>
+    </div>
+    <script id="__docs__" type="application/json">{ "catalog": [], "docs": {} }</script>
+  </div>
+
+  <div id="editorView" hidden>
   <!-- Top bar -->
   <div class="topbar">
+    <div class="group">
+      <button id="backToHubBtn" class="btn" title="Back to hub" aria-label="Back to hub">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
     <div class="group">
       <button id="editToggleBtn" class="btn" aria-pressed="false" title="Toggle Edit/View mode" aria-label="Toggle Edit/View mode">
         <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
@@ -51,16 +78,18 @@
         <span>Redo</span>
       </button>
     </div>
-    <div class="group" id="zoomGroup">
-      <input id="zoomSlider" type="range" min="25" max="300" step="1" value="100" style="width:160px">
-      <span id="zoomLabel">100%</span>
-    </div>
     <div class="group" id="viewToggles">
       <label class="switch"><input id="snapToggle" type="checkbox" checked><span>Snap</span></label>
       <!-- Guides & Minimap toggles temporarily removed per request -->
       <label class="switch" style="display:none"><input id="guidesToggle" type="checkbox"><span>Guides</span></label>
       <label class="switch" style="display:none"><input id="minimapToggle" type="checkbox"><span>Minimap</span></label>
       <label class="switch" style="display:none"><input id="rulersToggle" type="checkbox"><span>Rulers</span></label>
+    </div>
+    <div class="group" id="docTitleGroup">
+      <div class="btn" style="gap:6px">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 10h16" stroke="currentColor" stroke-width="2"/><path d="M8 14h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="docTitleInput" type="text" value="Untitled" aria-label="Document name" style="border:none;outline:none;background:transparent;color:#fff;max-width:360px" />
+      </div>
     </div>
     <div class="spacer"></div>
     <div class="group">
@@ -71,39 +100,19 @@
         </svg>
         <span>Save</span>
       </button>
-      <button id="saveAsBtn" class="btn">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M5 5h12v14H5z" fill="none" stroke="currentColor" stroke-width="2"/>
-          <path d="M9 5v6h6V5" fill="none" stroke="currentColor" stroke-width="2"/>
-          <path d="M12 13v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <span>Save As</span>
+      <div class="menu" style="position:relative">
+        <button class="btn" id="moreMenuBtn" title="More options" aria-haspopup="true" aria-expanded="false">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
       </button>
-      <button id="savePdfBtn" class="btn">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 3v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M8 9l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <span>Export PDF</span>
-      </button>
-      <button id="exportPngBtn" class="btn">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 3v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M8 9l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <span>Export PNG</span>
-      </button>
-      <button id="exportJpgBtn" class="btn">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 3v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M8 9l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <span>Export JPG</span>
-      </button>
+        <div class="dropdown hidden" id="moreMenu">
+          <button id="saveAsBtn" class="btn mini"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h12v14H5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 5v6h6V5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 13v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Save As</span></button>
+          <button id="savePdfBtn" class="btn mini"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 9l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Export PDF</span></button>
+          <button id="exportPngBtn" class="btn mini"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 9l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Export PNG</span></button>
+          <button id="exportJpgBtn" class="btn mini"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 9l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Export JPG</span></button>
+          <hr/>
+          <button id="settingsBtn" class="btn mini"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 110 8 4 4 0 010-8z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 12h2M18 12h2M12 4v2M12 18v2M6.2 6.2l1.4 1.4M16.4 16.4l1.4 1.4M17.8 6.2l-1.4 1.4M7.6 16.4l-1.4 1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Settings</span></button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -155,6 +164,11 @@
         </div>
       </div>
     </aside>
+  </div>
+  <!-- Bottom-right floating zoom control -->
+  <div class="zoom-control" id="zoomControl">
+    <input id="zoomSlider" type="range" min="25" max="300" step="1" value="100">
+    <span id="zoomLabel">100%</span>
   </div>
   <!-- aria-live region to announce selection and range changes for screen readers -->
   <div id="srAnnouncer" aria-live="polite" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden"></div>
@@ -391,6 +405,23 @@
     </div>
   </div>
 
+  <!-- Settings dialog -->
+  <div id="settingsDialog" class="hidden" role="dialog" aria-modal="true" aria-label="Settings" style="position:fixed;inset:0;display:grid;place-items:center;z-index:1200;background:rgba(0,0,0,.2)">
+    <div class="cpanel" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);width:min(420px,90vw);padding:12px 12px 10px 12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <h3 style="margin:0;font-size:16px">Settings</h3>
+        <button class="btn mini" id="settingsCloseBtn" aria-label="Close settings">Close</button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <div style="font-weight:600">Autosave</div>
+          <div style="font-size:12px;color:#555">When on, hub docs are saved to this file automatically.</div>
+        </div>
+        <label class="switch"><input id="autosaveToggle" type="checkbox" checked><span>On</span></label>
+      </div>
+    </div>
+  </div>
+
   <!-- Rulers (top/left) and Minimap -->
   <div id="rulers" class="hidden" aria-hidden="true" style="display:none">
     <div id="rulerH" class="ruler h"></div>
@@ -399,5 +430,6 @@
   <canvas id="minimap" class="hidden" width="180" height="120" style="display:none;position:fixed;right:16px;bottom:16px;border:1px solid var(--border);border-radius:6px;background:#fff;box-shadow:var(--shadow);z-index:1050"></canvas>
 
   
+  </div> <!-- /#editorView -->
 </body>
 </html>

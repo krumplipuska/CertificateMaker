@@ -8,6 +8,13 @@ let selectedIds = new Set();
 function clearSelection(){ 
   selectedIds.clear(); 
   console.log('[SELECTION] clear');
+  // If a canvas text/field/cell is currently being edited, stop editing as well
+  try {
+    const active = document.activeElement;
+    const isEditable = !!(active && (active.isContentEditable || active.tagName === 'INPUT' || active.tagName === 'TEXTAREA'));
+    const isInCanvas = !!(isEditable && active && active.closest && (active.closest('.page') || active.classList.contains('table-cell')));
+    if (isInCanvas) { active.blur(); }
+  } catch {}
   clearTableSelection(); 
   updateSelectionUI(); 
 }

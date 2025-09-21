@@ -10,6 +10,244 @@ function renderAll() {
   if (!(Model && Model.document && Model.document.editMode)) enforceVisibilityForAllPages();
 }
 
+/* ----------------------- Hub + Inline Docs ----------------------- */
+const AppState = { view: 'hub', activeDocId: null };
+
+// Lightweight settings store persisted in localStorage
+const Settings = (function(){
+  const KEY = 'certificateMaker:settings';
+  const defaults = { autosaveEnabled: true };
+  function read(){
+    try { return Object.assign({}, defaults, JSON.parse(localStorage.getItem(KEY) || '{}')); }
+    catch { return { ...defaults }; }
+  }
+  function write(data){ try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} }
+  function get(k){ return read()[k]; }
+  function set(k,v){ const s = read(); s[k] = v; write(s); }
+  function all(){ return read(); }
+  return { get, set, all };
+})();
+
+function setView(name){
+  try {
+    AppState.view = name;
+    const hv = document.getElementById('hubView');
+    const ev = document.getElementById('editorView');
+    if (hv) hv.hidden = name !== 'hub';
+    if (ev) ev.hidden = name !== 'editor';
+    const backBtn = document.getElementById('backToHubBtn');
+    if (backBtn) backBtn.hidden = name !== 'editor';
+    // Hide editor-only UI when in hub
+    document.body.classList.toggle('in-hub', name === 'hub');
+  } catch {}
+}
+
+const InlineDocs = (function(){
+  function node(){ return document.getElementById('__docs__'); }
+  function safeParse(text){ try { return JSON.parse(text); } catch { return { catalog:[], docs:{} }; } }
+  function read(){ const n = node(); return n ? safeParse(n.textContent || '{"catalog":[],"docs":{}}') : { catalog:[], docs:{} }; }
+  function write(data){
+    const n = node(); if (n) n.textContent = JSON.stringify(data);
+    try {
+      // Respect global autosave setting: only persist to localStorage when enabled
+      if (Settings.get('autosaveEnabled') !== false) {
+        localStorage.setItem('certificateMaker:inlineDocs', JSON.stringify(data));
+      }
+    } catch {}
+  }
+  function hydrateFromLocal(){
+    try {
+      if (Settings.get('autosaveEnabled') === false) return; // do not hydrate when autosave is off
+      const s = localStorage.getItem('certificateMaker:inlineDocs');
+      if (s){ const data = safeParse(s); write(data); }
+    } catch {}
+  }
+  function list(){ return read().catalog; }
+  function get(id){ return read().docs[id]; }
+  function set(id, doc, name){ const data = read(); if (!data.docs[id]) data.catalog.push({ id, name: name || 'Untitled', createdAt: Date.now(), updatedAt: Date.now() }); else data.catalog = data.catalog.map(r => r.id===id ? { ...r, name: name ?? r.name, updatedAt: Date.now() } : r); data.docs[id] = doc; write(data); }
+  function remove(id){ const data = read(); data.catalog = data.catalog.filter(r => r.id !== id); delete data.docs[id]; write(data); }
+  function rename(id, name){ const data = read(); data.catalog = data.catalog.map(r => r.id===id ? { ...r, name, updatedAt: Date.now() } : r); write(data); }
+  return { list, get, set, remove, rename, hydrateFromLocal };
+})();
+
+function renderHub(){
+  try {
+    InlineDocs.hydrateFromLocal();
+    const list = InlineDocs.list();
+    const host = document.getElementById('docList');
+    if (!host) return;
+    host.innerHTML = (list || []).map(r => `
+      <div class="doc-row" data-id="${r.id}">
+        <div class="doc-name">${r.name}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="doc-meta">${new Date(r.updatedAt || r.createdAt || Date.now()).toLocaleString()}</div>
+          <div class="doc-actions">
+            <button class="btn" data-act="open" title="Open"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="btn" data-act="rename" title="Rename"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"/></svg></button>
+            <button class="btn" data-act="duplicate" title="Duplicate"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+            <button class="btn" data-act="delete" title="Delete"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+    // Inline rename helper
+    function beginInlineRename(row){
+      try {
+        if (!row) return; const id = row.dataset.id; if (!id) return;
+        if (row.classList.contains('editing')) return;
+        row.classList.add('editing');
+        const nameEl = row.querySelector('.doc-name'); if (!nameEl) return;
+        const current = (nameEl.textContent || '').trim();
+        const input = document.createElement('input');
+        input.type = 'text'; input.value = current; input.className = 'doc-edit';
+        // Prevent row click opening while editing
+        ['click','mousedown','mouseup','dblclick'].forEach(evt => input.addEventListener(evt, ev => ev.stopPropagation(), true));
+        const finish = (commit) => {
+          try {
+            const newName = commit ? String(input.value || '').trim() || 'Untitled' : current;
+            if (commit && newName !== current) { InlineDocs.rename(id, newName); }
+          } catch {}
+          renderHub();
+        };
+        input.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+          if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+        });
+        input.addEventListener('blur', () => finish(true));
+        nameEl.replaceWith(input);
+        // Focus after replacing so selection works on Windows
+        setTimeout(() => { try { input.focus(); input.select(); } catch {} }, 0);
+      } catch {}
+    }
+
+    let clickTimer = null;
+    host.onclick = (e) => {
+      const row = e.target.closest('.doc-row'); if (!row) return;
+      const id = row.dataset.id; const act = e.target.closest('button')?.dataset.act;
+      // If clicking any action button
+      if (act) {
+        if (act === 'open') openDocument(id);
+        if (act === 'rename') beginInlineRename(row);
+        if (act === 'delete') { if (confirm('Delete this document?')) { InlineDocs.remove(id); renderHub(); } }
+        if (act === 'duplicate') {
+          const copyId = `doc-${(crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2))}`;
+          const cur = InlineDocs.get(id);
+          if (cur) InlineDocs.set(copyId, JSON.parse(JSON.stringify(cur)), (row.querySelector('.doc-name')?.textContent || 'Document') + ' copy');
+          renderHub();
+        }
+        return;
+      }
+
+      // If currently in inline edit mode, do nothing
+      if (row.classList.contains('editing')) return;
+
+      // If clicking on the name, delay to detect a double-click (which triggers rename)
+      if (e.target.closest('.doc-name')) {
+        clearTimeout(clickTimer);
+        clickTimer = setTimeout(() => { try { openDocument(id); } catch {} }, 250);
+        return;
+      }
+
+      // Otherwise open immediately
+      openDocument(id);
+    };
+
+    // Double click on the name -> inline rename
+    host.addEventListener('dblclick', (e) => {
+      const name = e.target.closest('.doc-name'); if (!name) return;
+      const row = e.target.closest('.doc-row'); if (!row) return;
+      clearTimeout(clickTimer);
+      e.preventDefault(); e.stopPropagation();
+      beginInlineRename(row);
+    }, true);
+  } catch {}
+}
+
+function newDocument(){
+  const id = `doc-${(crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2))}`;
+  const name = prompt('Document name', 'New document') || 'New document';
+  const doc = { pages: [createPage('Page 1')], currentPageId: '', nextElementId: 1, editMode: true, headerHeight: 10, footerHeight: 10 };
+  doc.currentPageId = doc.pages[0].id;
+  InlineDocs.set(id, doc, name);
+  openDocument(id);
+  try { const t = document.getElementById('docTitleInput'); if (t) t.value = name; } catch {}
+}
+
+function openDocument(id){
+  const doc = InlineDocs.get(id);
+  if (!doc) { alert('Document not found'); return; }
+  Model.document = doc;
+  // Always open in view mode as requested
+  setEditMode(false);
+  renderAll();
+  AppState.activeDocId = id;
+  setView('editor');
+  try {
+    // Update nav bar title text
+    const r = (InlineDocs.list() || []).find(x => x.id === id);
+    const t = document.getElementById('docTitleInput');
+    if (t) t.value = r ? r.name : 'Untitled';
+  } catch {}
+}
+
+function backToHub(){
+  // Do not autosave when leaving the doc; navigate only
+  setView('hub');
+  renderHub();
+}
+
+function initializeHubRouter(){
+  try {
+    // Initial view: hub
+    setView('hub');
+    renderHub();
+    const newBtn = document.getElementById('newDocBtn');
+    if (newBtn) newBtn.addEventListener('click', newDocument);
+    const hubSaveBtn = document.getElementById('hubSaveBtn');
+    if (hubSaveBtn) hubSaveBtn.addEventListener('click', async () => { try { await saveDocument(); } catch {} });
+    const backBtn = document.getElementById('backToHubBtn');
+    if (backBtn) backBtn.addEventListener('click', backToHub);
+    // Inline title editing
+    const titleInput = document.getElementById('docTitleInput');
+    if (titleInput){
+      // Initialize from current record if available
+      try {
+        const list = InlineDocs.list() || [];
+        const rec = list.find(r => r.id === AppState.activeDocId);
+        if (rec && typeof rec.name === 'string') titleInput.value = rec.name;
+      } catch {}
+      titleInput.addEventListener('change', () => {
+        const v = String(titleInput.value || '').trim() || 'Untitled';
+        try { if (AppState.activeDocId) InlineDocs.rename(AppState.activeDocId, v); } catch {}
+        titleInput.value = v;
+      });
+      titleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); titleInput.blur(); } });
+    }
+  } catch {}
+}
+
+// Debounced inline autosave that mirrors the current doc into InlineDocs and
+// performs a background file save (FSA/OPFS/local) without prompts.
+let __inlineSaveTimer = null;
+function autosaveInline(){
+  try {
+    if (Settings.get('autosaveEnabled') === false) return;
+    if (!AppState.activeDocId) return;
+    if (__inlineSaveTimer) clearTimeout(__inlineSaveTimer);
+    __inlineSaveTimer = setTimeout(async () => {
+      __inlineSaveTimer = null;
+      // 1) Update inline docs (and localStorage if enabled)
+      try { InlineDocs.set(AppState.activeDocId, Model.document); } catch {}
+      // 2) Visual feedback on the save button
+      indicateSaving();
+      // 3) Background save of the whole HTML using Persistence (silent fallbacks)
+      try { await Persistence.saveDocument({ silent: true }); } catch {}
+      // 4) Done
+      indicateSaved();
+    }, 500);
+  } catch {}
+}
+
 function enforceVisibilityForAllPages(){
   try {
     // Skip global visibility enforcement in edit mode to avoid re-applying view-mode hidden flags
@@ -2606,27 +2844,42 @@ function download(filename, content, type='text/html'){
   const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 1000);
 }
 
-// Save button UI feedback
-function getSaveBtn(){ return document.getElementById('saveBtn'); }
+// Save button UI feedback (both editor and hub buttons)
+function getSaveBtns(){
+  const a = document.getElementById('saveBtn');
+  const b = document.getElementById('hubSaveBtn');
+  return [a,b].filter(Boolean);
+}
 function indicateSaving(){
-  const btn = getSaveBtn();
-  if (!btn) return;
-  btn.classList.remove('saved');
-  btn.classList.add('saving');
-  if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent || 'Save';
-  btn.textContent = 'Saving…';
+  getSaveBtns().forEach((btn) => {
+    btn.classList.remove('saved');
+    btn.classList.add('saving');
+    btn.setAttribute('aria-busy', 'true');
+    if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent || 'Save';
+    btn.textContent = 'Saving…';
+    // Watchdog to avoid getting stuck
+    if (btn._saveWatchdog) clearTimeout(btn._saveWatchdog);
+    btn._saveWatchdog = setTimeout(() => {
+      if (btn.classList.contains('saving')){
+        btn.classList.remove('saving');
+        btn.removeAttribute('aria-busy');
+        btn.textContent = btn.dataset.originalText || 'Save';
+      }
+    }, 8000);
+  });
 }
 function indicateSaved(){
-  const btn = getSaveBtn();
-  if (!btn) return;
-  btn.classList.remove('saving');
-  btn.classList.add('saved');
-  btn.textContent = 'Saved';
-  if (btn._saveResetTimer) clearTimeout(btn._saveResetTimer);
-  btn._saveResetTimer = setTimeout(() => {
-    btn.classList.remove('saved');
-    btn.textContent = btn.dataset.originalText || 'Save';
-  }, 2000);
+  getSaveBtns().forEach((btn) => {
+    btn.classList.remove('saving');
+    btn.classList.add('saved');
+    btn.removeAttribute('aria-busy');
+    btn.textContent = 'Saved';
+    if (btn._saveResetTimer) clearTimeout(btn._saveResetTimer);
+    btn._saveResetTimer = setTimeout(() => {
+      btn.classList.remove('saved');
+      btn.textContent = btn.dataset.originalText || 'Save';
+    }, 1500);
+  });
 }
 
 // ---------------- OPFS (Origin Private File System) helpers ----------------
@@ -2717,7 +2970,9 @@ async function writeFile(handle, content){
 async function saveDocument(){
   indicateSaving();
   try {
-    const res = await Persistence.saveDocument();
+    // Always mirror the inline doc immediately
+    try { if (AppState.activeDocId) InlineDocs.set(AppState.activeDocId, Model.document); } catch {}
+    const res = await Persistence.saveDocument({ silent: true });
     if (res && res.ok) { indicateSaved(); return; }
   } catch {}
 }
@@ -2746,11 +3001,18 @@ async function saveDocumentAs(){
 
 /* ----------------------- Init & Events ----------------------- */
 async function bootstrap(){
-  // Use persistence facade to load
+  // When running in editor view, we'll load from InlineDocs if available; otherwise fall back
   let loaded = false;
-  try { const res = await Persistence.tryAutoLoad(); loaded = !!(res && res.ok); } catch {}
-
-  // If nothing loaded, create an initial document
+  try {
+    const hv = document.getElementById('hubView');
+    const ev = document.getElementById('editorView');
+    // If hub is visible on first load, don't load a document yet
+    if (hv && !hv.hidden && ev && ev.hidden) {
+      loaded = true; // defer loading until a doc is opened
+    }
+  } catch {}
+  // Disable auto-load of previous autosave; start with empty doc unless embedded
+  if (!loaded){ loaded = false; }
   if (!loaded){
     Model.document.pages = [createPage('Page 1')];
     Model.document.currentPageId = Model.document.pages[0].id;
@@ -3284,9 +3546,39 @@ async function bootstrap(){
 
   // save and export
   saveBtn().addEventListener('click', saveDocument);
-  saveAsBtn().addEventListener('click', saveDocumentAs);
+  // Hook up More menu items (Save As / Exports)
+  const moreBtn = document.getElementById('moreMenuBtn');
+  const moreMenu = document.getElementById('moreMenu');
+  if (moreBtn && moreMenu){
+    const toggleMenu = (open) => {
+      const willOpen = typeof open === 'boolean' ? open : moreMenu.classList.contains('hidden');
+      moreMenu.classList.toggle('hidden', !willOpen);
+      moreBtn.setAttribute('aria-expanded', String(willOpen));
+    };
+    moreBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(); });
+    document.addEventListener('click', (e) => { if (!moreMenu.contains(e.target) && e.target !== moreBtn) toggleMenu(false); });
+  }
+  // Settings dialog wiring
+  (function bindSettings(){
+    const openBtn = document.getElementById('settingsBtn');
+    const dialog = document.getElementById('settingsDialog');
+    const closeBtn = document.getElementById('settingsCloseBtn');
+    const autoToggle = document.getElementById('autosaveToggle');
+    function sync(){ try { if (autoToggle){ const on = Settings.get('autosaveEnabled') !== false; autoToggle.checked = !!on; const span = autoToggle.nextElementSibling; if (span) span.textContent = on ? 'On' : 'Off'; } } catch {} }
+    function open(){ if (!dialog) return; sync(); dialog.classList.remove('hidden'); }
+    function close(){ if (!dialog) return; dialog.classList.add('hidden'); }
+    if (openBtn) openBtn.addEventListener('click', (e)=>{ e.stopPropagation(); open(); });
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    if (dialog) dialog.addEventListener('click', (e)=>{ if (e.target === dialog) close(); });
+    document.addEventListener('keydown', (e)=>{ if (dialog && !dialog.classList.contains('hidden') && e.key === 'Escape') close(); });
+    if (autoToggle) autoToggle.addEventListener('change', ()=>{ const on = !!autoToggle.checked; Settings.set('autosaveEnabled', on); const span = autoToggle.nextElementSibling; if (span) span.textContent = on ? 'On' : 'Off'; });
+  })();
+  const saveAs = document.getElementById('saveAsBtn');
+  if (saveAs) saveAs.addEventListener('click', saveDocumentAs);
   const pngBtn = document.getElementById('exportPngBtn');
   const jpgBtn = document.getElementById('exportJpgBtn');
+  const pdfBtn = document.getElementById('savePdfBtn');
+  if (pdfBtn) pdfBtn.addEventListener('click', () => ExportService.exportDocumentToPdf());
   if (pngBtn) pngBtn.addEventListener('click', () => ExportService.exportCurrentPageToImage({ format: 'png' }));
   if (jpgBtn) jpgBtn.addEventListener('click', () => ExportService.exportCurrentPageToImage({ format: 'jpg', quality: 0.85 }));
   
@@ -3944,6 +4236,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (prT) prT.setAttribute('data-dir', document.getElementById('propertiesPanel')?.classList.contains('collapsed') ? 'right' : 'left');
   const versionEl = document.getElementById('version');
   if (versionEl) versionEl.textContent = APP_VERSION;
+  // Initialize hub/router after base editor wiring
+  try { initializeHubRouter(); } catch {}
 });
 
 

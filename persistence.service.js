@@ -21,17 +21,27 @@ const Persistence = (function(){
 	async function verifyPermission(fileHandle, withWrite){ const opts = {}; if (withWrite) opts.mode = 'readwrite'; if ((await fileHandle.queryPermission(opts)) === 'granted') return true; if ((await fileHandle.requestPermission(opts)) === 'granted') return true; return false; }
 	async function writeHandle(handle, content){ const ok = await verifyPermission(handle, true); if (!ok) throw new Error('Permission denied'); const writable = await handle.createWritable(); await writable.write(content); await writable.close(); }
 
-	async function saveDocument(){
-		const json = serializeDocument();
-		if (supportsOPFS()){
-			try { await opfsWriteFile(`autosave-${getFileScopeId()}.json`, json); return { ok:true, via:'opfs' }; } catch (_) {}
-		}
-		if (localSave(json)) return { ok:true, via:'localStorage' };
+	async function saveDocument(opts){
+		const options = opts || {};
+		// If we already have permission to a file handle, write silently.
 		if (supportsFSA() && currentFileHandle){
-			try { const html = buildSaveHtml(); await writeHandle(currentFileHandle, html); return { ok:true, via:'fsa' }; } catch(_){}
+			try { const html = buildSaveHtml(); await writeHandle(currentFileHandle, html); return { ok:true, via:'fsa' }; } catch(_){ }
 		}
-		const currentFilename = (function(){ const path = window.location.pathname; const filename = path.split('/').pop(); if (filename && filename.toLowerCase().endsWith('.html')) return filename; return null; })();
-		if (currentFilename){ const html = buildSaveHtml(); download(currentFilename, html, 'text/html'); return { ok:true, via:'download' }; }
+		// Silent background save path: try OPFS first, then localStorage as a last resort
+		if (options.silent){
+			try {
+				const html = buildSaveHtml();
+				if (supportsOPFS()) { await opfsWriteFile(`${getFileScopeId()}-autosave.html`, html); return { ok:true, via:'opfs' }; }
+				// Fall back to localStorage snapshot
+				localSave(html);
+				return { ok:true, via:'local' };
+			} catch (_) { /* swallow */ }
+		}
+		// If not silent, fall back to a regular download of the HTML (prompts user)
+		if (!options.silent){
+			const currentFilename = (function(){ const path = window.location.pathname; const filename = path.split('/').pop(); if (filename && filename.toLowerCase().endsWith('.html')) return filename; return null; })();
+			if (currentFilename){ const html = buildSaveHtml(); download(currentFilename, html, 'text/html'); return { ok:true, via:'download' }; }
+		}
 		return { ok:false };
 	}
 
@@ -53,17 +63,11 @@ const Persistence = (function(){
 	}
 
 	async function tryAutoLoad(){
-		// Embedded first
+		// Only load if the document is embedded in the current HTML file.
 		const saved = document.getElementById('__doc__');
 		if (saved && saved.textContent) {
 			try { deserializeDocument(saved.textContent.replaceAll('&lt;','<')); return { ok:true, via:'embedded' }; } catch {}
 		}
-		// OPFS
-		if (supportsOPFS()){
-			try { const text = await opfsReadTextIfExists(`autosave-${getFileScopeId()}.json`); if (text){ deserializeDocument(text); return { ok:true, via:'opfs' }; } } catch(_){}
-		}
-		// LocalStorage
-		const ls = localLoad(); if (ls){ try { deserializeDocument(ls); return { ok:true, via:'localStorage' }; } catch{} }
 		return { ok:false };
 	}
 

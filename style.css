@@ -51,14 +51,99 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial; }
 
 /* Top bar */
-.topbar { position: fixed; inset: 0 0 auto 0; height: 35px; background: var(--panel); display: flex; align-items: center; gap: 6px; padding: 0 8px; box-shadow: var(--shadow); z-index: 1100; }
-.topbar .group { display: inline-flex; gap: 4px; border: 1px solid var(--border); border-radius: 10px; padding: 4px; background: #fff; }
+.topbar { position: fixed; inset: 0 0 auto 0; height: 44px; background: var(--brand-primary); color: var(--brand-white); display: flex; align-items: center; gap: 6px; padding: 0 10px; box-shadow: var(--shadow); z-index: 1100; }
+/* Make groups transparent for a cleaner bar */
+.topbar .group { display: inline-flex; gap: 6px; border: 0; border-radius: 999px; padding: 0; background: transparent; }
+/* Simple, outlined white pills inside the red bar */
+.topbar .btn { background: transparent; color: #fff; border-color: rgba(255,255,255,.9); border-radius: 999px; transition: background-color .15s ease, color .15s ease, border-color .15s ease, transform .15s ease; }
+/* Prominent hover/focus: white pill, brand text/icon */
+.topbar .btn:hover,
+.topbar .btn:focus-visible { background: #fff; color: var(--brand-primary); border-color: #fff; transform: translateY(-1px); }
+/* Icons follow text color so hover/focus recolors them too */
+.topbar > .group .btn .icon { color: currentColor; }
+.topbar > .group .btn .icon circle { fill: currentColor; }
+.topbar #moreMenu { z-index: 1201; }
+/* Ensure dropdown buttons use regular palette, not the white-on-red topbar style */
+.topbar #moreMenu { 
+  position: absolute;
+  top: 36px;
+  right: 0;
+  background: #fff; 
+  border: 1px solid rgba(0,0,0,0.08); 
+  border-radius: 16px; 
+  box-shadow: 0 20px 40px rgba(0,0,0,0.15), 0 8px 16px rgba(0,0,0,0.1); 
+  padding: 8px; 
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  backdrop-filter: blur(10px);
+}
+.topbar #moreMenu .btn { 
+  background: transparent; 
+  color: var(--ink); 
+  border: none; 
+  border-radius: 8px;
+  padding: 10px 12px;
+  justify-content: flex-start;
+  width: 100%;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.topbar #moreMenu .btn:hover { 
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); 
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.topbar #moreMenu .btn .icon { 
+  color: var(--ink); 
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+.topbar #moreMenu .btn:hover .icon { 
+  opacity: 1; 
+}
+.topbar #moreMenu .btn span { 
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  flex: 1;
+}
+.topbar #moreMenu hr { 
+  border: none; 
+  border-top: 1px solid rgba(0,0,0,0.06); 
+  margin: 6px 0; 
+  border-radius: 1px;
+}
+.topbar #docTitleGroup { position: absolute; left: 50%; transform: translateX(-50%); }
+.topbar #docTitleGroup .btn { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
+/* When renaming (input focused), switch to white pill + brand accent */
+#docTitleGroup .btn:focus-within { background: #fff; color: var(--brand-primary); border-color: #fff; }
 .btn { height: 26px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: border-color .15s, background .15s, color .15s; }
 .btn:hover{ background:#f9fafb; }
 .btn.mini{ height: 22px; padding: 0 6px; font-size: 12px; }
 .btn.saving{ background: #fef3c7; border-color: #f59e0b; color: #92400e; }
 .btn.saved{ background: #ecfdf5; border-color: #10b981; color: #065f46; }
 .spacer { flex: 1; }
+.topbar #docTitleGroup .btn { max-width: 420px; }
+#docTitleText { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Title input inside red bar */
+#docTitleInput { color:#fff; transition: background-color .15s ease, color .15s ease; }
+#docTitleInput::placeholder { color: rgba(255,255,255,.8); }
+/* Override inline styles while typing to ensure readability */
+#docTitleInput:focus { background:#fff !important; color: var(--brand-dark) !important; }
+#docTitleInput:focus::placeholder { color: rgba(0,0,0,.5) !important; }
+/* Also recolor the title text on hover of the pill */
+.topbar #docTitleGroup .btn:hover #docTitleInput,
+.topbar #docTitleGroup .btn:focus-visible #docTitleInput { color: var(--brand-primary) !important; }
 .topbar #version { font-size: 12px; color: var(--muted); display: flex; align-items: center; }
 .pages-strip { display:flex; gap:6px; margin-right:8px; }
 .pages-strip .page-tab { padding: 6px 10px; border:1px solid var(--border); border-radius: 8px; background:#fff; cursor:pointer; }
@@ -284,6 +369,32 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 /* generic hidden utility */
 .hidden { display: none !important; }
 
+/* Hub view */
+.hub-header { position: fixed; left: 12px; right: 12px; top: 8px; height: 44px; background: var(--brand-primary); color: #fff; border-radius: 999px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 10px; box-shadow: var(--shadow); z-index: 1100; }
+.hub-title { font-size: 12px; opacity: .95; }
+.hub-save { background: var(--brand-dark); color:#fff; border-color: var(--brand-dark); }
+/* Make hub header buttons visually match editor topbar pills */
+.hub-header .btn { background: transparent; color: #fff; border-color: rgba(255,255,255,.9); border-radius: 999px; transition: background-color .15s ease, color .15s ease, border-color .15s ease, transform .15s ease; }
+/* Match editor topbar prominent hover */
+.hub-header .btn:hover,
+.hub-header .btn:focus-visible { background:#fff; color: var(--brand-primary); border-color:#fff; transform: translateY(-1px); }
+.hub-header .btn .icon { color: currentColor; }
+.hub-panel { position: fixed; top: 60px; bottom: 12px; left: 12px; right: 12px; background: #fff; border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); display: grid; grid-template-rows: auto 1fr; padding: 8px; }
+.hub-actions { display:flex; gap:6px; padding: 4px 4px 8px; }
+.doc-list { overflow: auto; padding-right: 4px; display: grid; gap: 10px; grid-auto-rows: min-content; }
+.doc-row { display:grid; grid-template-columns: 1fr auto; align-items:center; gap: 8px; background:#f8fafc; border:1px solid var(--border); border-radius: 999px; padding: 8px 10px; transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.doc-row:hover { background: color-mix(in srgb, var(--primary) 6%, #f8fafc); border-color: color-mix(in srgb, var(--primary) 28%, var(--border)); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.doc-row:focus-within { background: color-mix(in srgb, var(--primary) 9%, #f8fafc); border-color: color-mix(in srgb, var(--primary) 38%, var(--border)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent); }
+.doc-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-meta { font-size:12px; color: var(--muted); margin-right: 8px; }
+.doc-actions { display:inline-flex; gap:6px; }
+.doc-actions .btn { height: 24px; padding: 0 6px; }
+body.in-hub .topbar, body.in-hub #formatToolbar, body.in-hub .side, body.in-hub .workspace { display: none !important; }
+
+/* Inline rename input in hub list */
+.doc-edit { width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; padding: 6px 8px; height: 28px; font-size: 14px; }
+.doc-row.editing { background:#fff; border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent); }
+
 /* Rulers */
 .ruler { position:fixed; background:#fff; border:1px solid var(--border); z-index:1050; box-shadow:var(--shadow); }
 .ruler.h { left:12px; right:12px; top:35px; height:20px; }
@@ -457,3 +568,10 @@ input[type="color"].circle::-webkit-color-swatch { border: 1px solid var(--borde
 
 /* Disable text selection during drags/resizes */
 body.app-noselect, body.app-noselect * { user-select: none !important; }
+/* Hide complex controls from the simplified top bar */
+.topbar #undoBtn, .topbar #redoBtn, .topbar #viewToggles { display: none !important; }
+
+/* Bottom-right floating zoom control */
+.zoom-control { position: fixed; right: 12px; bottom: 12px; background: var(--panel); border:1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow); padding: 6px 8px; display:inline-flex; align-items:center; gap:8px; z-index: 1200; }
+.zoom-control input[type="range"]{ width: 160px; }
+.zoom-control #zoomLabel { font-size: 12px; color: var(--ink); }
