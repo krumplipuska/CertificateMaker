@@ -95,7 +95,23 @@ const InlineDocs = (function(){
   function set(id, doc, name){ const data = read(); if (!data.docs[id]) data.catalog.push({ id, name: name || 'Untitled', createdAt: Date.now(), updatedAt: Date.now() }); else data.catalog = data.catalog.map(r => r.id===id ? { ...r, name: name ?? r.name, updatedAt: Date.now() } : r); data.docs[id] = doc; write(data); }
   function remove(id){ const data = read(); data.catalog = data.catalog.filter(r => r.id !== id); delete data.docs[id]; write(data); }
   function rename(id, name){ const data = read(); data.catalog = data.catalog.map(r => r.id===id ? { ...r, name, updatedAt: Date.now() } : r); write(data); }
-  return { list, get, set, remove, rename, hydrateFromLocal };
+  function move(id, targetIndex){
+    const data = read();
+    const fromIndex = data.catalog.findIndex(r => r.id === id);
+    if (fromIndex === -1) return;
+    const [item] = data.catalog.splice(fromIndex, 1);
+    let to = Math.max(0, Math.min(Number(targetIndex) || 0, data.catalog.length));
+    data.catalog.splice(to, 0, item);
+    write(data);
+  }
+  function moveBefore(id, beforeId){
+    const data = read();
+    const fromIndex = data.catalog.findIndex(r => r.id === id);
+    const rawIndex = beforeId ? data.catalog.findIndex(r => r.id === beforeId) : data.catalog.length;
+    const toIndex = Math.max(0, rawIndex - (fromIndex !== -1 && fromIndex < rawIndex ? 1 : 0));
+    move(id, toIndex);
+  }
+  return { list, get, set, remove, rename, hydrateFromLocal, move, moveBefore };
 })();
 
 function renderHub(){
@@ -105,7 +121,7 @@ function renderHub(){
     const host = document.getElementById('docList');
     if (!host) return;
     host.innerHTML = (list || []).map(r => `
-      <div class="doc-row" data-id="${r.id}">
+      <div class="doc-row" data-id="${r.id}" draggable="true">
         <div class="doc-name">${r.name}</div>
         <div style="display:flex;align-items:center;gap:8px">
           <div class="doc-meta">${new Date(r.updatedAt || r.createdAt || Date.now()).toLocaleString()}</div>
@@ -118,9 +134,12 @@ function renderHub(){
         </div>
       </div>
     `).join('');
-    // Inline rename helper
-    function beginInlineRename(row){
+    // Inline rename helper (supports hover mode without auto-focus)
+    function beginInlineRename(row, opts){
       try {
+        const options = opts || {};
+        const shouldFocus = options.focus !== false; // default true
+        const hoverMode = options.hoverMode === true;
         if (!row) return; const id = row.dataset.id; if (!id) return;
         if (row.classList.contains('editing')) return;
         row.classList.add('editing');
@@ -128,25 +147,98 @@ function renderHub(){
         const current = (nameEl.textContent || '').trim();
         const input = document.createElement('input');
         input.type = 'text'; input.value = current; input.className = 'doc-edit';
-        // Prevent row click opening while editing
+        // Match font metrics of the text so width measurement is accurate
+        try {
+          const cs = getComputedStyle(nameEl);
+          input.style.fontFamily = cs.fontFamily;
+          input.style.fontSize = cs.fontSize;
+          input.style.fontWeight = cs.fontWeight;
+          input.style.fontStyle = cs.fontStyle;
+          input.style.letterSpacing = cs.letterSpacing;
+        } catch {}
+        // Prevent row click opening while editing when interacting with the input
         ['click','mousedown','mouseup','dblclick'].forEach(evt => input.addEventListener(evt, ev => ev.stopPropagation(), true));
+        // Create a hidden measurer to auto-size the input to text width + 20px
+        let measurer = null;
+        try {
+          measurer = document.createElement('span');
+          const cs = getComputedStyle(nameEl);
+          measurer.style.position = 'fixed';
+          measurer.style.left = '-9999px';
+          measurer.style.top = '-9999px';
+          measurer.style.visibility = 'hidden';
+          measurer.style.whiteSpace = 'pre';
+          measurer.style.fontFamily = cs.fontFamily;
+          measurer.style.fontSize = cs.fontSize;
+          measurer.style.fontWeight = cs.fontWeight;
+          measurer.style.fontStyle = cs.fontStyle;
+          measurer.style.letterSpacing = cs.letterSpacing;
+          document.body.appendChild(measurer);
+        } catch {}
+        function updateWidth(){
+          try {
+            if (!measurer) return; 
+            // Ensure at least one character so we don't collapse too far
+            const t = input.value || '';
+            measurer.textContent = t.length > 0 ? t : ' ';
+            const w = Math.ceil(measurer.getBoundingClientRect().width) + 20; // text width + 20px
+            input.style.width = Math.max(40, w) + 'px';
+            // Keep a safe hard cap to avoid breaking layout in extreme cases
+            input.style.maxWidth = '100%';
+          } catch {}
+        }
         const finish = (commit) => {
           try {
             const newName = commit ? String(input.value || '').trim() || 'Untitled' : current;
             if (commit && newName !== current) { InlineDocs.rename(id, newName); }
           } catch {}
+          try { if (measurer && measurer.parentNode) measurer.remove(); } catch {}
           renderHub();
         };
         input.addEventListener('keydown', (ev) => {
           if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
           if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
         });
+        input.addEventListener('input', updateWidth);
         input.addEventListener('blur', () => finish(true));
         nameEl.replaceWith(input);
-        // Focus after replacing so selection works on Windows
-        setTimeout(() => { try { input.focus(); input.select(); } catch {} }, 0);
+        updateWidth();
+        // In hover mode, if the user leaves the row without focusing the input, revert gracefully
+        if (hoverMode) {
+          const onLeave = () => { if (document.activeElement !== input) finish(false); };
+          row.addEventListener('mouseleave', onLeave, { once: true });
+        }
+        // Focus after replacing so selection works on Windows (unless explicitly disabled)
+        if (shouldFocus) setTimeout(() => { try { input.focus(); input.select(); } catch {} }, 0);
       } catch {}
     }
+
+    // Show inline rename input when hovering over the name text (no auto-focus)
+    host.addEventListener('mouseover', (e) => {
+      const name = e.target.closest('.doc-name'); if (!name) return;
+      const row = name.closest('.doc-row'); if (!row) return;
+
+      // Only trigger rename when hovering over actual text content, not empty space
+      let isOverText = false;
+      const walk = document.createTreeWalker(name, NodeFilter.SHOW_TEXT, null, false);
+      let textNode;
+      while (textNode = walk.nextNode()) {
+        if (textNode.textContent.trim()) {
+          const range = document.createRange();
+          range.selectNode(textNode);
+          const rect = range.getBoundingClientRect();
+          if (e.clientX >= rect.left && e.clientX <= rect.right &&
+              e.clientY >= rect.top && e.clientY <= rect.bottom) {
+            isOverText = true;
+            break;
+          }
+        }
+      }
+
+      if (isOverText) {
+        beginInlineRename(row, { focus: false, hoverMode: true });
+      }
+    });
 
     let clickTimer = null;
     host.onclick = (e) => {
@@ -166,8 +258,13 @@ function renderHub(){
         return;
       }
 
-      // If currently in inline edit mode, do nothing
-      if (row.classList.contains('editing')) return;
+      // If currently in inline edit mode, allow clicks inside input to edit; clicking elsewhere opens
+      if (row.classList.contains('editing')) {
+        if (e.target.closest('.doc-edit')) return; // keep editing
+        // If not clicking on input or action button, open the document
+        if (!e.target.closest('button')) { openDocument(id); }
+        return;
+      }
 
       // If clicking on the name, delay to detect a double-click (which triggers rename)
       if (e.target.closest('.doc-name')) {
@@ -188,16 +285,173 @@ function renderHub(){
       e.preventDefault(); e.stopPropagation();
       beginInlineRename(row);
     }, true);
+
+    // Drag & drop reordering with single global drop marker
+    let draggingId = null;
+    let dropMarker = null;
+    function ensureMarker(){
+      if (!dropMarker){
+        dropMarker = document.createElement('div');
+        dropMarker.className = 'doc-drop-marker';
+      }
+      if (!dropMarker.parentNode) host.appendChild(dropMarker);
+      return dropMarker;
+    }
+    host.ondragstart = (e) => {
+      const row = e.target.closest('.doc-row'); if (!row) return;
+      draggingId = row.dataset.id;
+      row.classList.add('dragging');
+      try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', draggingId); } catch {}
+    };
+    host.ondragend = () => {
+      draggingId = null;
+      host.querySelectorAll('.doc-row').forEach(r => r.classList.remove('dragging'));
+      if (dropMarker && dropMarker.parentNode) dropMarker.remove();
+    };
+    host.ondragover = (e) => {
+      if (!draggingId) return; e.preventDefault();
+      try { if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; } catch {}
+      const rows = Array.from(host.querySelectorAll('.doc-row'));
+      const others = rows.filter(r => r.dataset.id !== draggingId);
+      const marker = ensureMarker();
+      const hostRect = host.getBoundingClientRect();
+      const y = e.clientY - hostRect.top + host.scrollTop;
+      // Determine insertion index among non-dragging rows
+      let index = 0;
+      for (let i = 0; i < others.length; i++){
+        const rr = others[i].getBoundingClientRect();
+        const mid = rr.top - hostRect.top + host.scrollTop + rr.height / 2;
+        if (y > mid) index = i + 1; else break;
+      }
+      // Place marker at exact boundary without reflow
+      let top = 0;
+      if (others.length === 0){
+        top = 0;
+      } else if (index === 0){
+        const rr0 = others[0].getBoundingClientRect();
+        top = rr0.top - hostRect.top + host.scrollTop;
+      } else if (index >= others.length){
+        const rrl = others[others.length - 1].getBoundingClientRect();
+        top = rrl.top - hostRect.top + host.scrollTop + rrl.height;
+      } else {
+        const rrB = others[index - 1].getBoundingClientRect();
+        top = rrB.top - hostRect.top + host.scrollTop + rrB.height;
+      }
+      marker.style.top = Math.max(0, Math.floor(top)) + 'px';
+      marker.dataset.index = String(index);
+    };
+    host.ondrop = (e) => {
+      if (!draggingId) return; e.preventDefault();
+      let destIndex = Number(dropMarker?.dataset?.index || 0);
+      // Convert index among non-dragging rows into full list index
+      const rows = Array.from(host.querySelectorAll('.doc-row'));
+      const fromIndex = rows.findIndex(r => r.dataset.id === draggingId);
+      const others = rows.filter(r => r.dataset.id !== draggingId);
+      // Position relative to others, then adjust for removal when moving down
+      const afterRemovalIndex = destIndex + (fromIndex !== -1 && fromIndex < destIndex ? 1 : 0);
+      try { InlineDocs.move(draggingId, afterRemovalIndex); } catch {}
+      renderHub();
+    };
+  } catch {}
+}
+
+// Standalone function for inline document renaming (extracted from renderHub)
+function beginInlineRename(row, opts){
+  try {
+    const options = opts || {};
+    const shouldFocus = options.focus !== false; // default true
+    const hoverMode = options.hoverMode === true;
+    if (!row) return; const id = row.dataset.id; if (!id) return;
+    if (row.classList.contains('editing')) return;
+    row.classList.add('editing');
+    const nameEl = row.querySelector('.doc-name'); if (!nameEl) return;
+    const current = (nameEl.textContent || '').trim();
+    const input = document.createElement('input');
+    input.type = 'text'; input.value = current; input.className = 'doc-edit';
+    // Match font metrics of the text so width measurement is accurate
+    try {
+      const cs = getComputedStyle(nameEl);
+      input.style.fontFamily = cs.fontFamily;
+      input.style.fontSize = cs.fontSize;
+      input.style.fontWeight = cs.fontWeight;
+      input.style.fontStyle = cs.fontStyle;
+      input.style.letterSpacing = cs.letterSpacing;
+    } catch {}
+    // Prevent row click opening while editing when interacting with the input
+    ['click','mousedown','mouseup','dblclick'].forEach(evt => input.addEventListener(evt, ev => ev.stopPropagation(), true));
+    // Create a hidden measurer to auto-size the input to text width + 20px
+    let measurer = null;
+    try {
+      measurer = document.createElement('span');
+      const cs = getComputedStyle(nameEl);
+      measurer.style.position = 'fixed';
+      measurer.style.left = '-9999px';
+      measurer.style.top = '-9999px';
+      measurer.style.visibility = 'hidden';
+      measurer.style.whiteSpace = 'pre';
+      measurer.style.fontFamily = cs.fontFamily;
+      measurer.style.fontSize = cs.fontSize;
+      measurer.style.fontWeight = cs.fontWeight;
+      measurer.style.fontStyle = cs.fontStyle;
+      measurer.style.letterSpacing = cs.letterSpacing;
+      document.body.appendChild(measurer);
+    } catch {}
+    function updateWidth(){
+      try {
+        if (!measurer) return;
+        // Ensure at least one character so we don't collapse too far
+        const t = input.value || '';
+        measurer.textContent = t.length > 0 ? t : ' ';
+        const w = Math.ceil(measurer.getBoundingClientRect().width) + 20; // text width + 20px
+        input.style.width = Math.max(40, w) + 'px';
+        // Keep a safe hard cap to avoid breaking layout in extreme cases
+        input.style.maxWidth = '100%';
+      } catch {}
+    }
+    const finish = (commit) => {
+      try {
+        const newName = commit ? String(input.value || '').trim() || 'Untitled' : current;
+        if (commit && newName !== current) { InlineDocs.rename(id, newName); }
+      } catch {}
+      try { if (measurer && measurer.parentNode) measurer.remove(); } catch {}
+      renderHub();
+    };
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+      if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+    });
+    input.addEventListener('input', updateWidth);
+    input.addEventListener('blur', () => finish(true));
+    nameEl.replaceWith(input);
+    updateWidth();
+    // In hover mode, if the user leaves the row without focusing the input, revert gracefully
+    if (hoverMode) {
+      const onLeave = () => { if (document.activeElement !== input) finish(false); };
+      row.addEventListener('mouseleave', onLeave, { once: true });
+    }
+    // Focus after replacing so selection works on Windows (unless explicitly disabled)
+    if (shouldFocus) setTimeout(() => { try { input.focus(); input.select(); } catch {} }, 0);
   } catch {}
 }
 
 function newDocument(){
   const id = `doc-${(crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2))}`;
-  const name = prompt('Document name', 'New document') || 'New document';
+  const name = 'New document'; // Default name, will be immediately editable
   const doc = { pages: [createPage('Page 1')], currentPageId: '', nextElementId: 1, editMode: true, headerHeight: 10, footerHeight: 10 };
   doc.currentPageId = doc.pages[0].id;
   InlineDocs.set(id, doc, name);
-  openDocument(id);
+
+  // Re-render the hub to show the new document in the list
+  renderHub();
+
+  // Find the newly created document row and trigger inline rename
+  setTimeout(() => {
+    const row = document.querySelector(`.doc-row[data-id="${id}"]`);
+    if (row) {
+      beginInlineRename(row);
+    }
+  }, 0);
+
   try { const t = document.getElementById('docTitleInput'); if (t) t.value = name; } catch {}
 }
 
@@ -3152,6 +3406,8 @@ async function bootstrap(){
     const type = (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('text/plain')) ? 'ok' : null;
     if (!type) return;
     e.preventDefault();
+    // Stop bubbling so the viewport dragover doesn't also run
+    if (e.stopPropagation) e.stopPropagation();
     e.dataTransfer.dropEffect = 'copy';
   });
   pagesList().addEventListener('drop', (e) => {
@@ -3164,6 +3420,8 @@ async function bootstrap(){
     try { type = e.dataTransfer.getData('text/plain'); } catch { type = ''; }
     if (!type) return;
     e.preventDefault();
+    // Stop bubbling so the viewport drop handler doesn't also place the element
+    if (e.stopPropagation) e.stopPropagation();
     const pt = getCanvasPoint(e, page);
     Model.document.currentPageId = pageId;
     pendingAddType = type;
@@ -3184,6 +3442,8 @@ async function bootstrap(){
         if (!info) return;
       }
       e.preventDefault();
+      // Prevent the event from bubbling to any parent handlers
+      if (e.stopPropagation) e.stopPropagation();
       e.dataTransfer.dropEffect = 'copy';
     });
     viewportEl.addEventListener('drop', (e) => {
@@ -3195,6 +3455,8 @@ async function bootstrap(){
         const wrap = page.closest('.page-wrapper');
         const pageId = wrap?.dataset.pageId; if (!pageId) return;
         e.preventDefault();
+        // Stop bubbling so other drop listeners don't also run
+        if (e.stopPropagation) e.stopPropagation();
         const pt = getCanvasPoint(e, page);
         Model.document.currentPageId = pageId;
         pendingAddType = type;
@@ -3203,6 +3465,7 @@ async function bootstrap(){
       } else {
         const info = getMostVisiblePageInfo(); if (!info) return;
         e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
         const pr = info.pageNode.getBoundingClientRect();
         const z = (typeof getZoom === 'function') ? (getZoom() || 1) : 1;
         const cx = e.clientX; const cy = e.clientY;
@@ -3477,6 +3740,31 @@ async function bootstrap(){
   // undo/redo
   undoBtn().addEventListener('click', undo);
   redoBtn().addEventListener('click', redo);
+
+  // Keyboard shortcuts: Undo/Redo
+  // - Ctrl/Cmd + Z => Undo
+  // - Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y => Redo
+  document.addEventListener('keydown', (e) => {
+    const active = document.activeElement;
+    const isEditing = active && (
+      active.contentEditable === 'true' ||
+      active.contentEditable === 'plaintext-only' ||
+      active.tagName === 'INPUT' ||
+      active.tagName === 'TEXTAREA'
+    );
+    if (isEditing) return; // let native undo work while typing
+
+    if (e.ctrlKey || e.metaKey) {
+      const k = String(e.key || '').toLowerCase();
+      if (k === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) { redo(); } else { undo(); }
+      } else if (k === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    }
+  });
 
   // keyboard shortcuts for copy/paste (element-level)
   // IMPORTANT: if a table selection exists, DO NOT intercept copy/paste here.
@@ -3767,37 +4055,21 @@ async function bootstrap(){
     if (selectedIds && selectedIds.size > 0) clearSelection();
   });
 
-  // Element context menu (right-click)
+  // Element context menu (right-click) — reuse the actions bar "..." dropdown
   (function bindElementContextMenu(){
-    const menu = document.getElementById('elementMenu'); if (!menu) return;
     document.addEventListener('contextmenu', (e) => {
       const el = e.target.closest?.('.element');
-      if (!el) return; // let default elsewhere
+      if (!el) return; // allow default context menu elsewhere
       e.preventDefault();
       const id = el.dataset.id;
       if (!selectedIds.has(id)) setSelection([id]);
-      menu.style.left = e.clientX+'px'; menu.style.top = e.clientY+'px';
-      menu.classList.remove('hidden');
-    });
-    document.addEventListener('click', (e)=>{ if (!menu.contains(e.target)) menu.classList.add('hidden'); });
-    document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') menu.classList.add('hidden'); });
-    menu.addEventListener('click', (e)=>{
-      const b = e.target.closest('[data-em]'); if (!b) return; const act = b.dataset.em;
-      if (act === 'duplicate') { copySelection(); }
-      else if (act === 'delete') { deleteSelection(); }
-      else if (act === 'group') { groupSelection(); }
-      else if (act === 'ungroup') { ungroupSelection(); }
-      else if (act === 'z-front') { sendSelectionToFront(); }
-      else if (act === 'z-back') { sendSelectionToBack(); }
-      else if (act === 'align-left') { alignSelection('left'); }
-      else if (act === 'align-center') { alignSelection('center'); }
-      else if (act === 'align-right') { alignSelection('right'); }
-      else if (act === 'align-top') { alignSelection('top'); }
-      else if (act === 'align-middle') { alignSelection('middle'); }
-      else if (act === 'align-bottom') { alignSelection('bottom'); }
-      else if (act === 'distribute-h') { distributeSelection('h'); }
-      else if (act === 'distribute-v') { distributeSelection('v'); }
-      menu.classList.add('hidden');
+      // Ensure the element actions bubble is visible and positioned
+      try { elementActions().classList.remove('hidden'); positionElementActions(); } catch {}
+      // Open the existing actions dropdown panel
+      const actionsEl = elementActions && elementActions();
+      if (!actionsEl) return;
+      const panel = actionsEl.querySelector('[data-menu-panel="actions"]');
+      if (panel) panel.classList.remove('hidden');
     });
   })();
   document.addEventListener('keydown', (e) => {

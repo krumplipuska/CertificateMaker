@@ -29,6 +29,10 @@
     <div id="hubHeader" class="hub-header">
       <div id="hubFileTitle" class="hub-title">The whole file(app) name (like index.html)</div>
       <div style="display:inline-flex;align-items:center;gap:6px">
+        <button id="newDocBtn" class="btn" title="Create new document">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span>New</span>
+        </button>
         <button id="hubSaveBtn" class="btn hub-save" title="Save this file">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h12v14H5z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 5v6h6V5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
           <span>Save</span>
@@ -45,10 +49,6 @@
     </div>
     <div class="hub-panel">
       <div class="hub-actions">
-        <button id="newDocBtn" class="btn" title="Create new document">
-          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          <span>New</span>
-        </button>
       </div>
       <div id="docList" class="doc-list" aria-label="Documents"></div>
     </div>
@@ -73,19 +73,17 @@
       </button>
     </div>
     <div class="group">
-      <button id="undoBtn" class="btn" disabled>
+      <button id="undoBtn" class="btn" disabled title="Undo" aria-label="Undo">
         <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           <path d="M9 8l-4 4 4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <span>Undo</span>
       </button>
-      <button id="redoBtn" class="btn" disabled>
+      <button id="redoBtn" class="btn" disabled title="Redo" aria-label="Redo">
         <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           <path d="M15 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <span>Redo</span>
       </button>
     </div>
     <div class="group" id="viewToggles">
@@ -318,23 +316,85 @@
           <circle cx="19" cy="12" r="2" fill="currentColor"/>
         </svg>
       </button>
-      <div class="dropdown hidden" data-menu-panel="actions" style="position:absolute;top:36px;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);padding:8px;display:flex;flex-direction:column;gap:6px;min-width:220px">
-        <button class="btn mini" data-action="duplicate" title="Duplicate" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/></svg><span style="margin-left:6px">Duplicate</span></button>
-        <button class="btn mini" data-action="delete" title="Delete" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span style="margin-left:6px">Delete</span></button>
-        <hr/>
-        <button class="btn mini" data-align="left" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 4v16M6 7h12v4H6zM6 15h8v4H6z" fill="currentColor"/></svg><span style="margin-left:6px">Left</span></button>
-        <button class="btn mini" data-align="center" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M12 4v16M4 9h16v4H4z" fill="currentColor"/></svg><span style="margin-left:6px">Center</span></button>
-        <button class="btn mini" data-align="right" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M20 4v16M6 7h12v4H6zM10 15h8v4h-8z" fill="currentColor"/></svg><span style="margin-left:6px">Right</span></button>
-        <hr/>
-        <button class="btn mini" data-align="top" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 4h16M7 6v12h4V6zM15 6v8h4V6z" fill="currentColor"/></svg><span style="margin-left:6px">Top</span></button>
-        <button class="btn mini" data-align="middle" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 12h16M7 6v12h4V6zM15 8v8h4V8z" fill="currentColor"/></svg><span style="margin-left:6px">Middle</span></button>
-        <button class="btn mini" data-align="bottom" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 20h16M7 6v12h4V6zM15 10v8h4v-8z" fill="currentColor"/></svg><span style="margin-left:6px">Bottom</span></button>
-        <hr/>
-        <button class="btn mini" data-distribute="v" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 4h16M4 20h16M6 9v6h12V9z" fill="currentColor"/></svg><span style="margin-left:6px">Vertically</span></button>
-        <button class="btn mini" data-distribute="h" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 4v16M20 4v16M9 6h6v12H9z" fill="currentColor"/></svg><span style="margin-left:6px">Horizontally</span></button>
-        <hr/>
-        <button class="btn mini" data-z="front" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M3 3h8v8H3zM13 13h8v8h-8zM8 16h8v-8H8z" fill="currentColor"/></svg><span style="margin-left:6px">Bring to front</span></button>
-        <button class="btn mini" data-z="back" style="justify-content:flex-start"><svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M3 3h8v8H3zM13 13h8v8h-8zM10 10h8V2h-8z" fill="currentColor"/></svg><span style="margin-left:6px">Send to back</span></button>
+  <div class="dropdown hidden" data-menu-panel="actions" style="position:absolute;top:36px;right:0;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:8px;display:flex;flex-direction:column;gap:6px;min-width:160px">
+        <div class="icon-row" style="display:flex;gap:6px;justify-content:space-between">
+          <button class="btn mini" data-action="delete" title="Delete" aria-label="Delete">
+            <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>
+              <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button class="btn mini" data-action="duplicate" title="Duplicate" aria-label="Duplicate">
+            <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>
+              <rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+        </div>
+        <div class="group">
+          <div class="group-label">Align horizontally</div>
+          <div class="icon-row">
+            <button class="btn mini" data-align="left" title="Align left" aria-label="Align left">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 4v16M6 7h12v4H6zM6 15h8v4H6z" fill="currentColor"/></svg>
+            </button>
+            <button class="btn mini" data-align="center" title="Align center" aria-label="Align center">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M12 4v16M4 9h16v4H4z" fill="currentColor"/></svg>
+            </button>
+            <button class="btn mini" data-align="right" title="Align right" aria-label="Align right">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M20 4v16M6 7h12v4H6zM10 15h8v4h-8z" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="group">
+          <div class="group-label">Align vertically</div>
+          <div class="icon-row">
+            <button class="btn mini" data-align="top" title="Align top" aria-label="Align top">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 4h16M7 6v12h4V6zM15 6v8h4V6z" fill="currentColor"/></svg>
+            </button>
+            <button class="btn mini" data-align="middle" title="Align middle" aria-label="Align middle">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 12h16M7 6v12h4V6zM15 8v8h4V8z" fill="currentColor"/></svg>
+            </button>
+            <button class="btn mini" data-align="bottom" title="Align bottom" aria-label="Align bottom">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 20h16M7 6v12h4V6zM15 10v8h4v-8z" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="group">
+          <div class="group-label">Space evenly</div>
+          <div class="icon-row">
+            <button class="btn mini" data-distribute="h" title="Distribute horizontally" aria-label="Distribute horizontally">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 4v16M20 4v16M9 6h6v12H9z" fill="currentColor"/></svg>
+            </button>
+            <button class="btn mini" data-distribute="v" title="Distribute vertically" aria-label="Distribute vertically">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M4 4h16M4 20h16M6 9v6h12V9z" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="group">
+          <div class="group-label">Layers</div>
+          <div class="icon-row">
+            <button class="btn mini" data-z="front" title="Bring to front" aria-label="Bring to front">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M3 3h8v8H3zM13 13h8v8h-8zM8 16h8v-8H8z" fill="currentColor"/></svg>
+            </button>
+            <button class="btn mini" data-z="up" title="Bring forward" aria-label="Bring forward">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 5h8v8H5z" fill="none" stroke="currentColor" stroke-width="2"/>
+                <path d="M11 11h8v8h-8z" fill="none" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </button>
+            <button class="btn mini" data-z="down" title="Send backward" aria-label="Send backward">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M11 11h8v8h-8z" fill="none" stroke="currentColor" stroke-width="2"/>
+                <path d="M5 5h8v8H5z" fill="none" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </button>
+            <button class="btn mini" data-z="back" title="Send to back" aria-label="Send to back">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24"><path d="M3 3h8v8H3zM13 13h8v8h-8zM10 10h8V2h-8z" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
