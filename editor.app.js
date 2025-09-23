@@ -14,7 +14,7 @@ function renderAll() {
 // Lightweight app state with persistence
 const AppState = (function(){
   const KEY = 'certificateMaker:appState';
-  const defaults = { view: 'hub', activeDocId: null };
+  const defaults = { view: 'hub', activeDocId: null, activeFolderId: null };
   function read(){
     try { return Object.assign({}, defaults, JSON.parse(localStorage.getItem(KEY) || '{}')); }
     catch { return { ...defaults }; }
@@ -58,14 +58,29 @@ function setView(name){
 
 const InlineDocs = (function(){
   function node(){ return document.getElementById('__docs__'); }
-  function safeParse(text){ try { return JSON.parse(text); } catch { return { catalog:[], docs:{} }; } }
-  function read(){ const n = node(); return n ? safeParse(n.textContent || '{"catalog":[],"docs":{}}') : { catalog:[], docs:{} }; }
+  function safeParse(text){
+    try { return JSON.parse(text); }
+    catch { return { catalog:[], docs:{}, folders:[], docFolders:{} }; }
+  }
+  function ensureShape(data){
+    const d = data || {};
+    if (!Array.isArray(d.catalog)) d.catalog = [];
+    if (!d.docs || typeof d.docs !== 'object') d.docs = {};
+    if (!Array.isArray(d.folders)) d.folders = [];
+    if (!d.docFolders || typeof d.docFolders !== 'object') d.docFolders = {};
+    return d;
+  }
+  function read(){
+    const n = node();
+    const raw = n ? safeParse(n.textContent || '{"catalog":[],"docs":{}}') : { catalog:[], docs:{} };
+    return ensureShape(raw);
+  }
   function write(data){
-    const n = node(); if (n) n.textContent = JSON.stringify(data);
+    const n = node(); if (n) n.textContent = JSON.stringify(ensureShape(data));
     try {
       // Respect global autosave setting: only persist to localStorage when enabled
       if (Settings.get('autosaveEnabled') !== false) {
-        localStorage.setItem('certificateMaker:inlineDocs', JSON.stringify(data));
+        localStorage.setItem('certificateMaker:inlineDocs', JSON.stringify(ensureShape(data)));
       }
     } catch {}
   }
@@ -92,8 +107,14 @@ const InlineDocs = (function(){
   }
   function list(){ return read().catalog; }
   function get(id){ return read().docs[id]; }
-  function set(id, doc, name){ const data = read(); if (!data.docs[id]) data.catalog.push({ id, name: name || 'Untitled', createdAt: Date.now(), updatedAt: Date.now() }); else data.catalog = data.catalog.map(r => r.id===id ? { ...r, name: name ?? r.name, updatedAt: Date.now() } : r); data.docs[id] = doc; write(data); }
-  function remove(id){ const data = read(); data.catalog = data.catalog.filter(r => r.id !== id); delete data.docs[id]; write(data); }
+  function set(id, doc, name){
+    const data = read();
+    if (!data.docs[id]) data.catalog.push({ id, name: name || 'Untitled', createdAt: Date.now(), updatedAt: Date.now() });
+    else data.catalog = data.catalog.map(r => r.id===id ? { ...r, name: name ?? r.name, updatedAt: Date.now() } : r);
+    data.docs[id] = doc;
+    write(data);
+  }
+  function remove(id){ const data = read(); data.catalog = data.catalog.filter(r => r.id !== id); delete data.docs[id]; if (data.docFolders) delete data.docFolders[id]; write(data); }
   function rename(id, name){ const data = read(); data.catalog = data.catalog.map(r => r.id===id ? { ...r, name, updatedAt: Date.now() } : r); write(data); }
   function move(id, targetIndex){
     const data = read();
@@ -111,15 +132,153 @@ const InlineDocs = (function(){
     const toIndex = Math.max(0, rawIndex - (fromIndex !== -1 && fromIndex < rawIndex ? 1 : 0));
     move(id, toIndex);
   }
-  return { list, get, set, remove, rename, hydrateFromLocal, move, moveBefore };
+  // Folders API
+  function listFolders(){ return read().folders; }
+  function getFolder(id){ return (read().folders || []).find(f => f.id === id) || null; }
+  function docsInFolder(folderId){ const data = read(); const map = data.docFolders || {}; return (data.catalog || []).filter(r => map[r.id] === folderId).map(r => r.id); }
+  function createFolder(name){
+    const data = read();
+    const id = 'fld-' + (crypto?.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
+    const rec = { id, name: name || 'New folder', createdAt: Date.now(), updatedAt: Date.now() };
+    data.folders.push(rec);
+    write(data);
+    return rec;
+  }
+  function renameFolder(id, name){ const data = read(); data.folders = (data.folders||[]).map(f => f.id===id ? { ...f, name, updatedAt: Date.now() } : f); write(data); }
+  function removeFolder(id){
+    const data = read();
+    data.folders = (data.folders||[]).filter(f => f.id !== id);
+    // Un-assign docs from this folder
+    if (data.docFolders){ Object.keys(data.docFolders).forEach(did => { if (data.docFolders[did] === id) delete data.docFolders[did]; }); }
+    write(data);
+  }
+  function assignDocToFolder(docId, folderId){ const data = read(); data.docFolders = data.docFolders || {}; if (!folderId) delete data.docFolders[docId]; else data.docFolders[docId] = folderId; write(data); }
+  function docFolderId(docId){ const data = read(); return (data.docFolders || {})[docId] || null; }
+  return { list, get, set, remove, rename, hydrateFromLocal, move, moveBefore, listFolders, getFolder, createFolder, renameFolder, removeFolder, assignDocToFolder, docFolderId, docsInFolder };
 })();
 
 function renderHub(){
   try {
     InlineDocs.hydrateFromLocal();
-    const list = InlineDocs.list();
+    const allList = InlineDocs.list();
+    // Selected folder (persisted)
+    let activeFolder = AppState.get('activeFolderId') || null;
+    // Filter list by folder if selected
+    const list = (activeFolder ? allList.filter(r => InlineDocs.docFolderId(r.id) === activeFolder) : allList);
     const host = document.getElementById('docList');
     if (!host) return;
+    // Render folder bar
+    const folderBar = document.getElementById('folderBar');
+    if (folderBar){
+      const folders = InlineDocs.listFolders();
+      const makePill = (id, name, isActive, deletable) => `
+        <button class="folder-pill${isActive?' active':''}" data-fid="${id}" ${isActive?'aria-current="page"':''}>
+          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor"/></svg>
+          <span class="folder-name">${name}</span>
+          ${deletable?'<span class="close-btn" title="Delete" aria-label="Delete">×</span>':''}
+        </button>`;
+      folderBar.innerHTML = [
+        makePill('all','All', !activeFolder, false),
+        ...(folders||[]).map(f => makePill(f.id, f.name, activeFolder===f.id, true)).join(''),
+        `<button class="folder-plus" id="addFolderBtn" title="New folder" aria-label="New folder">+
+        </button>`
+      ].join('');
+      // Defer click action to allow dblclick to cancel it
+      let folderClickTimer = null;
+      // Click select
+      folderBar.querySelectorAll('.folder-pill').forEach(pill => {
+        pill.addEventListener('click', (e) => {
+          // Ignore clicks inside inline rename input
+          if (e.target && (e.target.tagName === 'INPUT' || e.target.closest('input'))) return;
+          // Delete if clicking X — ask whether to delete contained docs too
+          if (e.target && e.target.classList.contains('close-btn')){
+            const fid = pill.dataset.fid; if (!fid || fid === 'all') return;
+            // Internal dialog with two explicit options
+            confirmChoices({
+              title: 'Delete folder',
+              message: 'What would you like to delete?',
+              buttons: [
+                { id:'del-with-docs', label:'Delete folder and documents', class:'danger' },
+                { id:'del-folder-only', label:'Delete folder only', class:'primary' },
+                { id:'cancel', label:'Cancel', class:'light' }
+              ]
+            }).then((choice) => {
+              if (choice === 'del-with-docs'){
+                try { InlineDocs.docsInFolder(fid).forEach(id => InlineDocs.remove(id)); } catch {}
+                InlineDocs.removeFolder(fid);
+              } else if (choice === 'del-folder-only'){
+                InlineDocs.removeFolder(fid); // unassign docs to All
+              } else {
+                return; // cancelled
+              }
+              if (activeFolder===fid) { activeFolder = null; AppState.set('activeFolderId', null); }
+              renderHub();
+            });
+            return;
+          }
+          // Normal select with click-delay to allow dblclick to cancel
+          clearTimeout(folderClickTimer);
+          folderClickTimer = setTimeout(() => {
+            const fid = pill.dataset.fid;
+            const next = (fid === 'all') ? null : fid;
+            AppState.set('activeFolderId', next);
+            renderHub();
+          }, 220);
+        });
+        // Inline rename on double-click
+        pill.addEventListener('dblclick', (e) => {
+          // Cancel pending click selection
+          clearTimeout(folderClickTimer);
+          const fid = pill.dataset.fid; if (!fid || fid==='all') return;
+          e.preventDefault(); if (e.stopPropagation) e.stopPropagation();
+          const nameEl = pill.querySelector('.folder-name'); if (!nameEl) return;
+          const current = (nameEl.textContent||'').trim();
+          const inp = document.createElement('input');
+          inp.type = 'text'; inp.value = current; inp.className = 'rename-input';
+          nameEl.replaceWith(inp);
+          const done = (commit) => { const v = String(inp.value||'').trim()||'Untitled'; if (commit && v!==current) InlineDocs.renameFolder(fid, v); renderHub(); };
+          inp.addEventListener('keydown', (ev) => { if (ev.key==='Enter'){ ev.preventDefault(); inp.blur(); } if (ev.key==='Escape'){ ev.preventDefault(); done(false); } });
+          inp.addEventListener('blur', () => done(true));
+          setTimeout(() => { try { inp.focus(); inp.select(); } catch {} }, 0);
+        });
+        // Allow dropping docs on folder with visual indication
+        pill.addEventListener('dragenter', (ev) => { ev.preventDefault(); pill.classList.add('drag-over'); });
+        pill.addEventListener('dragover', (ev) => { try { if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move'; } catch{} ev.preventDefault(); pill.classList.add('drag-over'); });
+        pill.addEventListener('dragleave', () => { pill.classList.remove('drag-over'); });
+        pill.addEventListener('drop', (ev) => {
+          ev.preventDefault();
+          let docId = null; try { docId = ev.dataTransfer.getData('text/plain'); } catch {}
+          if (!docId) return;
+          const fid = pill.dataset.fid;
+          const targetFolder = (fid === 'all') ? null : fid;
+          InlineDocs.assignDocToFolder(docId, targetFolder);
+          // If user dropped into a different folder, switch view to it
+          AppState.set('activeFolderId', targetFolder);
+          pill.classList.remove('drag-over');
+          renderHub();
+        });
+      });
+      const addBtn = document.getElementById('addFolderBtn');
+      if (addBtn){
+        addBtn.onclick = () => {
+          const rec = InlineDocs.createFolder('New folder');
+          AppState.set('activeFolderId', rec.id);
+          // After render, switch the new pill into inline rename mode
+          renderHub();
+          setTimeout(() => {
+            const pill = document.querySelector(`.folder-pill[data-fid="${rec.id}"]`);
+            if (!pill) return;
+            const nameEl = pill.querySelector('.folder-name');
+            const inp = document.createElement('input'); inp.type='text'; inp.value = rec.name; inp.className='rename-input';
+            nameEl.replaceWith(inp);
+            const finish = (commit) => { const v = String(inp.value||'').trim()||'Untitled'; if (commit) InlineDocs.renameFolder(rec.id, v); renderHub(); };
+            inp.addEventListener('keydown',(ev)=>{ if (ev.key==='Enter'){ ev.preventDefault(); inp.blur(); } if (ev.key==='Escape'){ ev.preventDefault(); finish(false); } });
+            inp.addEventListener('blur', ()=> finish(true));
+            setTimeout(() => { try { inp.focus(); inp.select(); } catch {} }, 0);
+          }, 0);
+        };
+      }
+    }
     host.innerHTML = (list || []).map(r => `
       <div class="doc-row" data-id="${r.id}" draggable="true">
         <div class="doc-name">${r.name}</div>
@@ -252,7 +411,12 @@ function renderHub(){
         if (act === 'duplicate') {
           const copyId = `doc-${(crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2))}`;
           const cur = InlineDocs.get(id);
-          if (cur) InlineDocs.set(copyId, JSON.parse(JSON.stringify(cur)), (row.querySelector('.doc-name')?.textContent || 'Document') + ' copy');
+          if (cur) {
+            const name = (row.querySelector('.doc-name')?.textContent || 'Document') + ' copy';
+            InlineDocs.set(copyId, JSON.parse(JSON.stringify(cur)), name);
+            const activeFolder = AppState.get('activeFolderId') || null;
+            InlineDocs.assignDocToFolder(copyId, activeFolder);
+          }
           renderHub();
         }
         return;
@@ -355,6 +519,30 @@ function renderHub(){
   } catch {}
 }
 
+// Reusable internal confirm with multiple buttons
+function confirmChoices({ title = 'Confirm', message = '', buttons = [] } = {}){
+  return new Promise((resolve) => {
+    const dlg = document.getElementById('confirmDialog');
+    const titleEl = document.getElementById('confirmTitle');
+    const msgEl = document.getElementById('confirmMessage');
+    const btnsEl = document.getElementById('confirmButtons');
+    if (!dlg || !titleEl || !msgEl || !btnsEl){ resolve(null); return; }
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    btnsEl.innerHTML = '';
+    const close = (value) => { dlg.classList.add('hidden'); resolve(value); };
+    document.getElementById('confirmCloseBtn')?.addEventListener('click', () => close(null), { once:true });
+    buttons.forEach(b => {
+      const btn = document.createElement('button');
+      btn.className = `btn ${b.class||''}`.trim();
+      btn.textContent = b.label || 'OK';
+      btn.addEventListener('click', () => close(b.id || true));
+      btnsEl.appendChild(btn);
+    });
+    dlg.classList.remove('hidden');
+  });
+}
+
 // Standalone function for inline document renaming (extracted from renderHub)
 function beginInlineRename(row, opts){
   try {
@@ -440,6 +628,11 @@ function newDocument(){
   const doc = { pages: [createPage('Page 1')], currentPageId: '', nextElementId: 1, editMode: true, headerHeight: 10, footerHeight: 10 };
   doc.currentPageId = doc.pages[0].id;
   InlineDocs.set(id, doc, name);
+  // If a folder is active, assign the new doc to it
+  try {
+    const fid = AppState.get('activeFolderId');
+    if (fid) InlineDocs.assignDocToFolder(id, fid);
+  } catch {}
 
   // Re-render the hub to show the new document in the list
   renderHub();

@@ -48,8 +48,7 @@
       </div>
     </div>
     <div class="hub-panel">
-      <div class="hub-actions">
-      </div>
+      <div class="hub-actions" id="folderBar" aria-label="Folders"></div>
       <div id="docList" class="doc-list" aria-label="Documents"></div>
     </div>
     <script id="__docs__" type="application/json">{ "catalog": [], "docs": {} }</script>
@@ -501,6 +500,18 @@
         </div>
         <label class="switch"><input id="autosaveToggle" type="checkbox" checked><span>On</span></label>
       </div>
+    </div>
+  </div>
+
+  <!-- Internal confirmation dialog (reusable) -->
+  <div id="confirmDialog" class="hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" style="position:fixed;inset:0;display:grid;place-items:center;z-index:1250;background:rgba(0,0,0,.25)">
+    <div class="cpanel" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);width:min(460px,92vw);padding:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <h3 id="confirmTitle" style="margin:0;font-size:16px">Confirm</h3>
+        <button class="btn mini" id="confirmCloseBtn" aria-label="Close">Close</button>
+      </div>
+      <div id="confirmMessage" style="font-size:14px;color:#374151;margin-bottom:12px"></div>
+      <div id="confirmButtons" style="display:flex;gap:8px;justify-content:flex-end"></div>
     </div>
   </div>
 </body>
