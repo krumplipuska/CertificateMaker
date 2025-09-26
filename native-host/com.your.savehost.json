@@ -1,0 +1,7 @@
+{
+  "name": "com.your.savehost",
+  "description": "Local HTML saver host",
+  "path": "C:\\Users\\MonTech\\Desktop\\code\\CertificateMaker\\dist\\save_host.exe",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://fodjjnaloifjniikaeoelpnecdbbahce/"]
+}

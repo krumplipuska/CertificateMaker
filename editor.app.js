@@ -3430,11 +3430,68 @@ function supportsFileSystemAccess(){
 }
 function buildSaveHtml(){
   const documentData = serializeDocument();
-  const currentHtml = document.documentElement.outerHTML;
-  return currentHtml.replace(
-    '<body>',
-    `<body>\n  <pre id="__doc__" style="display:none">${documentData}</pre>`
-  );
+  // HTML-escape to keep JSON safe inside markup
+  const escaped = String(documentData)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  let html = document.documentElement.outerHTML;
+  // If an embedded payload already exists, replace it
+  const preRe = /<pre\s+id=["']__doc__["'][^>]*>[\s\S]*?<\/pre>/i;
+  if (preRe.test(html)){
+    return html.replace(preRe, `<pre id="__doc__" style="display:none">${escaped}</pre>`);
+  }
+  // Otherwise, inject right after the opening <body ...>
+  const bodyOpenRe = /<body([^>]*)>/i;
+  return html.replace(bodyOpenRe, (m, attrs) => `<body${attrs}>\n  <pre id="__doc__" style="display:none">${escaped}</pre>`);
+}
+
+// Attempt to load latest autosave snapshot (OPFS or localStorage) when embedded doc not present
+async function __tryLoadAutosaveSnapshot(){
+  if (window.__docLoaded) return false; // already have a document
+  let loaded = false;
+  const scopeId = (function(){
+    try { return getFileScopeId ? getFileScopeId() : (location.pathname||'index.html').replace(/[^a-z0-9\-_.]/gi,'_').toLowerCase(); } catch { return 'index'; }
+  })();
+  // 1) OPFS snapshot (saved by silent Persistence.saveDocument) => full HTML file containing <pre id="__doc__">
+  try {
+    if (!loaded && navigator.storage?.getDirectory){
+      const root = await navigator.storage.getDirectory();
+      const fname = `${scopeId}-autosave.html`;
+      let fh = null;
+      try { fh = await root.getFileHandle(fname, { create:false }); } catch {}
+      if (fh){
+        try {
+          const file = await fh.getFile(); const html = await file.text();
+          const m = html.match(/<pre\s+id=["']__doc__["'][^>]*>([\s\S]*?)<\/pre>/i);
+            if (m && m[1]) {
+              try { deserializeDocument(m[1].replaceAll('&lt;','<')); window.__docLoaded = true; loaded = true; console.info('[App] Loaded OPFS autosave snapshot'); } catch(e){ console.warn('[App] Failed to deserialize OPFS snapshot', e); }
+            }
+        } catch {}
+      }
+    }
+  } catch(e){ try { console.warn('[App] OPFS autosave load error', e); } catch {} }
+  // 2) localStorage snapshot (Persistence may have stored full HTML) or legacy JSON
+  if (!loaded){
+    try {
+      const lsKey = `certificateMaker:autosave:v1:${scopeId}`;
+      const raw = localStorage.getItem(lsKey);
+      if (raw){
+        let jsonPayload = null;
+        if (/^\s*\{/.test(raw)) { // looks like pure JSON
+          jsonPayload = raw;
+        } else {
+          // assume full HTML; extract embedded pre
+            const m2 = raw.match(/<pre\s+id=["']__doc__["'][^>]*>([\s\S]*?)<\/pre>/i);
+            if (m2 && m2[1]) jsonPayload = m2[1].replaceAll('&lt;','<');
+        }
+        if (jsonPayload){
+          try { deserializeDocument(jsonPayload); window.__docLoaded = true; loaded = true; console.info('[App] Loaded localStorage autosave snapshot'); } catch(e){ console.warn('[App] Failed to deserialize localStorage snapshot', e); }
+        }
+      }
+    } catch(e){ try { console.warn('[App] localStorage autosave load error', e); } catch {} }
+  }
+  return loaded;
 }
 async function verifyPermission(fileHandle, withWrite){
   const opts = {};
@@ -3453,13 +3510,25 @@ async function writeFile(handle, content){
 
 
 async function saveDocument(){
+  console.log('Saving document…');
+  // Mirror autosave behavior: silent background save with consistent UI feedback
   indicateSaving();
+  
   try {
-    // Always mirror the inline doc immediately
+    
+    // 1) Update inline docs (and localStorage if enabled)
     try { if (AppState.activeDocId) InlineDocs.set(AppState.activeDocId, Model.document); } catch {}
-    const res = await Persistence.saveDocument({ silent: true });
-    if (res && res.ok) { indicateSaved(); return; }
+    // 2) Background save of the whole HTML using Persistence (silent fallbacks)
+    try { await Persistence.saveDocument({ silent: true }); } catch {}
+
+    //press ctrl+s on the keyboard to save the document to a file
+    const event = new KeyboardEvent('keydown', { key: 's', ctrlKey: true });
+    await document.dispatchEvent(event);
+
+
   } catch {}
+  // 3) Done — always indicate saved (same as autosaveInline)
+  indicateSaved();
 }
 
 function getCurrentFilename(){
@@ -3486,6 +3555,7 @@ async function saveDocumentAs(){
 
 /* ----------------------- Init & Events ----------------------- */
 async function bootstrap(){
+  try { console.info('[App] bootstrap start'); } catch {}
   // When running in editor view, we'll load from InlineDocs if available; otherwise fall back
   let loaded = false;
   try {
@@ -3496,6 +3566,27 @@ async function bootstrap(){
       loaded = true; // defer loading until a doc is opened
     }
   } catch {}
+  // Try to auto-load an embedded document (when opening a file saved via Save As)
+  if (!loaded){
+    try {
+      if (window.Persistence && typeof Persistence.tryAutoLoad === 'function'){
+        const res = await Persistence.tryAutoLoad();
+        if (res && res.ok){
+          loaded = true;
+          try { console.info('[App] Embedded document loaded via', res.via); } catch {}
+          // Switch to editor view so the loaded doc is visible immediately
+          setView('editor');
+        }
+      }
+    } catch (e) { try { console.warn('[App] Embedded load failed', e); } catch {} }
+  }
+  // Attempt OPFS/localStorage autosave snapshot if no embedded doc
+  if (!loaded){
+    try {
+      const snap = await __tryLoadAutosaveSnapshot();
+      if (snap){ loaded = true; setView('editor'); }
+    } catch {}
+  }
   // Disable auto-load of previous autosave; start with empty doc unless embedded
   if (!loaded){ loaded = false; }
   if (!loaded){
@@ -3505,6 +3596,22 @@ async function bootstrap(){
   // Apply initial mode before rendering to avoid flicker
   setEditMode(!!Model.document.editMode);
   renderAll();
+  // Try to restore file handle for silent saves across reloads
+  try { if (window.Persistence && typeof Persistence.restoreHandle === 'function') { const ok = await Persistence.restoreHandle(); try { console.info('[App] restoreHandle:', ok); } catch {} } } catch {}
+  // Offer one-time banner to enable silent saves if no handle yet
+  try {
+    if (!currentFileHandle && typeof supportsFileSystemAccess === 'function' && supportsFileSystemAccess()){
+      const bar = document.createElement('div');
+      bar.textContent = 'Click to enable silent disk saves (optional)';
+      Object.assign(bar.style, {position:'fixed',bottom:'10px',left:'10px',padding:'8px 12px',background:'#ffd',border:'1px solid #cc9',cursor:'pointer',zIndex:99999,fontSize:'12px',borderRadius:'6px',boxShadow:'0 2px 4px rgba(0,0,0,.15)'});
+      let dismissed = false;
+      const remove = () => { if (dismissed) return; dismissed = true; try { bar.remove(); } catch {} };
+      bar.addEventListener('click', async () => { try { await saveDocumentAs(); remove(); } catch {} });
+      // Remove after 20s if unused
+      setTimeout(remove, 20000);
+      document.body.appendChild(bar);
+    }
+  } catch {}
 
   // elements panel
   elementsPanel().addEventListener('click', (e) => {
