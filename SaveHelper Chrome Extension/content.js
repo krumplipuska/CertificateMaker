@@ -1,24 +1,38 @@
+// Bridge helper events so the page can react to extension-driven saves
+function sendStart() {
+    try { document.dispatchEvent(new CustomEvent("cm-save-start")); } catch {}
+}
+function sendDone(ok, err) {
+    try {
+        const type = ok ? "cm-save-done" : "cm-save-error";
+        const detail = err ? { error: String(err) } : undefined;
+        document.dispatchEvent(new CustomEvent(type, { detail }));
+    } catch {}
+}
+
 function gatherHtml() {
     return document.documentElement.outerHTML;
-
 }
+
+// Allow page scripts to explicitly request a save without synthesizing a key event
+document.addEventListener("cm-request-save", () => { requestSave(); });
 
 async function requestSave() {
     const html = gatherHtml();
-   
     const fileUrl = location.href; // e.g., file:///C:/path/combined.html
     try {
+        sendStart();
         const res = await chrome.runtime.sendMessage({ type: "SAVE_HTML", fileUrl, html });
         if (res?.ok) {
             console.log("Saved:", res.path);
-            showToast("Saved");
+            sendDone(true);
         } else {
             console.error("Save failed:", res?.error);
-            showToast("Save failed");
+            sendDone(false, res?.error);
         }
     } catch (e) {
         console.error("Save error:", e);
-        showToast("Save error");
+        sendDone(false, e?.message || e);
     }
 }
 

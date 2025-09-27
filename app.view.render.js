@@ -115,6 +115,9 @@ function applyElementStyles(node, m, pageForParentLookup) {
 		else node.style.display = '';
 	}
 
+	// Free move: no special visual treatment now; ensure classes removed
+	try { node.classList.remove('free-move'); node.classList.remove('outside-page'); } catch {}
+
 	// If element repeats in header/footer, make it non-interactive and pinned band-wise
 	try {
 		if (m.repeatInHeader || m.repeatInFooter) {

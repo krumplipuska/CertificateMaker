@@ -163,7 +163,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 .workspace { display: grid; grid-template-columns: 1fr; }
 #pageViewport { height: calc(100dvh - 96px); overflow:auto; display:grid; place-items:start center; padding-left: calc(var(--left-panel-width) + 12px); padding-right: calc(var(--right-panel-width) + 12px); }
 #pageContainer { padding: 12px; }
-.page { position: relative; width: var(--page-w); height: var(--page-h); background:#fff; box-shadow: var(--shadow); overflow:hidden; border-radius:6px; transform: scale(var(--zoom)); transform-origin: top left; }
+.page { position: relative; width: var(--page-w); height: var(--page-h); background:#fff; box-shadow: var(--shadow); overflow:visible; border-radius:6px; transform: scale(var(--zoom)); transform-origin: top left; }
 /* grid background removed per request (no ::before) */
 
 /* Elements */
@@ -321,9 +321,14 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 /* Pages list */
 #pagesList { display: grid; gap: 32px; place-items: start center; width: 100%; }
 .page-wrapper { display: grid; gap: 8px; justify-items: center; }
-.page-title { color: var(--muted); font-size: 13px; display:flex; align-items:center; gap:6px; width: calc(var(--page-w) * var(--zoom)); }
+.page-title { color: var(--muted); font-size: 13px; display:flex; align-items:center; gap:6px; width: calc(var(--page-w) * var(--zoom));z-index: 899; }
 .page-title .title-actions { margin-left: auto; float: none !important; }
 .page-stage { position: relative; width: calc(var(--page-w) * var(--zoom)); height: calc(var(--page-h) * var(--zoom)); justify-self: center; }
+.page-stage .page-title,
+.page-stage .page-controls { position: relative; z-index: 1200; }
+.page-stage .page { position: relative; z-index: 99; }
+/* ensure editor overlays beat elements */
+#selectionBox, #elementActions, #tableActions, .guide { z-index: 1500; }
 .page-controls { display: inline-flex; gap: 6px; }
 
 /* Element actions bubble */
@@ -352,7 +357,36 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 
 /* Hub view */
 .hub-header { position: fixed; left: 12px; right: 12px; top: 8px; height: 44px; background: var(--brand-primary); color: #fff; border-radius: 999px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 10px; box-shadow: var(--shadow); z-index: 1100; }
-.hub-title { font-size: 12px; opacity: .95; }
+.hub-title { 
+  font-size: 12px; 
+  opacity: .95; 
+  cursor: pointer;
+  transition: opacity .15s ease, background-color .15s ease;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+
+.hub-title:hover {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.hub-title.editing {
+  opacity: 1;
+}
+
+.hub-filename-edit {
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: var(--brand-primary) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  border-radius: 6px !important;
+  padding: 4px 8px !important;
+  outline: none !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
 .hub-save { background: var(--brand-dark); color:#fff; border-color: var(--brand-dark); }
 /* Make hub header buttons visually match editor topbar pills */
 .hub-header .btn { background: transparent; color: #fff; border-color: rgba(255,255,255,.9); border-radius: 999px; transition: background-color .15s ease, color .15s ease, border-color .15s ease, transform .15s ease; }
@@ -535,6 +569,8 @@ input[type="color"].circle:hover::-webkit-color-swatch { border-color: var(--pri
 .edit-off .page .element.selected { box-shadow: none; }
 .edit-off .element.repeated { pointer-events: none; }
 .edit-off .page-title .title-actions { visibility: hidden; }
+
+/* (Removed explicit visual styling for freeMove elements; they appear like normal elements) */
 .edit-off .side { display: none; }
 .edit-off .app { grid-template-columns: 1fr; }
 /* Export sandbox guard: ensure no transforms leak into the clone */

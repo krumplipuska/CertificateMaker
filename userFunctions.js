@@ -295,14 +295,17 @@ try {
 
 function simpleConsoleLogFunction(message){
     try {
-        if (typeof Model === 'undefined' || !Model.document || Model.document.editMode) return;
+        if (typeof Model === 'undefined' || !Model.document) return;
+        // Allow preview execution in edit mode when override flag set
+        if (Model.document.editMode && !window.__ALLOW_USER_FUNCTIONS_IN_EDIT) return;
         console.log(message);
     } catch {}
 }
 
 function coloringFunction(targetSelector, styleString){
     try {
-        if (typeof Model === 'undefined' || !Model.document || Model.document.editMode) return;
+        if (typeof Model === 'undefined' || !Model.document) return;
+        if (Model.document.editMode && !window.__ALLOW_USER_FUNCTIONS_IN_EDIT) return;
         // Normalize inputs (strip wrapping quotes if any)
         const normalizeArg = (v) => String(v == null ? '' : v).trim().replace(/^['"]|['"]$/g, '');
         const sel = normalizeArg(targetSelector);
@@ -365,7 +368,8 @@ function modelPatchToCellStyle(patchStyles){
 // Conditional formatting using relative column offsets within the same row
 function conditionalFormatByOffset(minColOffset, maxColOffset, styleIfOk, styleIfNok){
     try {
-        if (typeof Model === 'undefined' || !Model.document || Model.document.editMode) return;
+        if (typeof Model === 'undefined' || !Model.document) return;
+        if (Model.document.editMode && !window.__ALLOW_USER_FUNCTIONS_IN_EDIT) return;
         const normalizeArg = (v) => String(v == null ? '' : v).trim().replace(/^['"]|['"]$/g, '');
         const offMin = parseInt(minColOffset, 10); const offMax = parseInt(maxColOffset, 10);
         const dMin = Number.isFinite(offMin) ? offMin : 0;
