@@ -1,4 +1,4 @@
-<html lang="en" style="--zoom: 1; --left-panel-width: 152px; --right-panel-width: 354px;"><head>
+<html lang="en" style="--zoom: 1; --left-panel-width: 152px; --right-panel-width: 233px;"><head>
   <meta charset="utf-8">
   <title>Minimal A4 Editor</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -21,17 +21,21 @@
   <script src="app.view.render.js" defer=""></script>
   <script src="editor.app.js" defer=""></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" async="" crossorigin="anonymous" referrerpolicy="no-referrer" data-dynamic-src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" data-loaded="true"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" async="" crossorigin="anonymous" referrerpolicy="no-referrer" data-dynamic-src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" data-loaded="true"></script></head>
-<body class="in-hub edit-off" style="">
+<body class="" style="">
   <!-- Hub view (hidden by default). All documents are stored inline in __docs__ -->
-  <div id="hubView">
+  <div id="hubView" hidden="">
     <div id="hubHeader" class="hub-header">
-      <div id="hubFileTitle" class="hub-title" data-renameable="true">The whole file(app) name (like index.html)</div>
+      <!-- Centered file name with inline rename -->
+      <div id="hubTitleGroup" class="btn" style="position:absolute;left:50%;transform:translateX(-50%);gap:6px">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z" fill="none" stroke="currentColor" stroke-width="2"></path><path d="M4 10h16" stroke="currentColor" stroke-width="2"></path><path d="M8 14h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+        <input id="hubFileInput" type="text" value="" aria-label="File name" placeholder="File name" style="border:none;outline:none;background:transparent;color:#fff;max-width:360px">
+      </div>
       <div style="display:inline-flex;align-items:center;gap:6px">
         <button id="newDocBtn" class="btn" title="Create new document">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
           <span>New</span>
         </button>
-        <button id="hubSaveBtn" class="btn hub-save saving" title="Save this file" aria-busy="true" data-original-text="Save">Saving…</button>
+        <button id="hubSaveBtn" class="btn hub-save saving" title="Save this file" data-original-text="Save" aria-busy="true">Saving…</button>
         <div class="menu" style="position:relative">
           <button class="btn" id="hubMoreMenuBtn" title="More options" aria-haspopup="true" aria-expanded="false">
             <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
@@ -48,23 +52,41 @@
           <svg class="icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor"></path></svg>
           <span class="folder-name">All</span>
           
+        </button>
+        <button class="folder-pill" data-fid="fld-dba698e3-adc8-4cf1-9476-994c6b9db1fd">
+          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor"></path></svg>
+          <span class="folder-name">New folder</span>
+          <span class="close-btn" title="Delete" aria-label="Delete">×</span>
         </button><button class="folder-plus" id="addFolderBtn" title="New folder" aria-label="New folder">+
         </button></div>
-      <div id="docList" class="doc-list" aria-label="Documents"></div>
+      <div id="docList" class="doc-list" aria-label="Documents">
+      <div class="doc-row" data-id="doc-1665141b-1674-41f1-83ec-55821eca0831" draggable="true">
+        <div class="doc-name">fwefw</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="doc-meta">9/27/2025, 9:41:39 PM</div>
+          <div class="doc-actions">
+            <button class="btn" data-act="open" title="Open"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            <button class="btn" data-act="rename" title="Rename"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"></path></svg></button>
+            <button class="btn" data-act="duplicate" title="Duplicate"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect><rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect></svg></button>
+            <button class="btn" data-act="delete" title="Delete"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg></button>
+          </div>
+        </div>
+      </div>
     </div>
-    <script id="__docs__" type="application/json">{"catalog":[],"docs":{},"folders":[],"docFolders":{}}</script>
+    </div>
+    <script id="__docs__" type="application/json">{"catalog":[{"id":"doc-1665141b-1674-41f1-83ec-55821eca0831","name":"fwefw","createdAt":1759002097855,"updatedAt":1759045607775}],"docs":{"doc-1665141b-1674-41f1-83ec-55821eca0831":{"pages":[{"id":"page-1759002097855-8r9vv","name":"Page 1","elements":[{"id":"el-1","type":"rect","x":230.84375,"y":153.5,"w":160,"h":60,"z":1,"styles":{"fill":"#dbeafe","strokeColor":"#111827","strokeWidth":1,"radius":4,"textColor":"#111827","fontFamily":"system-ui","fontSize":14,"bold":false,"italic":false,"underline":false},"freeMove":false}]}],"currentPageId":"page-1759002097855-8r9vv","nextElementId":2,"editMode":true,"headerHeight":10,"footerHeight":10}},"folders":[{"id":"fld-dba698e3-adc8-4cf1-9476-994c6b9db1fd","name":"New folder","createdAt":1759002094907,"updatedAt":1759002096324}],"docFolders":{}}</script>
   </div>
 
-  <div id="editorView" hidden="">
+  <div id="editorView">
   <!-- Top bar -->
   <div class="topbar">
     <div class="group">
-      <button id="backToHubBtn" class="btn" title="Back to hub" aria-label="Back to hub" hidden="">
+      <button id="backToHubBtn" class="btn" title="Back to hub" aria-label="Back to hub">
         <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
       </button>
     </div>
     <div class="group">
-      <button id="editToggleBtn" class="btn" aria-pressed="false" title="View mode" aria-label="View mode"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" fill="none" stroke="currentColor" stroke-width="2"></path><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg><span>View mode</span></button>
+      <button id="editToggleBtn" class="btn" aria-pressed="true" title="Edit mode" aria-label="Edit mode"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"></path><path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"></path></svg><span>Edit mode</span></button>
     </div>
     <div class="group">
       <button id="undoBtn" class="btn" title="Undo" aria-label="Undo">
@@ -95,7 +117,7 @@
     </div>
     <div class="spacer"></div>
     <div class="group">
-      <button id="saveBtn" class="btn saving" aria-busy="true" data-original-text="Save">Saving…</button>
+      <button id="saveBtn" class="btn saving" data-original-text="Save" aria-busy="true">Saving…</button>
       <div class="menu" style="position:relative">
         <button class="btn" id="moreMenuBtn" title="More options" aria-haspopup="true" aria-expanded="false">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
@@ -138,12 +160,47 @@
     </aside>
 
     <main class="workspace">
-      <div id="pageViewport" style="padding-left: 0px; padding-right: 0px;">
-        <div id="pagesList" aria-label="Pages list"></div>
+      <div id="pageViewport" style="padding-left: 166px; padding-right: 247px;">
+        <div id="pagesList" aria-label="Pages list"><div class="page-wrapper" data-page-id="page-1759002097855-8r9vv"><div class="page-title">
+      <strong>Page 1</strong>
+      <span style="margin-left:6px;color:var(--muted)">Page 1</span>
+      <span class="title-actions" style="float:right;display:inline-flex;gap:6px">
+        <button class="btn mini" data-act="move-up" title="Move up" aria-label="Move up">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6l-6 6h12z" fill="currentColor"></path></svg>
+        </button>
+        <button class="btn mini" data-act="move-down" title="Move down" aria-label="Move down">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18l6-6H6z" fill="currentColor"></path></svg>
+        </button>
+        <button class="btn mini" data-act="toggle-visibility" title="Show/Hide" aria-label="Show or hide">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M1.5 12s4-7.5 10.5-7.5S22.5 12 22.5 12s-4 7.5-10.5 7.5S1.5 12 1.5 12z" fill="none" stroke="currentColor" stroke-width="2"></path>
+            <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
+          </svg>
+        </button>
+        <button class="btn mini" data-act="duplicate" title="Duplicate" aria-label="Duplicate">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+            <rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+          </svg>
+        </button>
+        <button class="btn mini" data-act="delete" title="Delete" aria-label="Delete">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            <rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+            <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+          </svg>
+        </button>
+        <button class="btn mini" data-act="add-below" title="Add page below" aria-label="Add page below">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+          </svg>
+        </button>
+      </span></div><div class="page-stage"><div class="page" aria-label="A4 canvas"><div class="guide v hidden"></div><div class="guide h hidden"></div><div class="hf-guide header" style="height: 10px; display: block;"><div class="hf-label"></div><div class="hf-resize"></div></div><div class="hf-guide footer" style="height: 10px; display: block;"><div class="hf-label"></div><div class="hf-resize"></div></div><div class="element rect" data-id="el-1" style="left: 230.844px; top: 153.5px; width: 160px; height: 60px; border-radius: 4px; background: rgb(219, 234, 254); border: 1px solid rgb(17, 24, 39); color: rgb(17, 24, 39); font-family: system-ui; font-size: 14pt; font-weight: 400; font-style: normal; text-decoration: none; transform-origin: 50% 50%; flex-direction: column; justify-content: flex-start; align-items: flex-start; text-align: left; z-index: 101; display: flex;"></div></div></div></div></div>
       </div>
     </main>
 
-    <aside class="side right" id="propertiesPanel" style="width: 354px;">
+    <aside class="side right" id="propertiesPanel" style="width: 233px;">
       <div class="panel-resize-handle panel-resize-left" data-panel="propertiesPanel"></div>
       <div class="panel-header">
         <h3>Properties</h3>
@@ -268,7 +325,7 @@
     /* Suppress lasso only while header/footer resizing is active */
     .hf-resizing #lasso { display:none !important; }
   </style>
-  <div id="selectionBox" class="selbox hidden" style="left: 263.75px; top: 253.569px; width: 97.3738px; height: 59.5526px; z-index: 800;">
+  <div id="selectionBox" class="selbox hidden" style="left: 458.5px; top: 291.5px; width: 160px; height: 60px; z-index: 800;">
     <div class="sb-h" data-handle="nw"></div>
     <div class="sb-h" data-handle="n"></div>
     <div class="sb-h" data-handle="ne"></div>
@@ -281,7 +338,7 @@
     <div class="sb-h" data-handle="rotate" title="Drag to rotate"></div>
   </div>
 
-  <div id="elementActions" class="actions hidden" role="toolbar" aria-label="Element actions" data-shown-at="1758970687688" style="left: 312.435px; top: 245.566px;">
+  <div id="elementActions" class="actions hidden" role="toolbar" aria-label="Element actions" data-shown-at="1759045606434" style="left: 538.5px; top: 283.5px;">
     <button class="btn mini" data-action="copy" title="Copy" aria-label="Copy">
       <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
         <rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>

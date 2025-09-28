@@ -41,6 +41,24 @@ const Settings = (function(){
   return { get, set, all };
 })();
 
+// Basic filename sanitization used by the hub navbar rename control
+function sanitizeFileBaseName(name){
+  try {
+    let s = String(name || '')
+      .replace(/[^A-Za-z0-9 _\-\.]+/g, '')     // strip illegal chars
+      .replace(/\s+/g, ' ')                      // collapse spaces
+      .trim()
+      .replace(/^\.+|\.+$/g, '');               // trim leading/trailing dots
+    // Disallow empty
+    if (!s) s = 'index';
+    // Prevent directory traversal by dropping any accidental slashes or backslashes
+    s = s.replace(/[\\\/]+/g, '');
+    // Hide extension in UI; the host enforces .html
+    if (s.toLowerCase().endsWith('.html')) s = s.slice(0, -5);
+    return s;
+  } catch { return 'index'; }
+}
+
 function setView(name){
   try {
     AppState.set('view', name);
@@ -163,6 +181,17 @@ const InlineDocs = (function(){
 function renderHub(){
   try {
     InlineDocs.hydrateFromLocal();
+    // Update centered file name pill in the hub header
+    try {
+      const input = document.getElementById('hubFileInput');
+      if (input){
+        const filename = (function(){
+          try { const p = window.location.pathname || ''; const f = (p.split('/').pop() || '').trim(); return f; } catch { return ''; }
+        })();
+        const base = filename.toLowerCase().endsWith('.html') ? filename.slice(0, -5) : filename;
+        if (!input.matches(':focus')) input.value = base || 'index';
+      }
+    } catch {}
     const allList = InlineDocs.list();
     // Selected folder (persisted)
     let activeFolder = AppState.get('activeFolderId') || null;
@@ -170,9 +199,6 @@ function renderHub(){
     const list = (activeFolder ? allList.filter(r => InlineDocs.docFolderId(r.id) === activeFolder) : allList);
     const host = document.getElementById('docList');
     if (!host) return;
-    
-    // Update hub filename display
-    updateHubFilename();
     // Render folder bar
     const folderBar = document.getElementById('folderBar');
     if (folderBar){
@@ -691,6 +717,43 @@ function initializeHubRouter(){
     if (hubSaveBtn) hubSaveBtn.addEventListener('click', async () => { try { await saveDocument(); } catch {} });
     const backBtn = document.getElementById('backToHubBtn');
     if (backBtn) backBtn.addEventListener('click', backToHub);
+    // Hub filename inline rename: mirrors editor title pill behavior
+    try {
+      const hubFileInput = document.getElementById('hubFileInput');
+      if (hubFileInput){
+        // Track last committed base name and in-flight rename preventer
+        let lastBase = (function(){ try { const p = window.location.pathname || ''; const f = (p.split('/').pop() || '').trim(); return f.toLowerCase().endsWith('.html') ? f.slice(0, -5) : (f || 'index'); } catch { return 'index'; } })();
+        let renaming = false;
+        hubFileInput.value = lastBase;
+        const commit = () => {
+          if (renaming) return; // ignore duplicate triggers
+          const clean = sanitizeFileBaseName(hubFileInput.value);
+          hubFileInput.value = clean;
+          if (clean === (lastBase || '')) return; // no change
+          renaming = true;
+          try {
+            const ev = new CustomEvent('cm-request-rename', { detail: { newBaseName: clean } });
+            document.dispatchEvent(ev);
+          } catch { renaming = false; }
+        };
+        hubFileInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); hubFileInput.blur(); } if (e.key === 'Escape') { e.preventDefault(); renderHub(); }});
+        // Only commit on blur (Enter triggers blur). 'change' can fire twice and cause duplicates.
+        hubFileInput.addEventListener('blur', commit);
+        // Reflect rename completion by updating input and state
+        document.addEventListener('cm-rename-done', (e) => {
+          try {
+            const u = String(e?.detail?.newFileUrl || location.href);
+            const pn = (u.split('/').pop() || '').trim();
+            const base = pn.toLowerCase().endsWith('.html') ? pn.slice(0, -5) : pn;
+            lastBase = base || hubFileInput.value;
+            hubFileInput.value = lastBase;
+            indicateSaved();
+          } catch {}
+          renaming = false;
+        });
+        document.addEventListener('cm-rename-error', (e) => { try { console.warn('[Rename] error:', e?.detail?.error); } catch {} renaming = false; });
+      }
+    } catch {}
     // Inline title editing
     const titleInput = document.getElementById('docTitleInput');
     if (titleInput){
@@ -706,17 +769,6 @@ function initializeHubRouter(){
         titleInput.value = v;
       });
       titleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); titleInput.blur(); } });
-    }
-
-    // Hub filename renaming
-    const hubFileTitle = document.getElementById('hubFileTitle');
-    if (hubFileTitle) {
-      hubFileTitle.addEventListener('click', (e) => {
-        e.preventDefault();
-        beginHubFilenameRename();
-      });
-      hubFileTitle.style.cursor = 'pointer';
-      hubFileTitle.title = 'Click to rename file';
     }
 
     // Check if we should restore a previously opened document
@@ -3750,110 +3802,6 @@ function getCurrentFilename(){
   return null;
 }
 
-function updateHubFilename(){
-  try {
-    const hubFileTitle = document.getElementById('hubFileTitle');
-    if (!hubFileTitle) return;
-    
-    const filename = getCurrentFilename();
-    if (filename) {
-      hubFileTitle.textContent = filename;
-    } else {
-      hubFileTitle.textContent = 'Untitled.html';
-    }
-  } catch {}
-}
-
-function beginHubFilenameRename(){
-  try {
-    const hubFileTitle = document.getElementById('hubFileTitle');
-    if (!hubFileTitle || hubFileTitle.classList.contains('editing')) return;
-    
-    hubFileTitle.classList.add('editing');
-    const current = (hubFileTitle.textContent || '').trim();
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = current;
-    input.className = 'hub-filename-edit';
-    
-    // Match font metrics of the text so width measurement is accurate
-    try {
-      const cs = getComputedStyle(hubFileTitle);
-      input.style.fontFamily = cs.fontFamily;
-      input.style.fontSize = cs.fontSize;
-      input.style.fontWeight = cs.fontWeight;
-      input.style.fontStyle = cs.fontStyle;
-      input.style.letterSpacing = cs.letterSpacing;
-      input.style.color = cs.color;
-      input.style.background = 'transparent';
-      input.style.border = '1px solid #ccc';
-      input.style.borderRadius = '4px';
-      input.style.padding = '2px 6px';
-      input.style.outline = 'none';
-    } catch {}
-    
-    // Create a hidden measurer to auto-size the input
-    let measurer = null;
-    try {
-      measurer = document.createElement('span');
-      const cs = getComputedStyle(hubFileTitle);
-      measurer.style.position = 'fixed';
-      measurer.style.left = '-9999px';
-      measurer.style.top = '-9999px';
-      measurer.style.visibility = 'hidden';
-      measurer.style.whiteSpace = 'pre';
-      measurer.style.fontFamily = cs.fontFamily;
-      measurer.style.fontSize = cs.fontSize;
-      measurer.style.fontWeight = cs.fontWeight;
-      measurer.style.fontStyle = cs.fontStyle;
-      measurer.style.letterSpacing = cs.letterSpacing;
-      document.body.appendChild(measurer);
-    } catch {}
-    
-    function updateWidth(){
-      try {
-        if (!measurer) return;
-        const t = input.value || '';
-        measurer.textContent = t.length > 0 ? t : ' ';
-        const w = Math.ceil(measurer.getBoundingClientRect().width) + 20;
-        input.style.width = Math.max(100, w) + 'px';
-        input.style.maxWidth = '300px';
-      } catch {}
-    }
-    
-    const finish = (commit) => {
-      try {
-        const newName = commit ? String(input.value || '').trim() || 'Untitled.html' : current;
-        if (commit && newName !== current) {
-          // For now, just update the display - actual file renaming would require more complex logic
-          hubFileTitle.textContent = newName;
-        }
-      } catch {}
-      try { if (measurer && measurer.parentNode) measurer.remove(); } catch {}
-      hubFileTitle.classList.remove('editing');
-    };
-    
-    input.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
-      if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
-    });
-    
-    input.addEventListener('input', updateWidth);
-    input.addEventListener('blur', () => finish(true));
-    
-    hubFileTitle.replaceWith(input);
-    updateWidth();
-    
-    // Focus and select
-    setTimeout(() => { 
-      try { 
-        input.focus(); 
-        input.select(); 
-      } catch {} 
-    }, 0);
-  } catch {}
-}
-
 async function saveDocumentAs(){
   indicateSaving();
   try {
@@ -5123,6 +5071,15 @@ document.addEventListener('DOMContentLoaded', () => {
   bootstrap();
   initializePanelControls();
   initializeCustomColorPicker();
+  // Ensure save buttons start in a neutral state on load
+  try {
+    getSaveBtns().forEach((btn) => {
+      btn.classList.remove('saving', 'saved');
+      btn.removeAttribute('aria-busy');
+      if (!btn.dataset.originalText) btn.dataset.originalText = 'Save';
+      btn.textContent = btn.dataset.originalText || 'Save';
+    });
+  } catch {}
   // Initialize panel toggle arrow orientation
   const elT = document.getElementById('elementsToggle');
   const prT = document.getElementById('propertiesToggle');

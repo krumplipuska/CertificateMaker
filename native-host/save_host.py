@@ -56,18 +56,59 @@ def main():
         try:
             msg = read_message()
             req_id = uuid.uuid4().hex[:8]
-            log(f"req={req_id} keys={list(msg.keys())} type={msg.get('type')} fileUrl={msg.get('fileUrl')} html_len={len(msg.get('html') or '')}")
-            if msg.get("type") != "save":
-                send_message({ "ok": False, "error": "Unknown message type" })
+            t = msg.get("type")
+            log(f"req={req_id} keys={list(msg.keys())} type={t} fileUrl={msg.get('fileUrl')} html_len={len(msg.get('html') or '')}")
+
+            if t == "save":
+                path = file_url_to_path(msg.get("fileUrl",""))
+                html = msg.get("html","")
+                log(f"req={req_id} saving to: {path}")
+                if not path.lower().endswith(".html"):
+                    raise Exception("Only .html files allowed")
+                atomic_write(path, html)
+                send_message({ "ok": True, "path": path })
+                log(f"req={req_id} save ok")
                 continue
-            path = file_url_to_path(msg.get("fileUrl",""))
-            html = msg.get("html","")
-            log(f"req={req_id} saving to: {path}")
-            if not path.lower().endswith(".html"):
-                raise Exception("Only .html files allowed")
-            atomic_write(path, html)
-            send_message({ "ok": True, "path": path })
-            log(f"req={req_id} save ok")
+
+            if t == "rename":
+                old_path = file_url_to_path(msg.get("fileUrl",""))
+                new_base = str(msg.get("newBaseName") or "").strip()
+                if not new_base:
+                    raise Exception("Missing newBaseName")
+                # Basic sanitization: allow letters, numbers, spaces, dashes, underscores, dots; collapse spaces; trim dots
+                import re
+                safe = re.sub(r"[^A-Za-z0-9 _\-\.]+", "", new_base)
+                safe = re.sub(r"\s+", " ", safe).strip().strip('.')
+                if not safe:
+                    raise Exception("Invalid name")
+                # Ensure .html extension
+                if not safe.lower().endswith('.html'):
+                    safe += '.html'
+                new_path = os.path.join(os.path.dirname(old_path), safe)
+                if os.path.abspath(new_path) == os.path.abspath(old_path):
+                    send_message({ "ok": True, "path": old_path, "newPath": new_path, "fileUrl": msg.get("fileUrl") })
+                    continue
+                if os.path.exists(new_path):
+                    # If target exists and is same file ignoring case (Windows), consider it a no-op
+                    try:
+                        same = os.path.samefile(old_path, new_path)
+                    except Exception:
+                        same = os.path.normcase(os.path.abspath(old_path)) == os.path.normcase(os.path.abspath(new_path))
+                    if same:
+                        from pathlib import Path
+                        new_url = Path(new_path).resolve().as_uri()
+                        send_message({ "ok": True, "path": new_path, "newFileUrl": new_url })
+                        continue
+                    raise Exception("File already exists")
+                os.replace(old_path, new_path)
+                # Build correct file:// URL for response (handles Windows drive letters)
+                from pathlib import Path
+                new_url = Path(new_path).resolve().as_uri()
+                send_message({ "ok": True, "path": new_path, "newFileUrl": new_url })
+                continue
+
+            send_message({ "ok": False, "error": "Unknown message type" })
+            continue
         except SystemExit:
             raise
         except Exception:

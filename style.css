@@ -357,36 +357,12 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 
 /* Hub view */
 .hub-header { position: fixed; left: 12px; right: 12px; top: 8px; height: 44px; background: var(--brand-primary); color: #fff; border-radius: 999px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 10px; box-shadow: var(--shadow); z-index: 1100; }
-.hub-title { 
-  font-size: 12px; 
-  opacity: .95; 
-  cursor: pointer;
-  transition: opacity .15s ease, background-color .15s ease;
-  padding: 4px 8px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-}
-
-.hub-title:hover {
-  opacity: 1;
-  background-color: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.hub-title.editing {
-  opacity: 1;
-}
-
-.hub-filename-edit {
-  background: rgba(255, 255, 255, 0.9) !important;
-  color: var(--brand-primary) !important;
-  border: 1px solid rgba(255, 255, 255, 0.8) !important;
-  border-radius: 6px !important;
-  padding: 4px 8px !important;
-  outline: none !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-}
+.hub-title { font-size: 12px; opacity: .95; }
+.hub-header #hubTitleGroup { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
+#hubTitleGroup:focus-within { background:#fff; color: var(--brand-primary); border-color:#fff; }
+#hubFileInput { color:#fff; }
+#hubFileInput:focus { background:#fff !important; color: var(--brand-dark) !important; }
+#hubFileInput::placeholder { color: rgba(255,255,255,.85); }
 .hub-save { background: var(--brand-dark); color:#fff; border-color: var(--brand-dark); }
 /* Make hub header buttons visually match editor topbar pills */
 .hub-header .btn { background: transparent; color: #fff; border-color: rgba(255,255,255,.9); border-radius: 999px; transition: background-color .15s ease, color .15s ease, border-color .15s ease, transform .15s ease; }

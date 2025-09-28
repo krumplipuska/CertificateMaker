@@ -1,4 +1,7 @@
 // Click the toolbar button to trigger a save on the active tab
+// In-memory zoom store by tabId (also mirrored to storage.session for reliability)
+const __zoomByTab = {};
+
 chrome.action.onClicked.addListener(async (tab) => {
     console.log('[background] toolbar clicked', { tabId: tab?.id, tabTitle: tab?.title });
     if (tab?.id) {
@@ -9,6 +12,65 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // Relay SAVE_HTML messages from the content script to the native host
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    // Persist/restore zoom across a rename navigation
+    if (msg?.type === "GET_SAVED_ZOOM") {
+        const tabId = sender?.tab?.id;
+        const key = tabId != null ? `zoom_${tabId}` : null;
+        if (key && chrome.storage?.session) {
+            chrome.storage.session.get(key, (data) => {
+                const z = data?.[key];
+                sendResponse({ ok: true, zoom: (typeof z === 'number' ? z : __zoomByTab[tabId] ?? null) });
+            });
+            return true;
+        }
+        sendResponse({ ok: true, zoom: (tabId!=null ? (__zoomByTab[tabId] ?? null) : null) });
+        return true;
+    }
+    if (msg?.type === "APPLY_ZOOM") {
+        const tabId = sender?.tab?.id;
+        const z = Number(msg?.zoom);
+        if (tabId != null && !Number.isNaN(z) && chrome.tabs?.setZoom) {
+            chrome.tabs.setZoom(tabId, z, () => {
+                try {
+                    delete __zoomByTab[tabId];
+                    const key = `zoom_${tabId}`;
+                    chrome.storage?.session?.remove?.(key);
+                } catch {}
+                sendResponse({ ok: true });
+            });
+            return true;
+        }
+        sendResponse({ ok:false });
+        return true;
+    }
+    if (msg?.type === "RENAME_FILE") {
+        const tabId = sender?.tab?.id;
+        const proceed = () => {
+            try {
+                const port = chrome.runtime.connectNative("com.your.savehost");
+                port.onMessage.addListener((response) => { sendResponse(response); try { port.disconnect(); } catch {} });
+                port.onDisconnect.addListener(() => { if (chrome.runtime.lastError) sendResponse({ ok:false, error: chrome.runtime.lastError.message }); });
+                const payload = { type: "rename", fileUrl: msg.fileUrl, newBaseName: msg.newBaseName };
+                port.postMessage(payload);
+            } catch (e) {
+                sendResponse({ ok:false, error: e?.message || String(e) });
+            }
+        };
+        try {
+            if (tabId != null && chrome.tabs?.getZoom) {
+                chrome.tabs.getZoom(tabId, (z) => {
+                    __zoomByTab[tabId] = z;
+                    try { const key = `zoom_${tabId}`; chrome.storage?.session?.set?.({ [key]: z }); } catch {}
+                    proceed();
+                });
+            } else {
+                proceed();
+            }
+        } catch {
+            proceed();
+        }
+        return true;
+    }
     if (msg?.type !== "SAVE_HTML") return;
 
     console.log('[background] received SAVE_HTML message from content script', {
