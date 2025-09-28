@@ -13,11 +13,11 @@
 .selbox .sb-h[data-handle="sw"]{ left:-6px; bottom:-6px; }
 .selbox .sb-h[data-handle="w"]{ left:-6px; top:50%; transform:translateY(-50%); }
 /* Move and rotate handles */
-.selbox .sb-h[data-handle="rotate"]{ right:50%; bottom:-24px; transform:translate(50%,50%); width:12px; height:12px; border-radius:50%; border-color:#3b82f6; cursor: grab; }
+.selbox .sb-h[data-handle="rotate"]{ right:50%; bottom:-24px; transform:translate(50%,50%); width:16px; height:16px; background:rgba(255,255,255,0.9); border:1px solid rgba(0,0,0,0.2); border-radius:3px; cursor: grab; display:flex; align-items:center; justify-content:center; }
 /* Move handle moved down next to rotation handle (offset to the right) */
-.selbox .sb-h[data-handle="move"]{ left:calc(50% + 20px); bottom:-24px; transform:translate(-50%,50%); width:12px; height:12px; border-radius:4px; border-color:#10b981; cursor: grab; }
-.selbox .sb-h[data-handle="move"]::after{ content:""; position:absolute; inset:2px; background:#10b981; border-radius:2px; }
-.selbox .sb-h[data-handle="rotate"]::after{ content:""; position:absolute; inset:2px; border-radius:50%; background:#3b82f6; }
+.selbox .sb-h[data-handle="move"]{ left:calc(50% + 20px); bottom:-24px; transform:translate(-50%,50%); width:16px; height:16px; background:rgba(255,255,255,0.9); border:1px solid rgba(0,0,0,0.2); border-radius:3px; cursor: grab; display:flex; align-items:center; justify-content:center; }
+.selbox .sb-h[data-handle="move"] svg{ width:12px; height:12px; }
+.selbox .sb-h[data-handle="rotate"] svg{ width:12px; height:12px; }
 /* Resize cursors for handles */
 .selbox .sb-h[data-handle="n"], .selbox .sb-h[data-handle="s"] { cursor: ns-resize; }
 .selbox .sb-h[data-handle="e"], .selbox .sb-h[data-handle="w"] { cursor: ew-resize; }
@@ -139,6 +139,19 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 .panel-toggle .icon { display:block; width:16px; height:16px; transition: transform .15s ease; }
 .panel-toggle[data-dir="right"] .icon { transform: rotate(180deg); }
 .panel-content { padding: 10px; overflow-y: auto; height: calc(100% - 60px); }
+
+/* Elements panel: stack full-width buttons with icons */
+#elementsPanel:not(.collapsed) .panel-content { display: flex; flex-direction: column; gap: 6px; }
+#elementsPanel .add-el { width: 100%; justify-content: flex-start; box-sizing: border-box; }
+#elementsPanel .add-el .icon { width: 16px; height: 16px; margin: 0; flex-shrink: 0; }
+#elementsPanel .add-el span { text-align: left; }
+
+/* More menu: simple clean design using existing button patterns */
+#moreMenu { position: absolute; top: 36px; right: 0; background: #fff; border: 1px solid rgba(0,0,0,0.08); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; min-width: 200px; display: flex; flex-direction: column; gap: 4px; }
+#moreMenu .btn.mini { background: transparent; color: var(--ink); border: none; border-radius: 8px; padding: 10px 12px; justify-content: flex-start; width: 100%; margin: 0; font-size: 14px; font-weight: 500; transition: color .2s ease, background .2s ease; display: flex; align-items: center; gap: 10px; text-align: left; }
+#moreMenu .btn.mini:hover { background: #f9fafb; color: var(--brand-primary); }
+#moreMenu .btn.mini .icon { color: currentColor; flex-shrink: 0; width: 16px; height: 16px; }
+#moreMenu .btn.mini span { font-weight: 500; letter-spacing: 0.01em; flex: 1; }
 
 /* Panel resize handles */
 .panel-resize-handle { position: absolute; top: 0; bottom: 0; width: 4px; background: transparent; cursor: ew-resize; z-index: 1001; transition: background 0.15s ease; }
@@ -344,7 +357,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 #elementActions .dropdown .btn.mini{ width:50%; height:26px; padding:0; display:inline-flex; align-items:center; justify-content:center; }
 
 /* Floating table actions (small bubble) */
-#tableActions { position: fixed; top: 72px; left: 0; right: 0; margin: 0 auto; transform: none; background:var(--panel); border:1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; display: inline-flex; gap: 6px; z-index: 1150; width: fit-content; }
+#tableActions { position: fixed; transform: translate(-50%, -100%); background:var(--panel); border:1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; display: inline-flex; gap: 6px; z-index: 1150; width: fit-content; }
 #tableActions.hidden { display: none; }
 
 /* Alignment guides */
@@ -357,6 +370,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 
 /* Hub view */
 .hub-header { position: fixed; left: 12px; right: 12px; top: 8px; height: 44px; background: var(--brand-primary); color: #fff; border-radius: 999px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 10px; box-shadow: var(--shadow); z-index: 1100; }
+.hub-buttons { margin-left: auto; }
 .hub-title { font-size: 12px; opacity: .95; }
 .hub-header #hubTitleGroup { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
 #hubTitleGroup:focus-within { background:#fff; color: var(--brand-primary); border-color:#fff; }

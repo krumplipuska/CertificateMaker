@@ -194,13 +194,21 @@ function renderPage(page) {
 	Array.from(container.querySelectorAll('.element')).forEach(n => n.remove());
 	if (!page) return;
 
-	// Repeat-in-header/footer elements: clone from the first page's models if needed
+	// Repeat-in-header/footer elements: clone from the nearest previous page
+	// that defines any elements with repeatOnAllPages=true. This allows
+	// different headers/footers for different sections.
 	try {
 		const doc = Model && Model.document ? Model.document : { pages: [] };
-		const first = (doc.pages || [])[0];
-		if (first && page && page.id !== first.id) {
-			const shared = (first.elements || []).filter(e => (e && (e.repeatOnAllPages === true || e.repeatOnAllPages === 'true')));
-			shared.forEach((tpl) => {
+		const pages = doc.pages || [];
+		const idx = pages.findIndex(p => p && p.id === page.id);
+		if (idx > 0) {
+			// Collect all repeaters defined on any previous page (cumulative headers/footers)
+			const allShared = [];
+			for (let i = 0; i < idx; i++) {
+				const p = pages[i]; if (!p) continue;
+				(p.elements || []).forEach(e => { if (e && (e.repeatOnAllPages === true || e.repeatOnAllPages === 'true')) allShared.push(e); });
+			}
+			allShared.forEach((tpl) => {
 				const clone = Object.assign({}, tpl, { pageId: page.id });
 				let node = ensureElementNode(clone);
 				applyElementStyles(node, clone, page);

@@ -325,9 +325,11 @@ function evaluateFormulaExpression(expr){
     if (!raw.startsWith('=')) return { value: raw };
     const body = raw.slice(1);
 
-    // Support both raw #id tokens and quoted "#id" tokens from picker
+    // Support both raw #id tokens (numeric context) and quoted "#id" tokens (string context)
+    //   - #id     -> r('id') returns numeric value (or 0)
+    //   - "#id"  -> s('id') returns string content (or '')
     let toEval = body
-      .replace(/"#([A-Za-z0-9_\-:]+)"/g, (m, id) => `r('${id}')`)
+      .replace(/"#([A-Za-z0-9_\-:]+)"/g, (m, id) => `s('${id}')`)
       .replace(/#([A-Za-z0-9_\-:]+)/g, (m, id) => `r('${id}')`);
 
     // Helper to resolve a numeric value from an element or table cell by id
@@ -352,6 +354,24 @@ function evaluateFormulaExpression(expr){
       return 0;
     }
 
+    // Helper to resolve a string value from an element or table cell by id
+    function s(id){
+      try {
+        for (const p of (Model.document?.pages || [])){
+          const el = (p.elements || []).find(e => e && e.id === id);
+          if (el){
+            return String(el.content ?? '');
+          }
+          const table = (p.elements || []).find(e => e && e.type === 'table' && e.cells && e.cells[id]);
+          if (table){
+            const cell = table.cells[id];
+            return String(cell?.content ?? '');
+          }
+        }
+      } catch {}
+      return '';
+    }
+
     // Whitelist functions
     const SUM = (...args) => args.reduce((a,b)=>a + (Number(b)||0), 0);
     const AVG = (...args) => { const arr = args.map(v=>Number(v)||0); return arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length) : 0; };
@@ -362,17 +382,19 @@ function evaluateFormulaExpression(expr){
     const CEIL  = (x) => Math.ceil(Number(x)||0);
     const ABS   = (x) => Math.abs(Number(x)||0);
 
-    // Very light sanitization: allow digits, ops, commas, parentheses, dots, letters, and r('id') calls.
-    // Strip r('...') arguments before checking for disallowed characters so quotes inside r() are permitted.
-    const sanitized = toEval.replace(/r\('\s*[A-Za-z0-9_\-:]+\s*'\)/g, 'r(x)');
-    if (/[^0-9A-Za-z_\-:#(),.\s+\-*\/%%]/.test(sanitized)) {
+    // Very light sanitization: allow digits, ops, commas, parentheses, dots, letters, quotes, and r()/s() calls.
+    // Strip r('...') and s('...') arguments before checking for disallowed characters so quotes inside are permitted.
+    const sanitized = toEval
+      .replace(/r\('\s*[A-Za-z0-9_\-:]+\s*'\)/g, 'r(x)')
+      .replace(/s\('\s*[A-Za-z0-9_\-:]+\s*'\)/g, 's(x)');
+    if (/[^0-9A-Za-z_\-:#(),.\s+\-*\/%%'\"]/ .test(sanitized)) {
       return { value: '', error: 'Invalid characters in formula' };
     }
 
     // Evaluate in a restricted scope
     // eslint-disable-next-line no-new-func
-    const fn = new Function('r','SUM','AVG','MIN','MAX','ROUND','FLOOR','CEIL','ABS', `return (${toEval});`);
-    const num = fn(r, SUM, AVG, MIN, MAX, ROUND, FLOOR, CEIL, ABS);
+    const fn = new Function('r','s','SUM','AVG','MIN','MAX','ROUND','FLOOR','CEIL','ABS', `return (${toEval});`);
+    const num = fn(r, s, SUM, AVG, MIN, MAX, ROUND, FLOOR, CEIL, ABS);
     const asNum = Number(num);
     if (Number.isFinite(asNum)) return { value: String(asNum) };
     return { value: String(num ?? '') };

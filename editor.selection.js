@@ -135,6 +135,8 @@ function updateSelectionBox(){
     bubble.style.left = cx + 'px';
     bubble.style.top = cy + 'px';
   }
+  // Nudge table actions to follow the bubble/selection
+  try { if (typeof window.positionTableActions === 'function') window.positionTableActions(); } catch {}
 }
 
 // Re-align viewport overlays (selection box + action bubble) once per frame
@@ -145,6 +147,7 @@ function alignOverlays() {
     __alignReq = null;
     updateSelectionBox();
     positionElementActions();
+    try { if (typeof window.positionTableActions === 'function') window.positionTableActions(); } catch {}
   });
 }
 

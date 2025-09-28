@@ -931,7 +931,10 @@ function renderPagesList() {
       else if (btn.dataset.act === 'move-up') { Model.document.currentPageId = p.id; moveCurrentPage(-1); }
       else if (btn.dataset.act === 'move-down') { Model.document.currentPageId = p.id; moveCurrentPage(1); }
       else if (btn.dataset.act === 'add-below') { Model.document.currentPageId = p.id; addPage(); }
-      else if (btn.dataset.act === 'toggle-visibility') { wrap.classList.toggle('hidden'); }
+      else if (btn.dataset.act === 'toggle-visibility') {
+        const stage = wrap.querySelector('.page-stage');
+        if (stage) stage.classList.toggle('hidden');
+      }
     });
 
     // Position header/footer guides using document settings
@@ -1681,8 +1684,18 @@ function reparentFreeMoveAcrossPages(ids){
 }
 
 function onMouseDown(e){
-  // Ignore canvas interactions while a picker is active (element/style picker)
-  if (window.__PICKING) { e.preventDefault(); return; }
+  // Ignore canvas interactions while a picker is active (element/style picker),
+  // but allow caret movement inside the actively edited host
+  if (window.__PICKING) {
+    try {
+      const ph = window.__PICKER_HOST;
+      if (ph && (ph === e.target || (ph.contains && ph.contains(e.target)))) {
+        return; // allow default behavior inside host
+      }
+    } catch {}
+    e.preventDefault();
+    return;
+  }
   // Prevent moving/resizing when edit mode is off, but allow clicking/selection
   if (!Model.document.editMode) return;
   // If currently editing text/content, do not initiate drags
@@ -2003,6 +2016,18 @@ function onMouseMove(e){
   }
   page.elements[idx] = m;
   applyElementStyles(document.querySelector(`.page [data-id="${active.id}"]`), m);
+  // Auto-toggle repeatOnAllPages when overlapping header/footer while dragging/resizing
+  try {
+    const newShouldRepeat = shouldRepeatForHeaderFooter(m);
+    const wasRepeat = !!(active.orig && (active.orig.repeatOnAllPages === true || active.orig.repeatOnAllPages === 'true'));
+    const curRepeat = !!(page.elements[idx].repeatOnAllPages);
+    if (newShouldRepeat !== curRepeat){
+      page.elements[idx].repeatOnAllPages = newShouldRepeat;
+      // Light feedback render: update all pages only when state flips
+      const pages = (Model && Model.document && Array.isArray(Model.document.pages)) ? Model.document.pages : [];
+      pages.forEach(p => { try { renderPage(p); } catch {} });
+    }
+  } catch {}
   updateFormatToolbarVisibility(); positionElementActions(); updateSelectionBox();
 }
 
@@ -2026,6 +2051,16 @@ function onMouseUp(){
       // Now reparent into blocks and reflow only for non-freeMove stackers
       reparentIntoBlocks(getCurrentPage(), [...selectedIds]);
       reflowStacks(getCurrentPage());
+      // Re-evaluate header/footer repeat rule once at gesture end and render
+      try {
+        const ids = [...selectedIds];
+        ids.forEach(id => {
+          const m = getElementById(id);
+          if (!m) return;
+          const want = shouldRepeatForHeaderFooter(m);
+          if (!!m.repeatOnAllPages !== want){ m.repeatOnAllPages = want; }
+        });
+      } catch {}
       renderAll();
       // Restore selection that existed prior to re-render
       if (__prevSelection && __prevSelection.length) setSelection(__prevSelection);
@@ -2229,6 +2264,22 @@ function getBoundsForModel(m){
     return { x:left, y:top, w:right-left, h:bottom-top };
   }
   return { x:m.x, y:m.y, w:m.w || 0, h:m.h || 0 };
+}
+
+// Decide whether an element should repeat on all pages based on its
+// current bounds intersecting the header or footer guide regions.
+function shouldRepeatForHeaderFooter(m){
+  try {
+    const headerH = Number(Model?.document?.headerHeight || 0);
+    const footerH = Number(Model?.document?.footerHeight || 0);
+    const pageNode = getPageNode();
+    if (!pageNode) return false;
+    const pageH = Number(pageNode.clientHeight || 0);
+    const b = getBoundsForModel(m);
+    const overlapsHeader = b.y < headerH;
+    const overlapsFooter = (b.y + b.h) > (pageH - footerH);
+    return overlapsHeader || overlapsFooter;
+  } catch { return false; }
 }
 function snapSelectionBounds(b, excludeIds = [], prefer, options){
   // Allow toggling snap off via UI
@@ -2735,6 +2786,89 @@ function parsePropertyValue(raw){
 // Keys that are part of the element model and should not be treated as HTML attributes
 const RESERVED_MODEL_KEYS = new Set(['id','type','groupId','parentId','stackChildren','stackByPage','pageBreak','repeatOnAllPages','freeMove','x','y','w','h','z','x2','y2','content','src','styles','grid','rows','cols','rowHeights','colWidths']);
 
+// Persistent Properties panel filter
+const PROPS_FILTER_STORAGE_KEY = 'propertiesPanel.filter.hiddenKeys.v1';
+const DEFAULT_FILTER_KEYS = [
+  'id','type','groupId','cellId','x','y','w','h','z','content','formula',
+  'stackChildren','stackByPage','pageBreak','repeatOnAllPages','freeMove','Actions'
+];
+function loadHiddenPropKeys(){
+  try {
+    const raw = localStorage.getItem(PROPS_FILTER_STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) return new Set(arr.map(String));
+  } catch {}
+  return new Set();
+}
+function saveHiddenPropKeys(set){
+  try { localStorage.setItem(PROPS_FILTER_STORAGE_KEY, JSON.stringify(Array.from(set))); } catch {}
+}
+function isPropVisibleKey(key){
+  const hidden = (window.__HIDDEN_PROP_KEYS || (window.__HIDDEN_PROP_KEYS = loadHiddenPropKeys()));
+  return !hidden.has(String(key));
+}
+function setPropVisibleKey(key, visible){
+  const hidden = (window.__HIDDEN_PROP_KEYS || (window.__HIDDEN_PROP_KEYS = loadHiddenPropKeys()));
+  const k = String(key);
+  if (visible) hidden.delete(k); else hidden.add(k);
+  window.__HIDDEN_PROP_KEYS = hidden;
+  saveHiddenPropKeys(hidden);
+}
+function openPropsFilterMenu(anchor){
+  try { if (!anchor) return; } catch { return; }
+  // Close any existing
+  const old = document.getElementById('propsFilterMenu');
+  if (old) old.remove();
+  const menu = document.createElement('div');
+  menu.id = 'propsFilterMenu';
+  menu.setAttribute('role','menu');
+  menu.style.position = 'fixed';
+  menu.style.zIndex = '1202';
+  menu.style.background = '#fff';
+  menu.style.border = '1px solid rgba(0,0,0,.08)';
+  menu.style.borderRadius = '10px';
+  menu.style.boxShadow = 'var(--shadow)';
+  menu.style.padding = '8px';
+  menu.style.minWidth = '180px';
+  menu.style.maxHeight = '50vh';
+  menu.style.overflow = 'auto';
+  const rect = anchor.getBoundingClientRect();
+  menu.style.top = (rect.bottom + 6) + 'px';
+  menu.style.right = (window.innerWidth - rect.right) + 'px';
+
+  const list = document.createElement('div');
+  list.style.display = 'grid';
+  list.style.rowGap = '6px';
+  list.style.fontSize = '12px';
+  const keysNow = new Set(DEFAULT_FILTER_KEYS);
+  try { (window.__CURRENT_PROP_KEYS || []).forEach(k => keysNow.add(String(k))); } catch {}
+  const keys = Array.from(keysNow);
+  keys.sort((a,b) => a.localeCompare(b));
+  const hidden = (window.__HIDDEN_PROP_KEYS || (window.__HIDDEN_PROP_KEYS = loadHiddenPropKeys()));
+  keys.forEach((k) => {
+    const row = document.createElement('label');
+    row.style.display = 'grid';
+    row.style.gridTemplateColumns = '18px 1fr';
+    row.style.alignItems = 'center';
+    row.style.gap = '8px';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !hidden.has(k);
+    cb.addEventListener('change', () => { setPropVisibleKey(k, cb.checked); renderProperties(); });
+    const span = document.createElement('span'); span.textContent = k;
+    row.appendChild(cb); row.appendChild(span);
+    list.appendChild(row);
+  });
+  menu.appendChild(list);
+
+  document.body.appendChild(menu);
+  // Close interactions
+  const close = () => { menu.remove(); document.removeEventListener('mousedown', onDown, true); window.removeEventListener('blur', close); };
+  const onDown = (e) => { if (!menu.contains(e.target) && e.target !== anchor) close(); };
+  setTimeout(() => { document.addEventListener('mousedown', onDown, true); window.addEventListener('blur', close); }, 0);
+}
+
 function getCustomAttributesFromModel(model){
   const attrs = Object.assign({}, model && model.attrs ? model.attrs : {});
   // Also treat unknown top-level primitives as attributes for backward-compat
@@ -2823,7 +2957,11 @@ function renderProperties(){
     }
   }
 
+  // Share the keys with the filter menu builder
+  try { window.__CURRENT_PROP_KEYS = new Set(rows.map(r => r[0])); } catch {}
+
   rows.forEach(([k,v]) => {
+    if (!isPropVisibleKey(k)) return;
     const row = document.createElement('div');
     row.className = 'row';
     const name = document.createElement('label');
@@ -2885,40 +3023,50 @@ function renderProperties(){
 
   // Block-specific: stacking children toggle
   if (m && m.type === 'block'){
-    const row = document.createElement('div'); row.className = 'row'; row.style.display = 'flex'; row.style.alignItems = 'center';
-    const lab = document.createElement('label'); lab.textContent = 'stackChildren';
-    const ctl = document.createElement('input'); ctl.type='checkbox'; ctl.dataset.prop = 'stackChildren'; ctl.checked = !!m.stackChildren;
-    row.appendChild(lab); row.appendChild(ctl); box.appendChild(row);
+    if (isPropVisibleKey('stackChildren')){
+      const row = document.createElement('div'); row.className = 'row'; row.style.display = 'flex'; row.style.alignItems = 'center';
+      const lab = document.createElement('label'); lab.textContent = 'stackChildren';
+      const ctl = document.createElement('input'); ctl.type='checkbox'; ctl.dataset.prop = 'stackChildren'; ctl.checked = !!m.stackChildren;
+      row.appendChild(lab); row.appendChild(ctl); box.appendChild(row);
+    }
   }
 
   // Generic: stackByPage toggle available for all element types
   if (m){
-    const row2 = document.createElement('div'); row2.className = 'row'; row2.style.display = 'flex'; row2.style.alignItems = 'center';
-    const lab2 = document.createElement('label'); lab2.textContent = 'stackByPage';
-    const ctl2 = document.createElement('input'); ctl2.type='checkbox'; ctl2.dataset.prop = 'stackByPage'; ctl2.checked = !!m.stackByPage;
-    row2.appendChild(lab2); row2.appendChild(ctl2); box.appendChild(row2);
+    if (isPropVisibleKey('stackByPage')){
+      const row2 = document.createElement('div'); row2.className = 'row'; row2.style.display = 'flex'; row2.style.alignItems = 'center';
+      const lab2 = document.createElement('label'); lab2.textContent = 'stackByPage';
+      const ctl2 = document.createElement('input'); ctl2.type='checkbox'; ctl2.dataset.prop = 'stackByPage'; ctl2.checked = !!m.stackByPage;
+      row2.appendChild(lab2); row2.appendChild(ctl2); box.appendChild(row2);
+    }
 
     // Page break toggle: forces this element to start on a new page
-    const row3 = document.createElement('div'); row3.className = 'row'; row3.style.display = 'flex'; row3.style.alignItems = 'center';
-    const lab3 = document.createElement('label'); lab3.textContent = 'pageBreak';
-    const ctl3 = document.createElement('input'); ctl3.type='checkbox'; ctl3.dataset.prop = 'pageBreak'; ctl3.checked = !!m.pageBreak;
-    row3.appendChild(lab3); row3.appendChild(ctl3); box.appendChild(row3);
+    if (isPropVisibleKey('pageBreak')){
+      const row3 = document.createElement('div'); row3.className = 'row'; row3.style.display = 'flex'; row3.style.alignItems = 'center';
+      const lab3 = document.createElement('label'); lab3.textContent = 'pageBreak';
+      const ctl3 = document.createElement('input'); ctl3.type='checkbox'; ctl3.dataset.prop = 'pageBreak'; ctl3.checked = !!m.pageBreak;
+      row3.appendChild(lab3); row3.appendChild(ctl3); box.appendChild(row3);
+    }
 
     // Repeat flag (single checkbox)
-    const row4 = document.createElement('div'); row4.className = 'row'; row4.style.display = 'flex'; row4.style.alignItems = 'center';
-    const lab4 = document.createElement('label'); lab4.textContent = 'repeatOnAllPages';
-    const ctl4 = document.createElement('input'); ctl4.type='checkbox'; ctl4.dataset.prop = 'repeatOnAllPages'; ctl4.checked = !!m.repeatOnAllPages;
-    row4.appendChild(lab4); row4.appendChild(ctl4); box.appendChild(row4);
+    if (isPropVisibleKey('repeatOnAllPages')){
+      const row4 = document.createElement('div'); row4.className = 'row'; row4.style.display = 'flex'; row4.style.alignItems = 'center';
+      const lab4 = document.createElement('label'); lab4.textContent = 'repeatOnAllPages';
+      const ctl4 = document.createElement('input'); ctl4.type='checkbox'; ctl4.dataset.prop = 'repeatOnAllPages'; ctl4.checked = !!m.repeatOnAllPages;
+      row4.appendChild(lab4); row4.appendChild(ctl4); box.appendChild(row4);
+    }
 
     // Free move (allow positioning outside page bounds, visible overflow)
-    const row5 = document.createElement('div'); row5.className = 'row'; row5.style.display = 'flex'; row5.style.alignItems = 'center';
-  const lab5 = document.createElement('label'); lab5.textContent = 'freeMove'; lab5.title = 'Allow this element to move/appear outside page bounds and across pages (live reparent).';
-    const ctl5 = document.createElement('input'); ctl5.type='checkbox'; ctl5.dataset.prop = 'freeMove'; ctl5.checked = !!m.freeMove;
-    row5.appendChild(lab5); row5.appendChild(ctl5); box.appendChild(row5);
+    if (isPropVisibleKey('freeMove')){
+      const row5 = document.createElement('div'); row5.className = 'row'; row5.style.display = 'flex'; row5.style.alignItems = 'center';
+      const lab5 = document.createElement('label'); lab5.textContent = 'freeMove'; lab5.title = 'Allow this element to move/appear outside page bounds and across pages (live reparent).';
+      const ctl5 = document.createElement('input'); ctl5.type='checkbox'; ctl5.dataset.prop = 'freeMove'; ctl5.checked = !!m.freeMove;
+      row5.appendChild(lab5); row5.appendChild(ctl5); box.appendChild(row5);
+    }
   }
 
   // Actions UI (bubble layout): choose function, trigger, and inputs; stack multiple
-  try {
+  if (isPropVisibleKey('Actions')) try {
     const actionsRow = document.createElement('div');
     actionsRow.className = 'row';
     const lbl = document.createElement('label');
@@ -3075,7 +3223,7 @@ function renderProperties(){
 
         // expand/collapse toggle
         const keyOf = () => `${idx}:${it.event}:${it.fn}`;
-        let collapsed = !openSet.has(keyOf());
+        let collapsed = openSet.has(keyOf());
         const expBtn = document.createElement('button');
         expBtn.type = 'button';
         expBtn.className = 'btn mini';
@@ -3313,7 +3461,7 @@ function renderProperties(){
           writeBack(items);
           // nothing else
           // keep expansion state for this updated signature
-          if (!collapsed) openSet.add(keyOf()); else openSet.delete(keyOf());
+          if (collapsed) openSet.add(keyOf()); else openSet.delete(keyOf());
         }
 
         fnSel.addEventListener('change', () => { rebuildInputs(); commit(); });
@@ -3332,7 +3480,7 @@ function renderProperties(){
           : '<svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 10l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
         };
         applyCollapsed();
-        expBtn.addEventListener('click', () => { collapsed = !collapsed; if (collapsed) openSet.delete(keyOf()); else openSet.add(keyOf()); applyCollapsed(); });
+        expBtn.addEventListener('click', () => { collapsed = !collapsed; if (collapsed) openSet.add(keyOf()); else openSet.delete(keyOf()); applyCollapsed(); });
         container.appendChild(bubble);
       });
     }
@@ -3435,6 +3583,18 @@ function onPropsInput(e){
   // If stackByPage was toggled on/off, reflow immediately so element jumps in place
   if (key === 'stackByPage' || key === 'pageBreak' || key === 'repeatOnAllPages' || key === 'freeMove') {
     try { reflowStacks(getCurrentPage()); } catch {}
+    // Ensure visual update immediately:
+    // - For repeatOnAllPages we must re-render all pages, since clones are injected
+    //   on non-first pages during renderPage().
+    // - For other toggles, re-render just the current page for responsiveness.
+    try {
+      if (key === 'repeatOnAllPages') {
+        const pages = (Model && Model.document && Array.isArray(Model.document.pages)) ? Model.document.pages : [];
+        pages.forEach(p => { try { renderPage(p); } catch {} });
+      } else {
+        renderPage(getCurrentPage());
+      }
+    } catch {}
   }
   propertiesContent().addEventListener('change', onPropsInput, { once: true });
 }
@@ -4199,6 +4359,23 @@ async function bootstrap(){
     elNode.setAttribute('contenteditable', 'plaintext-only');
     elNode.classList.add('editing');
     elNode.focus();
+    // Place caret at the end of existing text so typing appends
+    try {
+      const sel = window.getSelection();
+      if (sel) {
+        let range = document.createRange();
+        const first = elNode.firstChild;
+        if (first && first.nodeType === Node.TEXT_NODE) {
+          const len = first.textContent ? first.textContent.length : 0;
+          range.setStart(first, len);
+        } else {
+          range.selectNodeContents(elNode);
+          range.collapse(false);
+        }
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    } catch {}
 
     // Track cancel to support Esc behavior (discard changes)
     let cancelled = false;
@@ -4236,7 +4413,8 @@ async function bootstrap(){
         const m = getElementById(id);
         updateElement(id, { content: m?.content || '' });
       } else {
-        updateElement(id, { content: text });
+        // Plain text: update content and clear any existing formula attribute
+        updateElement(id, { content: text, attrs: { formula: null } });
       }
       
       // Re-render to show placeholder if content is empty
@@ -4375,27 +4553,60 @@ async function bootstrap(){
     const pageEl = document.querySelector('.page'); if (!pageEl) return;
     let last;
     window.__PICKING = true; document.body.classList.add('app-noselect');
-    const blockDown = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+    try { window.__PICKER_HOST = host; } catch {}
+    // Allow text selection/caret movement inside the host while picker is active
+    const prevUserSelect = host && host.style ? host.style.userSelect : undefined;
+    const prevWebkitUserSelect = host && host.style ? host.style.webkitUserSelect : undefined;
+    try {
+      if (host && host.style) {
+        // Use important to win over body.app-noselect
+        host.style.setProperty('user-select', 'text', 'important');
+        host.style.setProperty('-webkit-user-select', 'text', 'important');
+      }
+    } catch {}
+    // Do not block events inside the host so the caret can be moved within the formula
+    const blockDown = (ev) => { if (host && (host === ev.target || host.contains(ev.target))) return; ev.stopPropagation(); ev.preventDefault(); };
     document.addEventListener('pointerdown', blockDown, true);
     document.addEventListener('mousedown', blockDown, true);
     const onMove = (ev) => {
       const cell = ev.target.closest('.table-cell');
-      const el = cell || ev.target.closest('.page .element');
+      let el = cell || ev.target.closest('.page .element');
+      // Ignore the actively edited host element
+      if (el === host || (host && el && host.contains(el))) el = null;
       if (last === el) return; if (last) last.style.outline = ''; last = el; if (last) last.style.outline = '2px solid var(--primary)';
     };
     const done = () => {
       document.removeEventListener('mousemove', onMove, true);
       document.removeEventListener('click', onClick, true);
       document.removeEventListener('keydown', onKey, true);
+      try { if (onHostInput) host.removeEventListener('input', onHostInput); } catch {}
       document.removeEventListener('pointerdown', blockDown, true);
       document.removeEventListener('mousedown', blockDown, true);
       if (last) last.style.outline = '';
       window.__PICKING = false; document.body.classList.remove('app-noselect');
+      try { window.__PICKER_HOST = null; } catch {}
+      // Restore host selection behavior
+      try {
+        if (host && host.style) {
+          if (typeof prevUserSelect === 'string') host.style.setProperty('user-select', prevUserSelect || ''); else host.style.removeProperty('user-select');
+          if (typeof prevWebkitUserSelect === 'string') host.style.setProperty('-webkit-user-select', prevWebkitUserSelect || ''); else host.style.removeProperty('-webkit-user-select');
+        }
+      } catch {}
       if (Array.isArray(prevSelIds) && prevSelIds.length && typeof setSelection === 'function') setSelection(prevSelIds);
       try { host._pickerDoneRef = null; } catch {}
     };
     const onKey = (ke) => { if (ke.key === 'Escape'){ ke.preventDefault(); done(); } };
+    // Stop picker automatically if the host no longer starts with '='
+    const onHostInput = () => {
+      try {
+        const txt = String(host.textContent || '');
+        if (!txt.trim().startsWith('=')) { done(); }
+      } catch {}
+    };
+    try { host.addEventListener('input', onHostInput); } catch {}
     const onClick = (ev) => {
+      // Allow normal clicks inside the host so the caret can move
+      if (host && (host === ev.target || host.contains(ev.target))) return;
       const cell = ev.target.closest('.table-cell');
       const el = cell || ev.target.closest('.page .element');
       if (!el) { done(); return; }
@@ -5065,6 +5276,12 @@ function initializePanelControls() {
       }
     });
   });
+
+  // Wire the Properties filter button
+  const filterBtn = document.getElementById('propertiesFilterBtn');
+  if (filterBtn){
+    filterBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openPropsFilterMenu(filterBtn); });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

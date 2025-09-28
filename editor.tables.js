@@ -1016,11 +1016,43 @@ function cmdTableUnmerge(){ if (!tableSel) return; const {tableId,r0,c0,r1,c1} =
   const bar = document.getElementById('tableActions');
   if (!bar) return;
 
+  // Position the small table actions bar near the main element actions bubble
+  function positionTableActions(){
+    if (!tableSel || !(Model && Model.document && Model.document.editMode)) return;
+    // Prefer anchoring to the element actions bubble if visible
+    try {
+      const bubble = (typeof elementActions === 'function') ? elementActions() : null;
+      let cx = null, cy = null;
+      if (bubble && !bubble.classList.contains('hidden')){
+        const r = bubble.getBoundingClientRect();
+        cx = r.left + r.width / 2;
+        cy = r.top; // anchor to top edge like element bubble
+      } else {
+        // Fallback: anchor to the table selection overlay if present
+        const host = getElementNode(tableSel.tableId);
+        const grid = host ? host.querySelector('.table-grid') : null;
+        const sel = grid ? grid.querySelector(':scope > .table-selection') : null;
+        const rr = sel ? sel.getBoundingClientRect() : (host ? host.getBoundingClientRect() : null);
+        if (rr){
+          cx = rr.left + rr.width / 2;
+          cy = rr.top; // anchor to table top when no bubble/overlay
+        }
+      }
+      if (cx != null && cy != null){
+        // With translate(-50%, -100%) the top acts as the anchor baseline
+        bar.style.left = cx + 'px';
+        bar.style.top = Math.max(4, cy - 8) + 'px';
+      }
+    } catch {}
+  }
+  // Expose for overlay alignment loop
+  try { window.positionTableActions = positionTableActions; } catch {}
+
   function showIfTableSelection() {
     // Hide entirely in view mode
     const canShow = !!tableSel && (!!Model && !!Model.document && !!Model.document.editMode);
-    if (canShow) bar.classList.remove('hidden');
-    else bar.classList.add('hidden');
+    if (canShow){ bar.classList.remove('hidden'); positionTableActions(); }
+    else { bar.classList.add('hidden'); }
   }
 
   // Show/hide but DO NOT reposition
@@ -1028,6 +1060,7 @@ function cmdTableUnmerge(){ if (!tableSel) return; const {tableId,r0,c0,r1,c1} =
   setTableSelection = function(...args){
     _set.apply(null, args);
     showIfTableSelection();
+    positionTableActions();
   };
   const _clear = clearTableSelection;
   clearTableSelection = function(){
@@ -1037,6 +1070,14 @@ function cmdTableUnmerge(){ if (!tableSel) return; const {tableId,r0,c0,r1,c1} =
 
   // Click actions
   bar.addEventListener('click', (e)=>{
+    // Toggle Borders dropdown
+    const menuBtn = e.target.closest('[data-menu="borders"]');
+    if (menuBtn){
+      const panel = bar.querySelector('[data-menu-panel="borders"]');
+      if (panel) panel.classList.toggle('hidden');
+      e.stopPropagation();
+      return;
+    }
     const btn = e.target.closest('[data-tact]');
     if (!btn || !tableSel) return;
     const t = getElementById(tableSel.tableId);
@@ -1067,10 +1108,22 @@ function cmdTableUnmerge(){ if (!tableSel) return; const {tableId,r0,c0,r1,c1} =
         break;
     }
     showIfTableSelection();
+    positionTableActions();
+  });
+
+  // Close Borders dropdown when clicking outside
+  document.addEventListener('click', (ev)=>{
+    const panel = bar.querySelector('[data-menu-panel="borders"]');
+    if (!panel) return;
+    const isInside = bar.contains(ev.target);
+    if (!isInside) panel.classList.add('hidden');
   });
 
   // Initial state
   showIfTableSelection();
+  positionTableActions();
+  // Keep in sync with viewport changes
+  window.addEventListener('resize', positionTableActions);
 })();
 // pure ops for resize/distribute/bg/borders
 function tableResizeRows(t, range, delta){ t = clone(t); const {r0=0,r1=t.rows-1}=range; for (let r=r0;r<=r1;r++){ t.rowHeights[r] = Math.max(10, (t.rowHeights[r]||40) + delta); } return t; }
