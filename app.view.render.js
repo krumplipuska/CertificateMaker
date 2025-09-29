@@ -240,11 +240,18 @@ function renderPage(page) {
 		// (no extra clamping needed; header/footer sizing only affects stacking, not rendering)
 		try { console.log('[RENDER] applyElementStyles', elm.id, elm.type); } catch {}
 		// Populate content for text-like elements so edits persist after re-render
-		if (elm.type === 'text' || elm.type === 'field' || elm.type === 'rect') {
-			const txt = typeof elm.content === 'string' ? elm.content : '';
-			// Only touch when different to avoid caret jumps if future live updates occur
-			if (node.textContent !== txt) node.textContent = txt;
-		}
+        if (elm.type === 'text' || elm.type === 'field' || elm.type === 'rect') {
+            const raw = typeof elm.content === 'string' ? elm.content : '';
+            // If a decimals style is set, display with fixed decimals like Excel (do not mutate model)
+            let txt = raw;
+            try {
+                const places = Number(elm?.styles?.decimals);
+                if (Number.isFinite(places) && places >= 0 && typeof window.formatNumberForDisplay === 'function'){
+                    txt = window.formatNumberForDisplay(raw, places);
+                }
+            } catch {}
+            if (node.textContent !== txt) node.textContent = txt;
+        }
 		if (elm.type === 'image') {
 			if (!node.querySelector('img')) {
 				const img = document.createElement('img');

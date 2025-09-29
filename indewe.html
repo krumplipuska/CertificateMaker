@@ -1,4 +1,4 @@
-<html lang="en" style="--zoom: 1; --left-panel-width: 152px; --right-panel-width: 233px;"><head>
+<html lang="en" style="--zoom: 1; --left-panel-width: 152px; --right-panel-width: 315px;"><head>
   <meta charset="utf-8">
   <title>Minimal A4 Editor</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -21,9 +21,9 @@
   <script src="app.view.render.js" defer=""></script>
   <script src="editor.app.js" defer=""></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" async="" crossorigin="anonymous" referrerpolicy="no-referrer" data-dynamic-src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" data-loaded="true"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" async="" crossorigin="anonymous" referrerpolicy="no-referrer" data-dynamic-src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" data-loaded="true"></script></head>
-<body class="">
+<body class="in-hub edit-off">
   <!-- Hub view (hidden by default). All documents are stored inline in __docs__ -->
-  <div id="hubView" hidden="">
+  <div id="hubView">
     <div id="hubHeader" class="hub-header">
       <!-- Centered file name with inline rename -->
       <div id="hubTitleGroup" class="btn" style="position:absolute;left:50%;transform:translateX(-50%);gap:6px">
@@ -33,9 +33,9 @@
       <div class="hub-buttons" style="display:inline-flex;align-items:center;gap:6px">
         <button id="newDocBtn" class="btn" title="Create new document">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
-          <span>New</span>
+          <span>New document</span>
         </button>
-        <button id="hubSaveBtn" class="btn hub-save saving" title="Save this file" data-original-text="Save" aria-busy="true">Saving…</button>
+        <button id="hubSaveBtn" class="btn hub-save" title="Save this file" data-original-text="Save">Save</button>
         <div class="menu" style="position:relative">
           <button class="btn" id="hubMoreMenuBtn" title="More options" aria-haspopup="true" aria-expanded="false">
             <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
@@ -53,17 +53,17 @@
           <span class="folder-name">All</span>
           
         </button>
-        <button class="folder-pill" data-fid="fld-dba698e3-adc8-4cf1-9476-994c6b9db1fd">
+        <button class="folder-pill" data-fid="fld-395d5d8e-909f-4add-84cd-3b50bd9ac20c">
           <svg class="icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor"></path></svg>
-          <span class="folder-name">New folder</span>
+          <span class="folder-name">template</span>
           <span class="close-btn" title="Delete" aria-label="Delete">×</span>
         </button><button class="folder-plus" id="addFolderBtn" title="New folder" aria-label="New folder">+
         </button></div>
       <div id="docList" class="doc-list" aria-label="Documents">
-      <div class="doc-row" data-id="doc-1665141b-1674-41f1-83ec-55821eca0831" draggable="true">
-        <div class="doc-name">fwefw</div>
+      <div class="doc-row" data-id="doc-4f1b2c36-a2ae-4fcf-a881-a9c9b064d5af" draggable="true">
+        <div class="doc-name">New document 1</div>
         <div style="display:flex;align-items:center;gap:8px">
-          <div class="doc-meta">9/28/2025, 9:46:47 AM</div>
+          <div class="doc-meta">9/28/2025, 8:41:52 PM</div>
           <div class="doc-actions">
             <button class="btn" data-act="open" title="Open"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
             <button class="btn" data-act="rename" title="Rename"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"></path></svg></button>
@@ -72,21 +72,54 @@
           </div>
         </div>
       </div>
+    
+      <div class="doc-row" data-id="doc-59daefdc-3faf-4b72-a493-96e2a96bd079" draggable="true">
+        <div class="doc-name">New document 3</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="doc-meta">9/28/2025, 8:41:59 PM</div>
+          <div class="doc-actions">
+            <button class="btn" data-act="open" title="Open"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            <button class="btn" data-act="rename" title="Rename"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"></path></svg></button>
+            <button class="btn" data-act="duplicate" title="Duplicate"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect><rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect></svg></button>
+            <button class="btn" data-act="delete" title="Delete"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg></button>
+          </div>
+        </div>
+      </div>
+    
+      <div class="doc-row" data-id="doc-32a6e75c-53f5-41d2-b9f3-e4ec693324f6" draggable="true">
+        <div class="doc-name">New document 2</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="doc-meta">9/28/2025, 8:41:55 PM</div>
+          <div class="doc-actions">
+            <button class="btn" data-act="open" title="Open"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            <button class="btn" data-act="rename" title="Rename"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"></path></svg></button>
+            <button class="btn" data-act="duplicate" title="Duplicate"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect><rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect></svg></button>
+            <button class="btn" data-act="delete" title="Delete"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg></button>
+          </div>
+        </div>
+      </div>
+    
+      <div class="doc-add-wrap" style="display:flex;justify-content:center;margin-top:4px;">
+        <button id="newDocInListBtn" class="btn" title="Create new document">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+          <span>New document</span>
+        </button>
+      </div>
     </div>
     </div>
-    <script id="__docs__" type="application/json">{"catalog":[{"id":"doc-1665141b-1674-41f1-83ec-55821eca0831","name":"fwefw","createdAt":1759002097855,"updatedAt":1759047866912}],"docs":{"doc-1665141b-1674-41f1-83ec-55821eca0831":{"pages":[{"id":"page-1759002097855-8r9vv","name":"Page 1","elements":[{"id":"el-1","type":"rect","x":308.84375,"y":111.5,"w":160,"h":60,"z":1,"styles":{"fill":"#dbeafe","strokeColor":"#111827","strokeWidth":1,"radius":4,"textColor":"#111827","fontFamily":"system-ui","fontSize":14,"bold":false,"italic":false,"underline":false},"freeMove":false}]}],"currentPageId":"page-1759002097855-8r9vv","nextElementId":2,"editMode":true,"headerHeight":10,"footerHeight":10}},"folders":[{"id":"fld-dba698e3-adc8-4cf1-9476-994c6b9db1fd","name":"New folder","createdAt":1759002094907,"updatedAt":1759002096324}],"docFolders":{}}</script>
+    <script id="__docs__" type="application/json">{"catalog":[{"id":"doc-4f1b2c36-a2ae-4fcf-a881-a9c9b064d5af","name":"New document 1","createdAt":1759084900693,"updatedAt":1759084912550},{"id":"doc-59daefdc-3faf-4b72-a493-96e2a96bd079","name":"New document 3","createdAt":1759084908418,"updatedAt":1759084919261},{"id":"doc-32a6e75c-53f5-41d2-b9f3-e4ec693324f6","name":"New document 2","createdAt":1759084905715,"updatedAt":1759084915954}],"docs":{"doc-4f1b2c36-a2ae-4fcf-a881-a9c9b064d5af":{"pages":[{"id":"page-1759084900692-9o3ag","name":"Page 1","elements":[]}],"currentPageId":"page-1759084900692-9o3ag","nextElementId":1,"editMode":true,"headerHeight":10,"footerHeight":10},"doc-32a6e75c-53f5-41d2-b9f3-e4ec693324f6":{"pages":[{"id":"page-1759084905715-5pk33","name":"Page 1","elements":[]}],"currentPageId":"page-1759084905715-5pk33","nextElementId":1,"editMode":true,"headerHeight":10,"footerHeight":10},"doc-59daefdc-3faf-4b72-a493-96e2a96bd079":{"pages":[{"id":"page-1759084908418-2tszp","name":"Page 1","elements":[]}],"currentPageId":"page-1759084908418-2tszp","nextElementId":1,"editMode":true,"headerHeight":10,"footerHeight":10}},"folders":[{"id":"fld-395d5d8e-909f-4add-84cd-3b50bd9ac20c","name":"template","createdAt":1759084925761,"updatedAt":1759084928260}],"docFolders":{"doc-4f1b2c36-a2ae-4fcf-a881-a9c9b064d5af":"fld-395d5d8e-909f-4add-84cd-3b50bd9ac20c"}}</script>
   </div>
 
-  <div id="editorView">
+  <div id="editorView" hidden="">
   <!-- Top bar -->
   <div class="topbar">
     <div class="group">
-      <button id="backToHubBtn" class="btn" title="Back to hub" aria-label="Back to hub">
+      <button id="backToHubBtn" class="btn" title="Back to hub" aria-label="Back to hub" hidden="">
         <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
       </button>
     </div>
     <div class="group">
-      <button id="editToggleBtn" class="btn" aria-pressed="true" title="Edit mode" aria-label="Edit mode"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"></path><path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"></path></svg><span>Edit mode</span></button>
+      <button id="editToggleBtn" class="btn" aria-pressed="false" title="View mode" aria-label="View mode"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" fill="none" stroke="currentColor" stroke-width="2"></path><circle cx="12" cy="12" r="3" fill="currentColor"></circle></svg><span>View mode</span></button>
     </div>
     <div class="group">
       <button id="undoBtn" class="btn" title="Undo" aria-label="Undo">
@@ -117,7 +150,7 @@
     </div>
     <div class="spacer"></div>
     <div class="group">
-      <button id="saveBtn" class="btn saving" data-original-text="Save" aria-busy="true">Saving…</button>
+      <button id="saveBtn" class="btn" data-original-text="Save">Save</button>
       <div class="menu" style="position:relative">
         <button class="btn" id="moreMenuBtn" title="More options" aria-haspopup="true" aria-expanded="false">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
@@ -125,41 +158,41 @@
         <div class="dropdown hidden" id="moreMenu">
           <button id="saveAsBtn" class="btn mini">
             <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M17 3h4a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4m0 0V1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 3h10M12 12l-2-2-2 2m4 0v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M17 3h4a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4m0 0V1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 3h10M12 12l-2-2-2 2m4 0v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
             </svg>
             <span>Save As</span>
           </button>
           <button id="savePdfBtn" class="btn mini">
             <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2"/>
-              <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
-              <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2"/>
-              <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2"/>
-              <polyline points="10,9 9,9 8,9" stroke="currentColor" stroke-width="2"/>
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2"></path>
+              <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2"></line>
+              <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2"></line>
+              <polyline points="10,9 9,9 8,9" stroke="currentColor" stroke-width="2"></polyline>
             </svg>
             <span>Export PDF</span>
           </button>
           <button id="exportPngBtn" class="btn mini">
             <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="2"/>
-              <polyline points="21,15 16,10 5,21" stroke="currentColor" stroke-width="2"/>
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="2"></circle>
+              <polyline points="21,15 16,10 5,21" stroke="currentColor" stroke-width="2"></polyline>
             </svg>
             <span>Export PNG</span>
           </button>
           <button id="exportJpgBtn" class="btn mini">
             <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="2"/>
-              <polyline points="21,15 16,10 5,21" stroke="currentColor" stroke-width="2"/>
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="2"></circle>
+              <polyline points="21,15 16,10 5,21" stroke="currentColor" stroke-width="2"></polyline>
             </svg>
             <span>Export JPG</span>
           </button>
           <hr>
           <button id="settingsBtn" class="btn mini">
             <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-              <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m15.5-6.5l-4.24 4.24M7.76 16.24l-4.24 4.24m12.73-12.73l-4.24-4.24M7.76 7.76L3.52 3.52" stroke="currentColor" stroke-width="2"/>
+              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"></circle>
+              <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m15.5-6.5l-4.24 4.24M7.76 16.24l-4.24 4.24m12.73-12.73l-4.24-4.24M7.76 7.76L3.52 3.52" stroke="currentColor" stroke-width="2"></path>
             </svg>
             <span>Settings</span>
           </button>
@@ -181,42 +214,42 @@
       <div class="panel-content">
         <button class="btn add-el" data-add="text" draggable="true">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 4V20M17 12V20M6 20H10M15 20H19M13 7V4H3V7M21 14V12H13V14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8 4V20M17 12V20M6 20H10M15 20H19M13 7V4H3V7M21 14V12H13V14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
           </svg>
           <span>Text</span>
         </button>
         <button class="btn add-el" data-add="field" draggable="true">
           <svg class="icon" width="16" height="16" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-            <rect x="3" y="12" width="26" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <line x1="6" y1="15" x2="10" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <line x1="8" y1="19" x2="8" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <line x1="11" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <line x1="11" y1="26" x2="15" y2="26" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <line x1="13" y1="26" x2="13" y2="8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <rect x="3" y="12" width="26" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></rect>
+            <line x1="6" y1="15" x2="10" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="8" y1="19" x2="8" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="11" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="11" y1="26" x2="15" y2="26" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="13" y1="26" x2="13" y2="8" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
           </svg>
           <span>Field</span>
         </button>
         <button class="btn add-el" data-add="rect" draggable="true">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></rect>
           </svg>
           <span>Rectangle</span>
         </button>
         <button class="btn add-el" data-add="line" draggable="true">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 12L14 12M4 12H5M19 12H20M6 16H9C9.55228 16 10 15.5523 10 15V9C10 8.44772 9.55228 8 9 8H6C5.44772 8 5 8.44772 5 9V15C5 15.5523 5.44772 16 6 16ZM15 18H18C18.5523 18 19 17.5523 19 17V7C19 6.44772 18.5523 6 18 6H15C14.4477 6 14 6.44772 14 7V17C14 17.5523 14.4477 18 15 18Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10 12L14 12M4 12H5M19 12H20M6 16H9C9.55228 16 10 15.5523 10 15V9C10 8.44772 9.55228 8 9 8H6C5.44772 8 5 8.44772 5 9V15C5 15.5523 5.44772 16 6 16ZM15 18H18C18.5523 18 19 17.5523 19 17V7C19 6.44772 18.5523 6 18 6H15C14.4477 6 14 6.44772 14 7V17C14 17.5523 14.4477 18 15 18Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
           </svg>
           <span>Line</span>
         </button>
         <button class="btn add-el" data-add="image" draggable="true">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M14.2639 15.9375L12.5958 14.2834C11.7909 13.4851 11.3884 13.086 10.9266 12.9401C10.5204 12.8118 10.0838 12.8165 9.68048 12.9536C9.22188 13.1095 8.82814 13.5172 8.04068 14.3326L4.04409 18.2801M14.2639 15.9375L14.6053 15.599C15.4112 14.7998 15.8141 14.4002 16.2765 14.2543C16.6831 14.126 17.12 14.1311 17.5236 14.2687C17.9824 14.4251 18.3761 14.8339 19.1634 15.6514L20 16.4934M14.2639 15.9375L18.275 19.9565M18.275 19.9565C17.9176 20 17.4543 20 16.8 20H7.2C6.07989 20 5.51984 20 5.09202 19.782C4.71569 19.5903 4.40973 19.2843 4.21799 18.908C4.12796 18.7313 4.07512 18.5321 4.04409 18.2801M18.275 19.9565C18.5293 19.9256 18.7301 19.8727 18.908 19.782C19.2843 19.5903 19.5903 19.2843 19.782 18.908C20 18.4802 20 17.9201 20 16.8V16.4934M4.04409 18.2801C4 17.9221 4 17.4575 4 16.8V7.2C4 6.0799 4 5.51984 4.21799 5.09202C4.40973 4.71569 4.71569 4.40973 5.09202 4.21799C5.51984 4 6.07989 4 7.2 4H16.8C17.9201 4 18.4802 4 18.908 4.21799C19.2843 4.40973 19.5903 4.71569 19.782 5.09202C20 5.51984 20 6.0799 20 7.2V16.4934M17 8.99989C17 10.1045 16.1046 10.9999 15 10.9999C13.8954 10.9999 13 10.1045 13 8.99989C13 7.89532 13.8954 6.99989 15 6.99989C16.1046 6.99989 17 7.89532 17 8.99989Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M14.2639 15.9375L12.5958 14.2834C11.7909 13.4851 11.3884 13.086 10.9266 12.9401C10.5204 12.8118 10.0838 12.8165 9.68048 12.9536C9.22188 13.1095 8.82814 13.5172 8.04068 14.3326L4.04409 18.2801M14.2639 15.9375L14.6053 15.599C15.4112 14.7998 15.8141 14.4002 16.2765 14.2543C16.6831 14.126 17.12 14.1311 17.5236 14.2687C17.9824 14.4251 18.3761 14.8339 19.1634 15.6514L20 16.4934M14.2639 15.9375L18.275 19.9565M18.275 19.9565C17.9176 20 17.4543 20 16.8 20H7.2C6.07989 20 5.51984 20 5.09202 19.782C4.71569 19.5903 4.40973 19.2843 4.21799 18.908C4.12796 18.7313 4.07512 18.5321 4.04409 18.2801M18.275 19.9565C18.5293 19.9256 18.7301 19.8727 18.908 19.782C19.2843 19.5903 19.5903 19.2843 19.782 18.908C20 18.4802 20 17.9201 20 16.8V16.4934M4.04409 18.2801C4 17.9221 4 17.4575 4 16.8V7.2C4 6.0799 4 5.51984 4.21799 5.09202C4.40973 4.71569 4.71569 4.40973 5.09202 4.21799C5.51984 4 6.07989 4 7.2 4H16.8C17.9201 4 18.4802 4 18.908 4.21799C19.2843 4.40973 19.5903 4.71569 19.782 5.09202C20 5.51984 20 6.0799 20 7.2V16.4934M17 8.99989C17 10.1045 16.1046 10.9999 15 10.9999C13.8954 10.9999 13 10.1045 13 8.99989C13 7.89532 13.8954 6.99989 15 6.99989C16.1046 6.99989 17 7.89532 17 8.99989Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
           </svg>
           <span>Image</span>
         </button>
         <button class="btn add-el" data-add="table" draggable="true">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M3 9.5H21M3 14.5H21M8 4.5V19.5M6.2 19.5H17.8C18.9201 19.5 19.4802 19.5 19.908 19.282C20.2843 19.0903 20.5903 18.7843 20.782 18.408C21 17.9802 21 17.4201 21 16.3V7.7C21 6.5799 21 6.01984 20.782 5.59202C20.5903 5.21569 20.2843 4.90973 19.908 4.71799C19.4802 4.5 18.9201 4.5 17.8 4.5H6.2C5.0799 4.5 4.51984 4.5 4.09202 4.71799C3.71569 4.90973 3.40973 5.21569 3.21799 5.59202C3 6.01984 3 6.57989 3 7.7V16.3C3 17.4201 3 17.9802 3.21799 18.408C3.40973 18.7843 3.71569 19.0903 4.09202 19.282C4.51984 19.5 5.07989 19.5 6.2 19.5Z" stroke="currentColor" stroke-width="2"/>
+            <path d="M3 9.5H21M3 14.5H21M8 4.5V19.5M6.2 19.5H17.8C18.9201 19.5 19.4802 19.5 19.908 19.282C20.2843 19.0903 20.5903 18.7843 20.782 18.408C21 17.9802 21 17.4201 21 16.3V7.7C21 6.5799 21 6.01984 20.782 5.59202C20.5903 5.21569 20.2843 4.90973 19.908 4.71799C19.4802 4.5 18.9201 4.5 17.8 4.5H6.2C5.0799 4.5 4.51984 4.5 4.09202 4.71799C3.71569 4.90973 3.40973 5.21569 3.21799 5.59202C3 6.01984 3 6.57989 3 7.7V16.3C3 17.4201 3 17.9802 3.21799 18.408C3.40973 18.7843 3.71569 19.0903 4.09202 19.282C4.51984 19.5 5.07989 19.5 6.2 19.5Z" stroke="currentColor" stroke-width="2"></path>
           </svg>
           <span>Table</span>
         </button>
@@ -224,10 +257,10 @@
           <svg class="icon" width="16" height="16" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
             <g>
               <path d="M256,0C114.609,0,0,114.609,0,256s114.609,256,256,256s256-114.609,256-256S397.391,0,256,0z M256,472
-                c-119.297,0-216-96.703-216-216S136.703,40,256,40s216,96.703,216,216S375.297,472,256,472z"/>
-              <polygon points="256,355.219 151.031,289.625 128,304 256,384 384,304.25 360.969,289.812"/>
-              <polygon points="256,306.859 151.594,241.609 128,256.359 256,336.359 384,256.609 360.391,241.797"/>
-              <polygon points="128,208 256,288 384,208.25 256,128"/>
+                c-119.297,0-216-96.703-216-216S136.703,40,256,40s216,96.703,216,216S375.297,472,256,472z"></path>
+              <polygon points="256,355.219 151.031,289.625 128,304 256,384 384,304.25 360.969,289.812"></polygon>
+              <polygon points="256,306.859 151.594,241.609 128,256.359 256,336.359 384,256.609 360.391,241.797"></polygon>
+              <polygon points="128,208 256,288 384,208.25 256,128"></polygon>
             </g>
           </svg>
           <span>Block</span>
@@ -240,60 +273,27 @@
     </aside>
 
     <main class="workspace">
-      <div id="pageViewport" style="padding-left: 166px; padding-right: 247px;">
-        <div id="pagesList" aria-label="Pages list"><div class="page-wrapper" data-page-id="page-1759002097855-8r9vv"><div class="page-title">
-      <strong>Page 1</strong>
-      <span style="margin-left:6px;color:var(--muted)">Page 1</span>
-      <span class="title-actions" style="float:right;display:inline-flex;gap:6px">
-        <button class="btn mini" data-act="move-up" title="Move up" aria-label="Move up">
-          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6l-6 6h12z" fill="currentColor"></path></svg>
-        </button>
-        <button class="btn mini" data-act="move-down" title="Move down" aria-label="Move down">
-          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18l6-6H6z" fill="currentColor"></path></svg>
-        </button>
-        <button class="btn mini" data-act="toggle-visibility" title="Show/Hide" aria-label="Show or hide">
-          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M1.5 12s4-7.5 10.5-7.5S22.5 12 22.5 12s-4 7.5-10.5 7.5S1.5 12 1.5 12z" fill="none" stroke="currentColor" stroke-width="2"></path>
-            <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
-          </svg>
-        </button>
-        <button class="btn mini" data-act="duplicate" title="Duplicate" aria-label="Duplicate">
-          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
-            <rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
-          </svg>
-        </button>
-        <button class="btn mini" data-act="delete" title="Delete" aria-label="Delete">
-          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-            <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-            <rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
-            <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-          </svg>
-        </button>
-        <button class="btn mini" data-act="add-below" title="Add page below" aria-label="Add page below">
-          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-          </svg>
-        </button>
-      </span></div><div class="page-stage"><div class="page" aria-label="A4 canvas"><div class="guide v hidden"></div><div class="guide h hidden"></div><div class="hf-guide header" style="height: 10px; display: block;"><div class="hf-label"></div><div class="hf-resize"></div></div><div class="hf-guide footer" style="height: 10px; display: block;"><div class="hf-label"></div><div class="hf-resize"></div></div><div class="element rect" data-id="el-1" style="left: 308.844px; top: 111.5px; width: 160px; height: 60px; border-radius: 4px; background: rgb(219, 234, 254); border: 1px solid rgb(17, 24, 39); color: rgb(17, 24, 39); font-family: system-ui; font-size: 14pt; font-weight: 400; font-style: normal; text-decoration: none; transform-origin: 50% 50%; flex-direction: column; justify-content: flex-start; align-items: flex-start; text-align: left; z-index: 101; display: flex;"></div></div></div></div></div>
+      <div id="pageViewport" style="padding-left: 0px; padding-right: 0px;">
+        <div id="pagesList" aria-label="Pages list"></div>
       </div>
     </main>
 
-    <aside class="side right" id="propertiesPanel" style="width: 233px;">
+    <aside class="side right" id="propertiesPanel" style="width: 315px;">
       <div class="panel-resize-handle panel-resize-left" data-panel="propertiesPanel"></div>
       <div class="panel-header">
+        <button class="panel-toggle" id="propertiesToggle" title="Collapse/Expand Properties Panel" aria-label="Toggle Properties Panel" data-dir="left">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
         <h3>Properties</h3>
         <button class="panel-toggle" id="propertiesFilterBtn" title="Filter properties shown" aria-label="Filter Properties">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3 5h18L14 13v6l-4-2v-4L3 5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
           </svg>
         </button>
-        <button class="panel-toggle" id="propertiesToggle" title="Collapse/Expand Properties Panel" aria-label="Toggle Properties Panel" data-dir="left">
-          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-          </svg>
-        </button>
+        
+        
       </div>
       <div class="panel-content">
         <div id="propertiesContent" class="props"></div>
@@ -314,12 +314,12 @@
 
   <div id="formatToolbar" class="floating hidden" role="toolbar" aria-label="Editing toolbar">
     <div class="row">
-      <label><svg class="icon" width="16" height="16" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M4,29.987l24,0c0.828,0 1.5,-0.672 1.5,-1.5c0,-0.827 -0.672,-1.5 -1.5,-1.5l-24,0c-0.828,0 -1.5,0.673 -1.5,1.5c0,0.828 0.672,1.5 1.5,1.5Z" fill="currentColor"/><path d="M9.138,22.244c1.323,0.328 2.775,0.118 3.995,-0.702l9.873,-6.712c0.458,-0.308 0.58,-0.929 0.273,-1.388l-6.717,-10c-0.308,-0.458 -0.929,-0.58 -1.388,-0.272c0,-0 -6.027,4.048 -9.961,6.691c-2.293,1.539 -2.903,4.646 -1.363,6.938c0.725,1.08 1.53,2.279 2.256,3.359c0.738,1.099 1.836,1.812 3.032,2.086Zm11.448,-9.223l-15.418,0c0.207,-0.591 0.599,-1.124 1.16,-1.5c-0,-0 9.131,-6.133 9.131,-6.133l5.127,7.633Z" fill="currentColor"/><path d="M26.339,15.455c-0.185,-0.284 -0.5,-0.455 -0.839,-0.455c-0.339,-0 -0.654,0.171 -0.839,0.455c0,0 -1.274,1.965 -2.039,3.732c-0.379,0.876 -0.622,1.717 -0.622,2.313c-0,1.932 1.568,3.5 3.5,3.5c1.932,0 3.5,-1.568 3.5,-3.5c-0,-0.596 -0.243,-1.437 -0.622,-2.313c-0.765,-1.767 -2.039,-3.732 -2.039,-3.732Z" fill="currentColor"/></svg> <input class="circle" type="color" data-prop="styles.fill"></label>
-      <label><svg class="icon" width="16" height="16" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg"><path d="M 7.5291661,11.795909 C 7.4168129,11.419456 7.3406864,10.225625 7.3406864,9.29222 c 0,-0.11438 -0.029767,-0.221667 -0.081573,-0.314893 0.051933,-0.115773 0.08132,-0.24358 0.08132,-0.378226 l 0,-1.709364 c 0,-0.511733 -0.416226,-0.927959 -0.9279585,-0.927959 l -0.8772919,0 C 5.527203,5.856265 5.52163,5.751005 5.518336,5.648406 5.514666,5.556066 5.513396,5.470313 5.513016,5.385826 5.511876,5.296776 5.5132694,5.224073 5.517196,5.160866 5.524666,5.024193 5.541009,4.891827 5.565076,4.773647 5.591043,4.646981 5.619669,4.564774 5.630689,4.535134 c 0.0019,-0.0052 0.0038,-0.01013 0.00557,-0.01533 0.00709,-0.02039 0.0133,-0.03559 0.017227,-0.04446 C 6.0127121,3.789698 5.750766,2.938499 5.0665137,2.5737 4.8642273,2.466034 4.6367344,2.409034 4.4084814,2.408147 4.1801018,2.409034 3.9526089,2.466037 3.7504492,2.5737 3.066197,2.938499 2.8042508,3.789698 3.1634768,4.475344 c 0.00393,0.0087 0.01026,0.02394 0.017227,0.04446 0.00177,0.0052 0.00367,0.01013 0.00557,0.01533 0.01102,0.02951 0.039647,0.111847 0.065613,0.238513 0.024067,0.11818 0.040533,0.250546 0.04788,0.387219 0.00393,0.06321 0.00532,0.135914 0.00418,0.22496 -5.066e-4,0.08449 -0.00165,0.17024 -0.00532,0.26258 -0.00329,0.102599 -0.00887,0.207859 -0.016847,0.313372 l -0.8772919,0 c -0.5117324,0 -0.9279584,0.416226 -0.9279584,0.927959 l 0,1.709364 c 0,0.134646 0.029387,0.262453 0.08132,0.378226 -0.051807,0.09323 -0.081573,0.200513 -0.081573,0.314893 0,0.933278 -0.076126,2.127236 -0.1884796,2.503689 C 1.0571435,11.985782 1.0131902,12.254315 1.0562568,12.453434 1.1748167,13 1.7477291,13 1.9359554,13 c 0.437506,0 1.226258,-0.07676 1.2595712,-0.08005 0.05092,-0.0051 0.1001932,-0.01596 0.1468065,-0.03179 0.049907,0.01241 0.1018398,0.01913 0.1546597,0.01925 l 0.9114918,0.0044 0.9114918,-0.0044 c 0.05282,-1.27e-4 0.1047532,-0.007 0.1546598,-0.01925 0.046613,0.01583 0.095886,0.02673 0.1468064,0.03179 C 5.6547556,12.92315 6.4436346,13 6.8810138,13 c 0.1882264,0 0.7612654,0 0.8796986,-0.546566 0.043067,-0.199119 -7.6e-4,-0.467652 -0.2315463,-0.657525 z m -1.833117,0.502486 -0.3480794,-1.518478 -0.1741664,1.503658 -1.6846638,-7.6e-4 -0.3680927,-0.885399 0,0.900979 c 0,0 -1.7672504,0.173279 -1.3861111,0 0.3811394,-0.173154 0.3811394,-2.980082 0.3811394,-2.980082 l 2.2924095,0 2.2924095,0 c 0,0 0,2.806928 0.3811394,2.980082 0.381266,0.173279 -1.3859844,0 -1.3859844,0 z M 10.219055,1 7.3387864,1 5.8932688,5.377719 l 0.9449318,0 c 0.3536527,0 0.6674055,0.17138 0.8650052,0.434593 l 0.04864,-0.18392 0.9107318,-2.702555 0.2962729,-0.0016 0.9543051,2.889769 -2.2085564,0 C 7.839499,5.994632 7.9204389,6.217692 7.9204389,6.459878 l 0,1.257038 2.3962751,0 0.423193,1.60917 2.218563,0 L 10.219055,1 Z" fill="currentColor"/></svg> <input class="circle" type="color" data-prop="styles.textColor"></label>
-      <label><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8.99994 1.75C8.99994 1.33579 9.33573 1 9.74994 1C10.1642 1 10.4999 1.33579 10.4999 1.75V3.01536C10.9506 3.0556 11.3903 3.24821 11.7352 3.59318L15.2708 7.12871C16.0518 7.90976 16.0518 9.17609 15.2708 9.95714L11.0281 14.1998C10.2471 14.9808 8.98074 14.9808 8.19969 14.1998L4.66416 10.6642C3.88311 9.8832 3.88311 8.61687 4.66416 7.83582L8.9068 3.59318C8.93713 3.56284 8.9682 3.53368 8.99994 3.5057V1.75ZM8.99994 6.25V5.62135L6.11052 8.51077H14.3555C14.348 8.39373 14.2995 8.27882 14.2101 8.18937L10.6746 4.65384C10.6233 4.60254 10.5636 4.56471 10.4999 4.54037V6.25C10.4999 6.66421 10.1642 7 9.74994 7C9.33573 7 8.99994 6.66421 8.99994 6.25ZM6.132 10.0108L9.26035 13.1391C9.45561 13.3344 9.77219 13.3344 9.96746 13.1391L13.0958 10.0108H6.132Z" fill="currentColor"/><path d="M6.58573 14H4.5C3.11929 14 2 15.1193 2 16.5V19.5C2 20.8807 3.11929 22 4.5 22H19.5C20.8807 22 22 20.8807 22 19.5V16.5C22 15.285 21.1333 14.2725 19.9844 14.0469C19.9945 14.1543 20 14.2638 20 14.3749C20 14.7762 19.9349 15.1734 19.8115 15.5495C20.2113 15.6804 20.5 16.0565 20.5 16.5V19.5C20.5 20.0523 20.0523 20.5 19.5 20.5H4.5C3.94772 20.5 3.5 20.0523 3.5 19.5V16.5C3.5 15.9477 3.94772 15.5 4.5 15.5H8.3345C8.02991 15.3564 7.74449 15.1588 7.49269 14.907L6.58573 14Z" fill="currentColor"/><path d="M14 14.375C14 13.8816 14.1541 13.4027 14.3418 12.9938C14.5325 12.5784 14.7798 12.1881 15.0158 11.8595C15.2531 11.5289 15.4888 11.247 15.6647 11.0481C15.7502 10.9515 15.9062 10.7867 15.9642 10.7254L15.9697 10.7197C16.2626 10.4268 16.7374 10.4268 17.0303 10.7197L17.3353 11.0481C17.5112 11.247 17.7469 11.5289 17.9842 11.8595C18.2202 12.1881 18.4675 12.5784 18.6582 12.9938C18.8459 13.4027 19 13.8816 19 14.375C19 15.7654 17.9711 17 16.5 17C15.0289 17 14 15.7654 14 14.375ZM16.7658 12.7343C16.676 12.6092 16.5858 12.4916 16.5 12.3844C16.4142 12.4916 16.324 12.6092 16.2342 12.7343C16.0327 13.015 15.8425 13.32 15.7051 13.6195C15.5647 13.9253 15.5 14.1808 15.5 14.375C15.5 15.0663 15.9809 15.5 16.5 15.5C17.0191 15.5 17.5 15.0663 17.5 14.375C17.5 14.1808 17.4353 13.9253 17.2949 13.6195C17.1575 13.32 16.9673 13.015 16.7658 12.7343Z" fill="currentColor"/></svg> <input class="circle" type="color" data-prop="styles.strokeColor"></label>
-      <label><svg class="icon" width="16" height="16" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="40" width="40" height="2" rx="1" ry="1" fill="currentColor"/><rect x="4" y="31" width="40" height="4" rx="1" ry="1" fill="currentColor"/><rect x="4" y="20" width="40" height="6" rx="1" ry="1" fill="currentColor"/><rect x="4" y="7" width="40" height="8" rx="1" ry="1" fill="currentColor"/></svg> <input type="range" min="0" max="20" step="1" style="width:120px" data-prop="styles.strokeWidth"></label>
-      <label><svg class="icon" width="16" height="16" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M656 200h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm58 624h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM192 650h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 174h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm696-696h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 174h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 174h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 174h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 174h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm-348 0h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm-174 0h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm174-696H358c-127 0-230 103-230 230v182c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V358c0-87.3 70.7-158 158-158h182c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8z" fill="currentColor"/></svg> <input type="range" min="0" max="60" step="1" style="width:120px" data-prop="styles.radius"></label>
-      <label><svg class="icon" width="16" height="16" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg"><path d="m 29.09375,11.234375 c -3.183804,0 -5.71875,2.566196 -5.71875,5.75 l 0,94.031255 c 0,3.1838 2.534946,5.75 5.71875,5.75 l 69.8125,0 c 3.1838,0 5.71875,-2.5662 5.71875,-5.75 l 0,-70.656255 -21.03125,0 c -4.306108,0 -8.0625,-3.141109 -8.0625,-7.3125 l 0,-21.8125 -46.4375,0 z m 50.4375,0 0,21.8125 c 0,1.714122 1.631968,3.3125 4.0625,3.3125 l 21.03125,0 -25.09375,-25.125 z m 3.34375,36.65625 1.3125,0 -3.8125,41.75 c -0.197474,1.94973 -0.312535,3.226755 -0.3125,3.84375 -3.5e-5,0.987205 0.192265,1.731723 0.5625,2.25 0.468884,0.715723 1.085201,1.248232 1.875,1.59375 0.814403,0.345522 2.193348,0.531251 4.09375,0.53125 l -0.40625,1.375 -19.78125,0 0.40625,-1.375 0.84375,0 c 1.604178,10e-7 2.925593,-0.340208 3.9375,-1.03125 0.715693,-0.468917 1.261342,-1.257825 1.65625,-2.34375 0.271452,-0.765076 0.534422,-2.568039 0.78125,-5.40625 l 0.59375,-6.375 -14.375,0 -5.09375,6.9375 c -1.159972,1.55485 -1.891348,2.683967 -2.1875,3.375 -0.296168,0.666367 -0.437508,1.282684 -0.4375,1.875 -8e-6,0.789765 0.295811,1.463612 0.9375,2.03125 0.641672,0.567643 1.706688,0.888141 3.1875,0.9375 l -0.40625,1.375 -14.84375,0 0.40625,-1.375 c 1.826324,-0.07404 3.430418,-0.677217 4.8125,-1.8125 1.406758,-1.159957 3.517081,-3.623628 6.28125,-7.375 L 82.875,47.890625 z m -6.03125,12.3125 -14.5625,19.8125 12.625,0 1.9375,-19.8125 z" fill="currentColor"/></svg> <select data-prop="styles.fontFamily">
+      <label><svg class="icon" width="16" height="16" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M4,29.987l24,0c0.828,0 1.5,-0.672 1.5,-1.5c0,-0.827 -0.672,-1.5 -1.5,-1.5l-24,0c-0.828,0 -1.5,0.673 -1.5,1.5c0,0.828 0.672,1.5 1.5,1.5Z" fill="currentColor"></path><path d="M9.138,22.244c1.323,0.328 2.775,0.118 3.995,-0.702l9.873,-6.712c0.458,-0.308 0.58,-0.929 0.273,-1.388l-6.717,-10c-0.308,-0.458 -0.929,-0.58 -1.388,-0.272c0,-0 -6.027,4.048 -9.961,6.691c-2.293,1.539 -2.903,4.646 -1.363,6.938c0.725,1.08 1.53,2.279 2.256,3.359c0.738,1.099 1.836,1.812 3.032,2.086Zm11.448,-9.223l-15.418,0c0.207,-0.591 0.599,-1.124 1.16,-1.5c-0,-0 9.131,-6.133 9.131,-6.133l5.127,7.633Z" fill="currentColor"></path><path d="M26.339,15.455c-0.185,-0.284 -0.5,-0.455 -0.839,-0.455c-0.339,-0 -0.654,0.171 -0.839,0.455c0,0 -1.274,1.965 -2.039,3.732c-0.379,0.876 -0.622,1.717 -0.622,2.313c-0,1.932 1.568,3.5 3.5,3.5c1.932,0 3.5,-1.568 3.5,-3.5c-0,-0.596 -0.243,-1.437 -0.622,-2.313c-0.765,-1.767 -2.039,-3.732 -2.039,-3.732Z" fill="currentColor"></path></svg> <input class="circle" type="color" data-prop="styles.fill"></label>
+      <label><svg class="icon" width="16" height="16" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg"><path d="M 7.5291661,11.795909 C 7.4168129,11.419456 7.3406864,10.225625 7.3406864,9.29222 c 0,-0.11438 -0.029767,-0.221667 -0.081573,-0.314893 0.051933,-0.115773 0.08132,-0.24358 0.08132,-0.378226 l 0,-1.709364 c 0,-0.511733 -0.416226,-0.927959 -0.9279585,-0.927959 l -0.8772919,0 C 5.527203,5.856265 5.52163,5.751005 5.518336,5.648406 5.514666,5.556066 5.513396,5.470313 5.513016,5.385826 5.511876,5.296776 5.5132694,5.224073 5.517196,5.160866 5.524666,5.024193 5.541009,4.891827 5.565076,4.773647 5.591043,4.646981 5.619669,4.564774 5.630689,4.535134 c 0.0019,-0.0052 0.0038,-0.01013 0.00557,-0.01533 0.00709,-0.02039 0.0133,-0.03559 0.017227,-0.04446 C 6.0127121,3.789698 5.750766,2.938499 5.0665137,2.5737 4.8642273,2.466034 4.6367344,2.409034 4.4084814,2.408147 4.1801018,2.409034 3.9526089,2.466037 3.7504492,2.5737 3.066197,2.938499 2.8042508,3.789698 3.1634768,4.475344 c 0.00393,0.0087 0.01026,0.02394 0.017227,0.04446 0.00177,0.0052 0.00367,0.01013 0.00557,0.01533 0.01102,0.02951 0.039647,0.111847 0.065613,0.238513 0.024067,0.11818 0.040533,0.250546 0.04788,0.387219 0.00393,0.06321 0.00532,0.135914 0.00418,0.22496 -5.066e-4,0.08449 -0.00165,0.17024 -0.00532,0.26258 -0.00329,0.102599 -0.00887,0.207859 -0.016847,0.313372 l -0.8772919,0 c -0.5117324,0 -0.9279584,0.416226 -0.9279584,0.927959 l 0,1.709364 c 0,0.134646 0.029387,0.262453 0.08132,0.378226 -0.051807,0.09323 -0.081573,0.200513 -0.081573,0.314893 0,0.933278 -0.076126,2.127236 -0.1884796,2.503689 C 1.0571435,11.985782 1.0131902,12.254315 1.0562568,12.453434 1.1748167,13 1.7477291,13 1.9359554,13 c 0.437506,0 1.226258,-0.07676 1.2595712,-0.08005 0.05092,-0.0051 0.1001932,-0.01596 0.1468065,-0.03179 0.049907,0.01241 0.1018398,0.01913 0.1546597,0.01925 l 0.9114918,0.0044 0.9114918,-0.0044 c 0.05282,-1.27e-4 0.1047532,-0.007 0.1546598,-0.01925 0.046613,0.01583 0.095886,0.02673 0.1468064,0.03179 C 5.6547556,12.92315 6.4436346,13 6.8810138,13 c 0.1882264,0 0.7612654,0 0.8796986,-0.546566 0.043067,-0.199119 -7.6e-4,-0.467652 -0.2315463,-0.657525 z m -1.833117,0.502486 -0.3480794,-1.518478 -0.1741664,1.503658 -1.6846638,-7.6e-4 -0.3680927,-0.885399 0,0.900979 c 0,0 -1.7672504,0.173279 -1.3861111,0 0.3811394,-0.173154 0.3811394,-2.980082 0.3811394,-2.980082 l 2.2924095,0 2.2924095,0 c 0,0 0,2.806928 0.3811394,2.980082 0.381266,0.173279 -1.3859844,0 -1.3859844,0 z M 10.219055,1 7.3387864,1 5.8932688,5.377719 l 0.9449318,0 c 0.3536527,0 0.6674055,0.17138 0.8650052,0.434593 l 0.04864,-0.18392 0.9107318,-2.702555 0.2962729,-0.0016 0.9543051,2.889769 -2.2085564,0 C 7.839499,5.994632 7.9204389,6.217692 7.9204389,6.459878 l 0,1.257038 2.3962751,0 0.423193,1.60917 2.218563,0 L 10.219055,1 Z" fill="currentColor"></path></svg> <input class="circle" type="color" data-prop="styles.textColor"></label>
+      <label><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8.99994 1.75C8.99994 1.33579 9.33573 1 9.74994 1C10.1642 1 10.4999 1.33579 10.4999 1.75V3.01536C10.9506 3.0556 11.3903 3.24821 11.7352 3.59318L15.2708 7.12871C16.0518 7.90976 16.0518 9.17609 15.2708 9.95714L11.0281 14.1998C10.2471 14.9808 8.98074 14.9808 8.19969 14.1998L4.66416 10.6642C3.88311 9.8832 3.88311 8.61687 4.66416 7.83582L8.9068 3.59318C8.93713 3.56284 8.9682 3.53368 8.99994 3.5057V1.75ZM8.99994 6.25V5.62135L6.11052 8.51077H14.3555C14.348 8.39373 14.2995 8.27882 14.2101 8.18937L10.6746 4.65384C10.6233 4.60254 10.5636 4.56471 10.4999 4.54037V6.25C10.4999 6.66421 10.1642 7 9.74994 7C9.33573 7 8.99994 6.66421 8.99994 6.25ZM6.132 10.0108L9.26035 13.1391C9.45561 13.3344 9.77219 13.3344 9.96746 13.1391L13.0958 10.0108H6.132Z" fill="currentColor"></path><path d="M6.58573 14H4.5C3.11929 14 2 15.1193 2 16.5V19.5C2 20.8807 3.11929 22 4.5 22H19.5C20.8807 22 22 20.8807 22 19.5V16.5C22 15.285 21.1333 14.2725 19.9844 14.0469C19.9945 14.1543 20 14.2638 20 14.3749C20 14.7762 19.9349 15.1734 19.8115 15.5495C20.2113 15.6804 20.5 16.0565 20.5 16.5V19.5C20.5 20.0523 20.0523 20.5 19.5 20.5H4.5C3.94772 20.5 3.5 20.0523 3.5 19.5V16.5C3.5 15.9477 3.94772 15.5 4.5 15.5H8.3345C8.02991 15.3564 7.74449 15.1588 7.49269 14.907L6.58573 14Z" fill="currentColor"></path><path d="M14 14.375C14 13.8816 14.1541 13.4027 14.3418 12.9938C14.5325 12.5784 14.7798 12.1881 15.0158 11.8595C15.2531 11.5289 15.4888 11.247 15.6647 11.0481C15.7502 10.9515 15.9062 10.7867 15.9642 10.7254L15.9697 10.7197C16.2626 10.4268 16.7374 10.4268 17.0303 10.7197L17.3353 11.0481C17.5112 11.247 17.7469 11.5289 17.9842 11.8595C18.2202 12.1881 18.4675 12.5784 18.6582 12.9938C18.8459 13.4027 19 13.8816 19 14.375C19 15.7654 17.9711 17 16.5 17C15.0289 17 14 15.7654 14 14.375ZM16.7658 12.7343C16.676 12.6092 16.5858 12.4916 16.5 12.3844C16.4142 12.4916 16.324 12.6092 16.2342 12.7343C16.0327 13.015 15.8425 13.32 15.7051 13.6195C15.5647 13.9253 15.5 14.1808 15.5 14.375C15.5 15.0663 15.9809 15.5 16.5 15.5C17.0191 15.5 17.5 15.0663 17.5 14.375C17.5 14.1808 17.4353 13.9253 17.2949 13.6195C17.1575 13.32 16.9673 13.015 16.7658 12.7343Z" fill="currentColor"></path></svg> <input class="circle" type="color" data-prop="styles.strokeColor"></label>
+      <label><svg class="icon" width="16" height="16" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="40" width="40" height="2" rx="1" ry="1" fill="currentColor"></rect><rect x="4" y="31" width="40" height="4" rx="1" ry="1" fill="currentColor"></rect><rect x="4" y="20" width="40" height="6" rx="1" ry="1" fill="currentColor"></rect><rect x="4" y="7" width="40" height="8" rx="1" ry="1" fill="currentColor"></rect></svg> <input type="range" min="0" max="20" step="1" style="width:120px" data-prop="styles.strokeWidth"></label>
+      <label><svg class="icon" width="16" height="16" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M656 200h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm58 624h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM192 650h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 174h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm696-696h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 174h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 174h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 174h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 174h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm-348 0h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm-174 0h-56c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm174-696H358c-127 0-230 103-230 230v182c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V358c0-87.3 70.7-158 158-158h182c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8z" fill="currentColor"></path></svg> <input type="range" min="0" max="60" step="1" style="width:120px" data-prop="styles.radius"></label>
+      <label><svg class="icon" width="16" height="16" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg"><path d="m 29.09375,11.234375 c -3.183804,0 -5.71875,2.566196 -5.71875,5.75 l 0,94.031255 c 0,3.1838 2.534946,5.75 5.71875,5.75 l 69.8125,0 c 3.1838,0 5.71875,-2.5662 5.71875,-5.75 l 0,-70.656255 -21.03125,0 c -4.306108,0 -8.0625,-3.141109 -8.0625,-7.3125 l 0,-21.8125 -46.4375,0 z m 50.4375,0 0,21.8125 c 0,1.714122 1.631968,3.3125 4.0625,3.3125 l 21.03125,0 -25.09375,-25.125 z m 3.34375,36.65625 1.3125,0 -3.8125,41.75 c -0.197474,1.94973 -0.312535,3.226755 -0.3125,3.84375 -3.5e-5,0.987205 0.192265,1.731723 0.5625,2.25 0.468884,0.715723 1.085201,1.248232 1.875,1.59375 0.814403,0.345522 2.193348,0.531251 4.09375,0.53125 l -0.40625,1.375 -19.78125,0 0.40625,-1.375 0.84375,0 c 1.604178,10e-7 2.925593,-0.340208 3.9375,-1.03125 0.715693,-0.468917 1.261342,-1.257825 1.65625,-2.34375 0.271452,-0.765076 0.534422,-2.568039 0.78125,-5.40625 l 0.59375,-6.375 -14.375,0 -5.09375,6.9375 c -1.159972,1.55485 -1.891348,2.683967 -2.1875,3.375 -0.296168,0.666367 -0.437508,1.282684 -0.4375,1.875 -8e-6,0.789765 0.295811,1.463612 0.9375,2.03125 0.641672,0.567643 1.706688,0.888141 3.1875,0.9375 l -0.40625,1.375 -14.84375,0 0.40625,-1.375 c 1.826324,-0.07404 3.430418,-0.677217 4.8125,-1.8125 1.406758,-1.159957 3.517081,-3.623628 6.28125,-7.375 L 82.875,47.890625 z m -6.03125,12.3125 -14.5625,19.8125 12.625,0 1.9375,-19.8125 z" fill="currentColor"></path></svg> <select data-prop="styles.fontFamily">
         <option value="system-ui">System</option>
         <option value="Arial">Arial</option>
         <option value="Helvetica Neue">Helvetica</option>
@@ -327,7 +327,7 @@
         <option value="Georgia">Georgia</option>
         <option value="Courier New">Courier</option>
       </select></label>
-      <label><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 4V20M17 12V20M6 20H10M15 20H19M13 7V4H3V7M21 14V12H13V14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> <select style="width:64px" data-prop="styles.fontSize">
+      <label><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 4V20M17 12V20M6 20H10M15 20H19M13 7V4H3V7M21 14V12H13V14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg> <select style="width:64px" data-prop="styles.fontSize">
         <option value="8">8</option>
         <option value="9">9</option>
         <option value="10">10</option>
@@ -401,16 +401,34 @@
           </g>
         </svg>
       </button>
+      <button class="btn mini" id="decDownBtn" title="Decrease decimal places" aria-label="Decrease decimal places">
+        <svg class="icon" width="16" height="16" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="48" height="48" fill="currentColor" fill-opacity="0"/>
+          <path d="M27 9C27 6.23858 24.7614 4 22 4C19.2386 4 17 6.23858 17 9V19C17 21.7614 19.2386 24 22 24C24.7614 24 27 21.7614 27 19V9Z" stroke="currentColor" stroke-width="4"/>
+          <path d="M25 32L19 38L25 44" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8 24H9" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+          <path d="M40 38H19" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      <button class="btn mini" id="decUpBtn" title="Increase decimal places" aria-label="Increase decimal places">
+        <svg class="icon" width="16" height="16" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" transform="matrix(-1, 0, 0, 1, 0, 0)">
+          <rect width="48" height="48" fill="currentColor" fill-opacity="0"/>
+          <path d="M27 9C27 6.23858 24.7614 4 22 4C19.2386 4 17 6.23858 17 9V19C17 21.7614 19.2386 24 22 24C24.7614 24 27 21.7614 27 19V9Z" stroke="currentColor" stroke-width="4"/>
+          <path d="M25 32L19 38L25 44" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8 24H9" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+          <path d="M40 38H19" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       <label class="btn" style="gap:6px; align-items:center"><input type="checkbox" id="bgTransparentToggle"> Transparent BG</label>
     </div>
   </div>
 
-  <div id="lasso" style="left: 491px; top: 326px; width: 2px; height: 8px;" hidden=""></div>
+  <div id="lasso" style="left: 384px; top: 130px; width: 33px; height: 67px;" hidden=""></div>
   <style>
     /* Suppress lasso only while header/footer resizing is active */
     .hf-resizing #lasso { display:none !important; }
   </style>
-  <div id="selectionBox" class="selbox hidden" style="left: 536.5px; top: 249.5px; width: 160px; height: 60px; z-index: 800;">
+  <div id="selectionBox" class="selbox hidden" style="left: 456.88px; top: 195.088px; width: 60.2911px; height: 180.873px; z-index: 800;">
     <div class="sb-h" data-handle="nw"></div>
     <div class="sb-h" data-handle="n"></div>
     <div class="sb-h" data-handle="ne"></div>
@@ -421,17 +439,17 @@
     <div class="sb-h" data-handle="w"></div>
     <div class="sb-h" data-handle="move" title="Drag to move">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 21V12M12 21L15 18M12 21L9 18M12 12V3M12 12H3M12 12H21M12 3L9 6M12 3L15 6M3 12L6 15M3 12L6 9M21 12L18 9M21 12L18 15" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M12 21V12M12 21L15 18M12 21L9 18M12 12V3M12 12H3M12 12H21M12 3L9 6M12 3L15 6M3 12L6 15M3 12L6 9M21 12L18 9M21 12L18 15" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
       </svg>
     </div>
     <div class="sb-h" data-handle="rotate" title="Drag to rotate">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M15.7733 13.3292C15.4851 14.1471 14.9388 14.8493 14.2169 15.3298C13.4949 15.8103 12.6363 16.0432 11.7704 15.9934C10.9046 15.9436 10.0784 15.6137 9.41631 15.0535C8.75424 14.4933 8.29217 13.7332 8.09972 12.8876C7.90728 12.042 7.99489 11.1567 8.34934 10.3652C8.7038 9.57374 9.3059 8.91887 10.0649 8.4993C10.824 8.07974 11.6988 7.91819 12.5576 8.03902C13.9223 8.23101 14.9173 9.23345 16 10M16 10V7M16 10H13" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M15.7733 13.3292C15.4851 14.1471 14.9388 14.8493 14.2169 15.3298C13.4949 15.8103 12.6363 16.0432 11.7704 15.9934C10.9046 15.9436 10.0784 15.6137 9.41631 15.0535C8.75424 14.4933 8.29217 13.7332 8.09972 12.8876C7.90728 12.042 7.99489 11.1567 8.34934 10.3652C8.7038 9.57374 9.3059 8.91887 10.0649 8.4993C10.824 8.07974 11.6988 7.91819 12.5576 8.03902C13.9223 8.23101 14.9173 9.23345 16 10M16 10V7M16 10H13" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
       </svg>
     </div>
   </div>
 
-  <div id="elementActions" class="actions hidden" role="toolbar" aria-label="Element actions" data-shown-at="1759047862697" style="left: 616.5px; top: 241.5px;">
+  <div id="elementActions" class="actions hidden" role="toolbar" aria-label="Element actions" data-shown-at="1759065891501" style="left: 487.026px; top: 187.088px;">
     <button class="btn mini" data-action="copy" title="Copy" aria-label="Copy">
       <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
         <rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
@@ -477,7 +495,7 @@
           <div class="icon-row">
             <button class="btn mini" data-align="left" title="Align left" aria-label="Align left">
               <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 4V20M9 10H15C15.5523 10 16 9.55228 16 9V5C16 4.44772 15.5523 4 15 4H9C8.44772 4 8 4.44772 8 5V9C8 9.55228 8.44772 10 9 10ZM9 20H19C19.5523 20 20 19.5523 20 19V15C20 14.4477 19.5523 14 19 14H9C8.44772 14 8 14.4477 8 15V19C8 19.5523 8.44772 20 9 20Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 4V20M9 10H15C15.5523 10 16 9.55228 16 9V5C16 4.44772 15.5523 4 15 4H9C8.44772 4 8 4.44772 8 5V9C8 9.55228 8.44772 10 9 10ZM9 20H19C19.5523 20 20 19.5523 20 19V15C20 14.4477 19.5523 14 19 14H9C8.44772 14 8 14.4477 8 15V19C8 19.5523 8.44772 20 9 20Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
               </svg>
             </button>
             <button class="btn mini" data-align="center" title="Align center" aria-label="Align center">
@@ -485,7 +503,7 @@
             </button>
             <button class="btn mini" data-align="right" title="Align right" aria-label="Align right">
               <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 4V20M9 10H15C15.5523 10 16 9.55228 16 9V5C16 4.44772 15.5523 4 15 4H9C8.44772 4 8 4.44772 8 5V9C8 9.55228 8.44772 10 9 10ZM5 20H15C15.5523 20 16 19.5523 16 19V15C16 14.4477 15.5523 14 15 14H5C4.44772 14 4 14.4477 4 15V19C4 19.5523 4.44772 20 5 20Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M20 4V20M9 10H15C15.5523 10 16 9.55228 16 9V5C16 4.44772 15.5523 4 15 4H9C8.44772 4 8 4.44772 8 5V9C8 9.55228 8.44772 10 9 10ZM5 20H15C15.5523 20 16 19.5523 16 19V15C16 14.4477 15.5523 14 15 14H5C4.44772 14 4 14.4477 4 15V19C4 19.5523 4.44772 20 5 20Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
               </svg>
             </button>
           </div>
@@ -495,17 +513,17 @@
           <div class="icon-row">
             <button class="btn mini" data-align="top" title="Align top" aria-label="Align top">
               <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 3C3.44772 3 3 3.44772 3 4C3 4.55228 3.44772 5 4 5V3ZM20 5C20.5523 5 21 4.55228 21 4C21 3.44772 20.5523 3 20 3V5ZM5.53903 15.8874L5.07805 16.7748L5.53903 15.8874ZM5.11259 15.461L4.22517 15.9219L5.11259 15.461ZM9.88741 15.461L10.7748 15.9219L9.88741 15.461ZM9.46097 15.8874L9.92195 16.7748L9.46097 15.8874ZM9.46097 8.11259L9.92195 7.22517L9.46097 8.11259ZM9.88741 8.53903L10.7748 8.07805L9.88741 8.53903ZM5.53903 8.11259L5.07805 7.22517L5.53903 8.11259ZM5.11259 8.53903L4.22517 8.07805L5.11259 8.53903ZM14.539 19.8874L14.0781 20.7748L14.539 19.8874ZM14.1126 19.461L13.2252 19.9219L14.1126 19.461ZM18.8874 19.461L19.7748 19.9219L18.8874 19.461ZM18.461 19.8874L18.9219 20.7748L18.461 19.8874ZM18.461 8.11259L18.9219 7.22517L18.461 8.11259ZM18.8874 8.53903L19.7748 8.07805L18.8874 8.53903ZM14.539 8.11259L14.0781 7.22517L14.539 8.11259ZM14.1126 8.53903L13.2252 8.07805L14.1126 8.53903ZM4 5H20V3H4V5ZM6.61 9H8.39V7H6.61V9ZM9 9.61V14.39H11V9.61H9ZM8.39 15H6.61V17H8.39V15ZM6 14.39V9.61H4V14.39H6ZM6.61 15C6.30847 15 6.14347 14.9992 6.02499 14.9894C5.91848 14.9805 5.94184 14.9698 6 15L5.07805 16.7748C5.35295 16.9176 5.62705 16.9632 5.85947 16.9825C6.07992 17.0008 6.34204 17 6.61 17V15ZM4 14.39C4 14.658 3.9992 14.9201 4.0175 15.1405C4.03681 15.373 4.08238 15.6471 4.22517 15.9219L6 15C6.03021 15.0582 6.01949 15.0815 6.01064 14.975C6.0008 14.8565 6 14.6915 6 14.39H4ZM6 15L4.22517 15.9219C4.41493 16.2872 4.71277 16.5851 5.07805 16.7748L6 15ZM9 14.39C9 14.6915 8.9992 14.8565 8.98936 14.975C8.98051 15.0815 8.96979 15.0582 9 15L10.7748 15.9219C10.9176 15.6471 10.9632 15.373 10.9825 15.1405C11.0008 14.9201 11 14.658 11 14.39H9ZM8.39 17C8.65796 17 8.92008 17.0008 9.14053 16.9825C9.37295 16.9632 9.64705 16.9176 9.92195 16.7748L9 15C9.05816 14.9698 9.08152 14.9805 8.97501 14.9894C8.85653 14.9992 8.69153 15 8.39 15V17ZM9 15L9.92195 16.7748C10.2872 16.5851 10.5851 16.2872 10.7748 15.9219L9 15ZM8.39 9C8.69153 9 8.85653 9.0008 8.97501 9.01064C9.08152 9.01949 9.05816 9.03021 9 9L9.92195 7.22517C9.64705 7.08238 9.37295 7.03681 9.14053 7.0175C8.92008 6.9992 8.65796 7 8.39 7V9ZM11 9.61C11 9.34204 11.0008 9.07992 10.9825 8.85947C10.9632 8.62705 10.9176 8.35295 10.7748 8.07805L9 9C8.96979 8.94184 8.98051 8.91848 8.98936 9.02499C8.9992 9.14347 9 9.30847 9 9.61H11ZM9 9L10.7748 8.07805C10.5851 7.71276 10.2872 7.41492 9.92195 7.22517L9 9ZM6.61 7C6.34204 7 6.07992 6.9992 5.85947 7.0175C5.62705 7.03681 5.35295 7.08238 5.07805 7.22517L6 9C5.94184 9.03021 5.91848 9.01949 6.02499 9.01064C6.14347 9.0008 6.30847 9 6.61 9V7ZM6 9.61C6 9.30847 6.0008 9.14347 6.01064 9.02499C6.01949 8.91848 6.03021 8.94184 6 9L4.22517 8.07805C4.08238 8.35295 4.03681 8.62705 4.0175 8.85947C3.9992 9.07992 4 9.34204 4 9.61H6ZM5.07805 7.22517C4.71276 7.41492 4.41492 7.71277 4.22517 8.07805L6 9L5.07805 7.22517ZM15.61 9H17.39V7H15.61V9ZM18 9.61V18.39H20V9.61H18ZM17.39 19H15.61V21H17.39V19ZM15 18.39V9.61H13V18.39H15ZM15.61 19C15.3085 19 15.1435 18.9992 15.025 18.9894C14.9185 18.9805 14.9418 18.9698 15 19L14.0781 20.7748C14.3529 20.9176 14.627 20.9632 14.8595 20.9825C15.0799 21.0008 15.342 21 15.61 21V19ZM13 18.39C13 18.658 12.9992 18.9201 13.0175 19.1405C13.0368 19.373 13.0824 19.6471 13.2252 19.9219L15 19C15.0302 19.0582 15.0195 19.0815 15.0106 18.975C15.0008 18.8565 15 18.6915 15 18.39H13ZM15 19L13.2252 19.9219C13.4149 20.2872 13.7128 20.5851 14.0781 20.7748L15 19ZM18 18.39C18 18.6915 17.9992 18.8565 17.9894 18.975C17.9805 19.0815 17.9698 19.0582 18 19L19.7748 19.9219C19.9176 19.6471 19.9632 19.373 19.9825 19.1405C20.0008 18.9201 20 18.658 20 18.39H18ZM17.39 21C17.658 21 17.9201 21.0008 18.1405 20.9825C18.373 20.9632 18.6471 20.9176 18.9219 20.7748L18 19C18.0582 18.9698 18.0815 18.9805 17.975 18.9894C17.8565 18.9992 17.6915 19 17.39 19V21ZM18 19L18.9219 20.7748C19.2872 20.5851 19.5851 20.2872 19.7748 19.9219L18 19ZM17.39 9C17.6915 9 17.8565 9.0008 17.975 9.01064C18.0815 9.01949 18.0582 9.03021 18 9L18.9219 7.22517C18.6471 7.08238 18.373 7.03681 18.1405 7.0175C17.9201 6.9992 17.658 7 17.39 7V9ZM20 9.61C20 9.34204 20.0008 9.07992 19.9825 8.85947C19.9632 8.62705 19.9176 8.35295 19.7748 8.07805L18 9C17.9698 8.94184 17.9805 8.91848 17.9894 9.02499C17.9992 9.14347 18 9.30847 18 9.61H20ZM18 9L19.7748 8.07805C19.5851 7.71277 19.2872 7.41493 18.9219 7.22517L18 9ZM15.61 7C15.342 7 15.0799 6.9992 14.8595 7.0175C14.627 7.03681 14.3529 7.08238 14.0781 7.22517L15 9C14.9418 9.03021 14.9185 9.01949 15.025 9.01064C15.1435 9.0008 15.3085 9 15.61 9V7ZM15 9.61C15 9.30847 15.0008 9.14347 15.0106 9.02499C15.0195 8.91848 15.0302 8.94184 15 9L13.2252 8.07805C13.0824 8.35295 13.0368 8.62705 13.0175 8.85947C12.9992 9.07992 13 9.34204 13 9.61H15ZM14.0781 7.22517C13.7128 7.41493 13.4149 7.71277 13.2252 8.07805L15 9L14.0781 7.22517Z" fill="currentColor"/>
+                <path d="M4 3C3.44772 3 3 3.44772 3 4C3 4.55228 3.44772 5 4 5V3ZM20 5C20.5523 5 21 4.55228 21 4C21 3.44772 20.5523 3 20 3V5ZM5.53903 15.8874L5.07805 16.7748L5.53903 15.8874ZM5.11259 15.461L4.22517 15.9219L5.11259 15.461ZM9.88741 15.461L10.7748 15.9219L9.88741 15.461ZM9.46097 15.8874L9.92195 16.7748L9.46097 15.8874ZM9.46097 8.11259L9.92195 7.22517L9.46097 8.11259ZM9.88741 8.53903L10.7748 8.07805L9.88741 8.53903ZM5.53903 8.11259L5.07805 7.22517L5.53903 8.11259ZM5.11259 8.53903L4.22517 8.07805L5.11259 8.53903ZM14.539 19.8874L14.0781 20.7748L14.539 19.8874ZM14.1126 19.461L13.2252 19.9219L14.1126 19.461ZM18.8874 19.461L19.7748 19.9219L18.8874 19.461ZM18.461 19.8874L18.9219 20.7748L18.461 19.8874ZM18.461 8.11259L18.9219 7.22517L18.461 8.11259ZM18.8874 8.53903L19.7748 8.07805L18.8874 8.53903ZM14.539 8.11259L14.0781 7.22517L14.539 8.11259ZM14.1126 8.53903L13.2252 8.07805L14.1126 8.53903ZM4 5H20V3H4V5ZM6.61 9H8.39V7H6.61V9ZM9 9.61V14.39H11V9.61H9ZM8.39 15H6.61V17H8.39V15ZM6 14.39V9.61H4V14.39H6ZM6.61 15C6.30847 15 6.14347 14.9992 6.02499 14.9894C5.91848 14.9805 5.94184 14.9698 6 15L5.07805 16.7748C5.35295 16.9176 5.62705 16.9632 5.85947 16.9825C6.07992 17.0008 6.34204 17 6.61 17V15ZM4 14.39C4 14.658 3.9992 14.9201 4.0175 15.1405C4.03681 15.373 4.08238 15.6471 4.22517 15.9219L6 15C6.03021 15.0582 6.01949 15.0815 6.01064 14.975C6.0008 14.8565 6 14.6915 6 14.39H4ZM6 15L4.22517 15.9219C4.41493 16.2872 4.71277 16.5851 5.07805 16.7748L6 15ZM9 14.39C9 14.6915 8.9992 14.8565 8.98936 14.975C8.98051 15.0815 8.96979 15.0582 9 15L10.7748 15.9219C10.9176 15.6471 10.9632 15.373 10.9825 15.1405C11.0008 14.9201 11 14.658 11 14.39H9ZM8.39 17C8.65796 17 8.92008 17.0008 9.14053 16.9825C9.37295 16.9632 9.64705 16.9176 9.92195 16.7748L9 15C9.05816 14.9698 9.08152 14.9805 8.97501 14.9894C8.85653 14.9992 8.69153 15 8.39 15V17ZM9 15L9.92195 16.7748C10.2872 16.5851 10.5851 16.2872 10.7748 15.9219L9 15ZM8.39 9C8.69153 9 8.85653 9.0008 8.97501 9.01064C9.08152 9.01949 9.05816 9.03021 9 9L9.92195 7.22517C9.64705 7.08238 9.37295 7.03681 9.14053 7.0175C8.92008 6.9992 8.65796 7 8.39 7V9ZM11 9.61C11 9.34204 11.0008 9.07992 10.9825 8.85947C10.9632 8.62705 10.9176 8.35295 10.7748 8.07805L9 9C8.96979 8.94184 8.98051 8.91848 8.98936 9.02499C8.9992 9.14347 9 9.30847 9 9.61H11ZM9 9L10.7748 8.07805C10.5851 7.71276 10.2872 7.41492 9.92195 7.22517L9 9ZM6.61 7C6.34204 7 6.07992 6.9992 5.85947 7.0175C5.62705 7.03681 5.35295 7.08238 5.07805 7.22517L6 9C5.94184 9.03021 5.91848 9.01949 6.02499 9.01064C6.14347 9.0008 6.30847 9 6.61 9V7ZM6 9.61C6 9.30847 6.0008 9.14347 6.01064 9.02499C6.01949 8.91848 6.03021 8.94184 6 9L4.22517 8.07805C4.08238 8.35295 4.03681 8.62705 4.0175 8.85947C3.9992 9.07992 4 9.34204 4 9.61H6ZM5.07805 7.22517C4.71276 7.41492 4.41492 7.71277 4.22517 8.07805L6 9L5.07805 7.22517ZM15.61 9H17.39V7H15.61V9ZM18 9.61V18.39H20V9.61H18ZM17.39 19H15.61V21H17.39V19ZM15 18.39V9.61H13V18.39H15ZM15.61 19C15.3085 19 15.1435 18.9992 15.025 18.9894C14.9185 18.9805 14.9418 18.9698 15 19L14.0781 20.7748C14.3529 20.9176 14.627 20.9632 14.8595 20.9825C15.0799 21.0008 15.342 21 15.61 21V19ZM13 18.39C13 18.658 12.9992 18.9201 13.0175 19.1405C13.0368 19.373 13.0824 19.6471 13.2252 19.9219L15 19C15.0302 19.0582 15.0195 19.0815 15.0106 18.975C15.0008 18.8565 15 18.6915 15 18.39H13ZM15 19L13.2252 19.9219C13.4149 20.2872 13.7128 20.5851 14.0781 20.7748L15 19ZM18 18.39C18 18.6915 17.9992 18.8565 17.9894 18.975C17.9805 19.0815 17.9698 19.0582 18 19L19.7748 19.9219C19.9176 19.6471 19.9632 19.373 19.9825 19.1405C20.0008 18.9201 20 18.658 20 18.39H18ZM17.39 21C17.658 21 17.9201 21.0008 18.1405 20.9825C18.373 20.9632 18.6471 20.9176 18.9219 20.7748L18 19C18.0582 18.9698 18.0815 18.9805 17.975 18.9894C17.8565 18.9992 17.6915 19 17.39 19V21ZM18 19L18.9219 20.7748C19.2872 20.5851 19.5851 20.2872 19.7748 19.9219L18 19ZM17.39 9C17.6915 9 17.8565 9.0008 17.975 9.01064C18.0815 9.01949 18.0582 9.03021 18 9L18.9219 7.22517C18.6471 7.08238 18.373 7.03681 18.1405 7.0175C17.9201 6.9992 17.658 7 17.39 7V9ZM20 9.61C20 9.34204 20.0008 9.07992 19.9825 8.85947C19.9632 8.62705 19.9176 8.35295 19.7748 8.07805L18 9C17.9698 8.94184 17.9805 8.91848 17.9894 9.02499C17.9992 9.14347 18 9.30847 18 9.61H20ZM18 9L19.7748 8.07805C19.5851 7.71277 19.2872 7.41493 18.9219 7.22517L18 9ZM15.61 7C15.342 7 15.0799 6.9992 14.8595 7.0175C14.627 7.03681 14.3529 7.08238 14.0781 7.22517L15 9C14.9418 9.03021 14.9185 9.01949 15.025 9.01064C15.1435 9.0008 15.3085 9 15.61 9V7ZM15 9.61C15 9.30847 15.0008 9.14347 15.0106 9.02499C15.0195 8.91848 15.0302 8.94184 15 9L13.2252 8.07805C13.0824 8.35295 13.0368 8.62705 13.0175 8.85947C12.9992 9.07992 13 9.34204 13 9.61H15ZM14.0781 7.22517C13.7128 7.41493 13.4149 7.71277 13.2252 8.07805L15 9L14.0781 7.22517Z" fill="currentColor"></path>
               </svg>
             </button>
             <button class="btn mini" data-align="middle" title="Align middle" aria-label="Align middle">
               <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 12L14 12M4 12H5M19 12H20M6 16H9C9.55228 16 10 15.5523 10 15V9C10 8.44772 9.55228 8 9 8H6C5.44772 8 5 8.44772 5 9V15C5 15.5523 5.44772 16 6 16ZM15 18H18C18.5523 18 19 17.5523 19 17V7C19 6.44772 18.5523 6 18 6H15C14.4477 6 14 6.44772 14 7V17C14 17.5523 14.4477 18 15 18Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M10 12L14 12M4 12H5M19 12H20M6 16H9C9.55228 16 10 15.5523 10 15V9C10 8.44772 9.55228 8 9 8H6C5.44772 8 5 8.44772 5 9V15C5 15.5523 5.44772 16 6 16ZM15 18H18C18.5523 18 19 17.5523 19 17V7C19 6.44772 18.5523 6 18 6H15C14.4477 6 14 6.44772 14 7V17C14 17.5523 14.4477 18 15 18Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
               </svg>
             </button>
             <button class="btn mini" data-align="bottom" title="Align bottom" aria-label="Align bottom">
               <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 21C3.44772 21 3 20.5523 3 20C3 19.4477 3.44772 19 4 19V21ZM20 19C20.5523 19 21 19.4477 21 20C21 20.5523 20.5523 21 20 21V19ZM5.53903 8.11259L5.07805 7.22517L5.53903 8.11259ZM5.11259 8.53903L4.22517 8.07805L5.11259 8.53903ZM9.88741 8.53903L10.7748 8.07805L9.88741 8.53903ZM9.46097 8.11259L9.92195 7.22517L9.46097 8.11259ZM9.46097 15.8874L9.92195 16.7748L9.46097 15.8874ZM9.88741 15.461L10.7748 15.9219L9.88741 15.461ZM5.53903 15.8874L5.07805 16.7748L5.53903 15.8874ZM5.11259 15.461L4.22517 15.9219L5.11259 15.461ZM14.539 4.11259L14.0781 3.22517L14.539 4.11259ZM14.1126 4.53903L13.2252 4.07805L14.1126 4.53903ZM18.8874 4.53903L19.7748 4.07805L18.8874 4.53903ZM18.461 4.11259L18.9219 3.22517L18.461 4.11259ZM18.461 15.8874L18.9219 16.7748L18.461 15.8874ZM18.8874 15.461L19.7748 15.9219L18.8874 15.461ZM14.539 15.8874L14.0781 16.7748L14.539 15.8874ZM14.1126 15.461L13.2252 15.9219L14.1126 15.461ZM4 19H20V21H4V19ZM6.61 15H8.39V17H6.61V15ZM9 14.39V9.61H11V14.39H9ZM8.39 9H6.61V7H8.39V9ZM6 9.61V14.39H4V9.61H6ZM6.61 9C6.30847 9 6.14347 9.0008 6.02499 9.01064C5.91848 9.01949 5.94184 9.03021 6 9L5.07805 7.22517C5.35295 7.08238 5.62705 7.03681 5.85947 7.0175C6.07992 6.9992 6.34204 7 6.61 7V9ZM4 9.61C4 9.34204 3.9992 9.07992 4.0175 8.85947C4.03681 8.62705 4.08238 8.35295 4.22517 8.07805L6 9C6.03021 9.0582 6.01949 9.0815 6.01064 9.02499C6.0008 9.14347 6 9.30847 6 9.61H4ZM6 9L4.22517 8.07805C4.41493 7.71276 4.71277 7.41492 5.07805 7.22517L6 9ZM9 9.61C9 9.30847 8.9992 9.14347 8.98936 9.02499C8.98051 8.91848 8.96979 8.94184 9 9L10.7748 8.07805C10.9176 8.35295 10.9632 8.62705 10.9825 8.85947C11.0008 9.07992 11 9.34204 11 9.61H9ZM8.39 7C8.65796 7 8.92008 6.9992 9.14053 7.0175C9.37295 7.03681 9.64705 7.08238 9.92195 7.22517L9 9C9.05816 9.03021 9.08152 9.01949 8.97501 9.01064C8.85653 9.0008 8.69153 9 8.39 9V7ZM9 9L9.92195 7.22517C10.2872 7.41492 10.5851 7.71276 10.7748 8.07805L9 9ZM8.39 15C8.69153 15 8.85653 15.0008 8.97501 15.0106C9.08152 15.0195 9.05816 15.0302 9 15L9.92195 16.7748C9.64705 16.9176 9.37295 16.9632 9.14053 16.9825C8.92008 17.0008 8.65796 17 8.39 17V15ZM11 14.39C11 14.658 11.0008 14.9201 10.9825 15.1405C10.9632 15.373 10.9176 15.6471 10.7748 15.9219L9 15C8.96979 15.0582 8.98051 15.0815 8.98936 15.02499C8.9992 15.1435 9 15.3085 9 14.39H11ZM9 15L10.7748 15.9219C10.5851 16.2872 10.2872 16.5851 9.92195 16.7748L9 15ZM6.61 17C6.34204 17 6.07992 17.0008 5.85947 17.0175C5.62705 17.0368 5.35295 17.0824 5.07805 17.2252L6 15C5.94184 14.9698 5.91848 14.9805 6.02499 14.9894C6.14347 15.0008 6.30847 15 6.61 15V17ZM6 14.39C6 14.6915 6.0008 14.8565 6.01064 14.975C6.01949 15.0815 6.03021 15.0582 6 15L4.22517 15.9219C4.08238 15.6471 4.03681 15.373 4.0175 15.1405C3.9992 14.9201 4 14.658 4 14.39H6ZM5.07805 16.7748C4.71276 16.5851 4.41492 16.2872 4.22517 15.9219L6 15L5.07805 16.7748ZM15.61 15H17.39V17H15.61V15ZM18 14.39V9.61H20V14.39H18ZM17.39 9H15.61V7H17.39V9ZM15 9.61V14.39H13V9.61H15ZM15.61 9C15.3085 9 15.1435 9.0008 15.025 9.01064C14.9185 9.01949 14.9418 9.03021 15 9L14.0781 7.22517C14.3529 7.08238 14.627 7.03681 14.8595 7.0175C15.0799 6.9992 15.342 7 15.61 7V9ZM13 9.61C13 9.34204 12.9992 9.07992 13.0175 8.85947C13.0368 8.62705 13.0824 8.35295 13.2252 8.07805L15 9C15.0302 8.94184 15.0195 8.91848 15.0106 9.02499C15.0008 9.14347 15 9.30847 15 9.61H13ZM15 9L13.2252 8.07805C13.4149 7.71276 13.7128 7.41492 14.0781 7.22517L15 9ZM18 9.61C18 9.30847 17.9992 9.14347 17.9894 9.02499C17.9805 8.91848 17.9698 8.94184 18 9L19.7748 8.07805C19.9176 8.35295 19.9632 8.62705 19.9825 8.85947C20.0008 9.07992 20 9.34204 20 9.61H18ZM17.39 7C17.658 7 17.9201 6.9992 18.1405 7.0175C18.373 7.03681 18.6471 7.08238 18.9219 7.22517L18 9C18.0582 9.03021 18.0815 9.01949 17.975 9.01064C17.8565 9.0008 17.6915 9 17.39 9V7ZM18 9L18.9219 7.22517C19.2872 7.41492 19.5851 7.71276 19.7748 8.07805L18 9ZM17.39 15C17.6915 15 17.8565 15.0008 17.975 15.0106C18.0815 15.0195 18.0582 15.0302 18 15L18.9219 16.7748C18.6471 16.9176 18.373 16.9632 18.1405 16.9825C17.9201 17.0008 17.658 15 17.39 15V15ZM20 14.39C20 14.658 20.0008 14.9201 19.9825 15.1405C19.9632 15.373 19.9176 15.6471 19.7748 15.9219L18 15C17.9698 15.0582 17.9805 15.0815 17.9894 15.02499C17.9992 15.1435 18 15.3085 18 14.39H20ZM18 15L19.7748 15.9219C19.5851 16.2872 19.2872 16.5851 18.9219 16.7748L18 15ZM15.61 17C15.342 17 15.0799 17.0008 14.8595 17.0175C14.627 17.0368 14.3529 17.0824 14.0781 17.2252L15 15C14.9418 14.9698 14.9185 14.9805 15.025 14.9894C15.1435 15.0008 15.3085 15 15.61 15V17ZM15 14.39C15 14.6915 15.0008 14.8565 15.0106 14.975C15.0195 15.0815 15.0302 15.0582 15 15L13.2252 15.9219C13.0824 15.6471 13.0368 15.373 13.0175 15.1405C12.9992 14.9201 13 14.658 13 14.39H15ZM14.0781 16.7748C13.7128 16.5851 13.4149 16.2872 13.2252 15.9219L15 15L14.0781 16.7748Z" fill="currentColor"/>
+                <path d="M4 21C3.44772 21 3 20.5523 3 20C3 19.4477 3.44772 19 4 19V21ZM20 19C20.5523 19 21 19.4477 21 20C21 20.5523 20.5523 21 20 21V19ZM5.53903 8.11259L5.07805 7.22517L5.53903 8.11259ZM5.11259 8.53903L4.22517 8.07805L5.11259 8.53903ZM9.88741 8.53903L10.7748 8.07805L9.88741 8.53903ZM9.46097 8.11259L9.92195 7.22517L9.46097 8.11259ZM9.46097 15.8874L9.92195 16.7748L9.46097 15.8874ZM9.88741 15.461L10.7748 15.9219L9.88741 15.461ZM5.53903 15.8874L5.07805 16.7748L5.53903 15.8874ZM5.11259 15.461L4.22517 15.9219L5.11259 15.461ZM14.539 4.11259L14.0781 3.22517L14.539 4.11259ZM14.1126 4.53903L13.2252 4.07805L14.1126 4.53903ZM18.8874 4.53903L19.7748 4.07805L18.8874 4.53903ZM18.461 4.11259L18.9219 3.22517L18.461 4.11259ZM18.461 15.8874L18.9219 16.7748L18.461 15.8874ZM18.8874 15.461L19.7748 15.9219L18.8874 15.461ZM14.539 15.8874L14.0781 16.7748L14.539 15.8874ZM14.1126 15.461L13.2252 15.9219L14.1126 15.461ZM4 19H20V21H4V19ZM6.61 15H8.39V17H6.61V15ZM9 14.39V9.61H11V14.39H9ZM8.39 9H6.61V7H8.39V9ZM6 9.61V14.39H4V9.61H6ZM6.61 9C6.30847 9 6.14347 9.0008 6.02499 9.01064C5.91848 9.01949 5.94184 9.03021 6 9L5.07805 7.22517C5.35295 7.08238 5.62705 7.03681 5.85947 7.0175C6.07992 6.9992 6.34204 7 6.61 7V9ZM4 9.61C4 9.34204 3.9992 9.07992 4.0175 8.85947C4.03681 8.62705 4.08238 8.35295 4.22517 8.07805L6 9C6.03021 9.0582 6.01949 9.0815 6.01064 9.02499C6.0008 9.14347 6 9.30847 6 9.61H4ZM6 9L4.22517 8.07805C4.41493 7.71276 4.71277 7.41492 5.07805 7.22517L6 9ZM9 9.61C9 9.30847 8.9992 9.14347 8.98936 9.02499C8.98051 8.91848 8.96979 8.94184 9 9L10.7748 8.07805C10.9176 8.35295 10.9632 8.62705 10.9825 8.85947C11.0008 9.07992 11 9.34204 11 9.61H9ZM8.39 7C8.65796 7 8.92008 6.9992 9.14053 7.0175C9.37295 7.03681 9.64705 7.08238 9.92195 7.22517L9 9C9.05816 9.03021 9.08152 9.01949 8.97501 9.01064C8.85653 9.0008 8.69153 9 8.39 9V7ZM9 9L9.92195 7.22517C10.2872 7.41492 10.5851 7.71276 10.7748 8.07805L9 9ZM8.39 15C8.69153 15 8.85653 15.0008 8.97501 15.0106C9.08152 15.0195 9.05816 15.0302 9 15L9.92195 16.7748C9.64705 16.9176 9.37295 16.9632 9.14053 16.9825C8.92008 17.0008 8.65796 17 8.39 17V15ZM11 14.39C11 14.658 11.0008 14.9201 10.9825 15.1405C10.9632 15.373 10.9176 15.6471 10.7748 15.9219L9 15C8.96979 15.0582 8.98051 15.0815 8.98936 15.02499C8.9992 15.1435 9 15.3085 9 14.39H11ZM9 15L10.7748 15.9219C10.5851 16.2872 10.2872 16.5851 9.92195 16.7748L9 15ZM6.61 17C6.34204 17 6.07992 17.0008 5.85947 17.0175C5.62705 17.0368 5.35295 17.0824 5.07805 17.2252L6 15C5.94184 14.9698 5.91848 14.9805 6.02499 14.9894C6.14347 15.0008 6.30847 15 6.61 15V17ZM6 14.39C6 14.6915 6.0008 14.8565 6.01064 14.975C6.01949 15.0815 6.03021 15.0582 6 15L4.22517 15.9219C4.08238 15.6471 4.03681 15.373 4.0175 15.1405C3.9992 14.9201 4 14.658 4 14.39H6ZM5.07805 16.7748C4.71276 16.5851 4.41492 16.2872 4.22517 15.9219L6 15L5.07805 16.7748ZM15.61 15H17.39V17H15.61V15ZM18 14.39V9.61H20V14.39H18ZM17.39 9H15.61V7H17.39V9ZM15 9.61V14.39H13V9.61H15ZM15.61 9C15.3085 9 15.1435 9.0008 15.025 9.01064C14.9185 9.01949 14.9418 9.03021 15 9L14.0781 7.22517C14.3529 7.08238 14.627 7.03681 14.8595 7.0175C15.0799 6.9992 15.342 7 15.61 7V9ZM13 9.61C13 9.34204 12.9992 9.07992 13.0175 8.85947C13.0368 8.62705 13.0824 8.35295 13.2252 8.07805L15 9C15.0302 8.94184 15.0195 8.91848 15.0106 9.02499C15.0008 9.14347 15 9.30847 15 9.61H13ZM15 9L13.2252 8.07805C13.4149 7.71276 13.7128 7.41492 14.0781 7.22517L15 9ZM18 9.61C18 9.30847 17.9992 9.14347 17.9894 9.02499C17.9805 8.91848 17.9698 8.94184 18 9L19.7748 8.07805C19.9176 8.35295 19.9632 8.62705 19.9825 8.85947C20.0008 9.07992 20 9.34204 20 9.61H18ZM17.39 7C17.658 7 17.9201 6.9992 18.1405 7.0175C18.373 7.03681 18.6471 7.08238 18.9219 7.22517L18 9C18.0582 9.03021 18.0815 9.01949 17.975 9.01064C17.8565 9.0008 17.6915 9 17.39 9V7ZM18 9L18.9219 7.22517C19.2872 7.41492 19.5851 7.71276 19.7748 8.07805L18 9ZM17.39 15C17.6915 15 17.8565 15.0008 17.975 15.0106C18.0815 15.0195 18.0582 15.0302 18 15L18.9219 16.7748C18.6471 16.9176 18.373 16.9632 18.1405 16.9825C17.9201 17.0008 17.658 15 17.39 15V15ZM20 14.39C20 14.658 20.0008 14.9201 19.9825 15.1405C19.9632 15.373 19.9176 15.6471 19.7748 15.9219L18 15C17.9698 15.0582 17.9805 15.0815 17.9894 15.02499C17.9992 15.1435 18 15.3085 18 14.39H20ZM18 15L19.7748 15.9219C19.5851 16.2872 19.2872 16.5851 18.9219 16.7748L18 15ZM15.61 17C15.342 17 15.0799 17.0008 14.8595 17.0175C14.627 17.0368 14.3529 17.0824 14.0781 17.2252L15 15C14.9418 14.9698 14.9185 14.9805 15.025 14.9894C15.1435 15.0008 15.3085 15 15.61 15V17ZM15 14.39C15 14.6915 15.0008 14.8565 15.0106 14.975C15.0195 15.0815 15.0302 15.0582 15 15L13.2252 15.9219C13.0824 15.6471 13.0368 15.373 13.0175 15.1405C12.9992 14.9201 13 14.658 13 14.39H15ZM14.0781 16.7748C13.7128 16.5851 13.4149 16.2872 13.2252 15.9219L15 15L14.0781 16.7748Z" fill="currentColor"></path>
               </svg>
             </button>
           </div>
@@ -515,12 +533,12 @@
           <div class="icon-row">
             <button class="btn mini" data-distribute="h" title="Distribute horizontally" aria-label="Distribute horizontally">
               <svg class="icon" width="16" height="16" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M14.4999 0.999992C14.2237 0.999992 13.9999 1.22385 13.9999 1.49999L13.9999 13.4999C13.9999 13.776 14.2237 13.9999 14.4999 13.9999C14.776 13.9999 14.9999 13.776 14.9999 13.4999L14.9999 1.49999C14.9999 1.22385 14.776 0.999992 14.4999 0.999992ZM0.499996 0.999992C0.223856 0.999992 -9.78509e-09 1.22385 -2.18556e-08 1.49999L4.07279e-07 13.4999C3.95208e-07 13.776 0.223855 13.9999 0.499996 13.9999C0.776136 13.9999 0.999992 13.776 0.999992 13.4999L0.999992 1.49999C0.999992 1.22385 0.776136 0.999992 0.499996 0.999992ZM1.99998 6.99994C1.99998 6.44766 2.44769 5.99995 2.99998 5.99995L5.99995 5.99995C6.55223 5.99995 6.99994 6.44766 6.99994 6.99994L6.99994 7.99993C6.99994 8.55221 6.55223 8.99992 5.99995 8.99992L2.99998 8.99992C2.4477 8.99992 1.99998 8.55221 1.99998 7.99993L1.99998 6.99994ZM8.99993 5.99995C8.44765 5.99995 7.99993 6.44766 7.99993 6.99994L7.99993 7.99993C7.99993 8.55221 8.44765 8.99992 8.99993 8.99992L11.9999 8.99992C12.5522 8.99992 12.9999 8.55221 12.9999 7.99993L12.9999 6.99994C12.9999 6.44766 12.5522 5.99995 11.9999 5.99995L8.99993 5.99995Z" fill="currentColor"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M14.4999 0.999992C14.2237 0.999992 13.9999 1.22385 13.9999 1.49999L13.9999 13.4999C13.9999 13.776 14.2237 13.9999 14.4999 13.9999C14.776 13.9999 14.9999 13.776 14.9999 13.4999L14.9999 1.49999C14.9999 1.22385 14.776 0.999992 14.4999 0.999992ZM0.499996 0.999992C0.223856 0.999992 -9.78509e-09 1.22385 -2.18556e-08 1.49999L4.07279e-07 13.4999C3.95208e-07 13.776 0.223855 13.9999 0.499996 13.9999C0.776136 13.9999 0.999992 13.776 0.999992 13.4999L0.999992 1.49999C0.999992 1.22385 0.776136 0.999992 0.499996 0.999992ZM1.99998 6.99994C1.99998 6.44766 2.44769 5.99995 2.99998 5.99995L5.99995 5.99995C6.55223 5.99995 6.99994 6.44766 6.99994 6.99994L6.99994 7.99993C6.99994 8.55221 6.55223 8.99992 5.99995 8.99992L2.99998 8.99992C2.4477 8.99992 1.99998 8.55221 1.99998 7.99993L1.99998 6.99994ZM8.99993 5.99995C8.44765 5.99995 7.99993 6.44766 7.99993 6.99994L7.99993 7.99993C7.99993 8.55221 8.44765 8.99992 8.99993 8.99992L11.9999 8.99992C12.5522 8.99992 12.9999 8.55221 12.9999 7.99993L12.9999 6.99994C12.9999 6.44766 12.5522 5.99995 11.9999 5.99995L8.99993 5.99995Z" fill="currentColor"></path>
               </svg>
             </button>
             <button class="btn mini" data-distribute="v" title="Distribute vertically" aria-label="Distribute vertically">
               <svg class="icon" width="16" height="16" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M0.999878 0.5C0.999878 0.223858 1.22374 0 1.49988 0H13.4999C13.776 0 13.9999 0.223858 13.9999 0.5C13.9999 0.776142 13.776 1 13.4999 1H1.49988C1.22374 1 0.999878 0.776142 0.999878 0.5ZM7 2C6.44772 2 6 2.44772 6 3V6C6 6.55228 6.44772 7 7 7H8C8.55228 7 9 6.55228 9 6V3C9 2.44772 8.55228 2 8 2H7ZM7 8C6.44772 8 6 8.44771 6 9V12C6 12.5523 6.44772 13 7 13H8C8.55228 13 9 12.5523 9 12V9C9 8.44772 8.55228 8 8 8H7ZM1.49988 14C1.22374 14 0.999878 14.2239 0.999878 14.5C0.999878 14.7761 1.22374 15 1.49988 15H13.4999C13.776 15 13.9999 14.7761 13.9999 14.5C13.9999 14.2239 13.776 14 13.4999 14H1.49988Z" fill="currentColor"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M0.999878 0.5C0.999878 0.223858 1.22374 0 1.49988 0H13.4999C13.776 0 13.9999 0.223858 13.9999 0.5C13.9999 0.776142 13.776 1 13.4999 1H1.49988C1.22374 1 0.999878 0.776142 0.999878 0.5ZM7 2C6.44772 2 6 2.44772 6 3V6C6 6.55228 6.44772 7 7 7H8C8.55228 7 9 6.55228 9 6V3C9 2.44772 8.55228 2 8 2H7ZM7 8C6.44772 8 6 8.44771 6 9V12C6 12.5523 6.44772 13 7 13H8C8.55228 13 9 12.5523 9 12V9C9 8.44772 8.55228 8 8 8H7ZM1.49988 14C1.22374 14 0.999878 14.2239 0.999878 14.5C0.999878 14.7761 1.22374 15 1.49988 15H13.4999C13.776 15 13.9999 14.7761 13.9999 14.5C13.9999 14.2239 13.776 14 13.4999 14H1.49988Z" fill="currentColor"></path>
               </svg>
             </button>
           </div>
@@ -530,27 +548,27 @@
           <div class="icon-row">
             <button class="btn mini" data-z="front" title="Bring to front" aria-label="Bring to front">
               <svg class="icon" width="16" height="16" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                <path d="M28,10H22V4a2.0023,2.0023,0,0,0-2-2H4A2.0023,2.0023,0,0,0,2,4V20a2.0023,2.0023,0,0,0,2,2h6v6a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V12A2,2,0,0,0,28,10ZM4,20,3.9985,4H20v6H12a2,2,0,0,0-2,2v8Z" fill="currentColor"/>
+                <path d="M28,10H22V4a2.0023,2.0023,0,0,0-2-2H4A2.0023,2.0023,0,0,0,2,4V20a2.0023,2.0023,0,0,0,2,2h6v6a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V12A2,2,0,0,0,28,10ZM4,20,3.9985,4H20v6H12a2,2,0,0,0-2,2v8Z" fill="currentColor"></path>
               </svg>
             </button>
             <button class="btn mini" data-z="up" title="Bring forward" aria-label="Bring forward">
               <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 3.75C1 2.23122 2.23122 1 3.75 1H7.25C8.76878 1 10 2.23122 10 3.75V5H9.25C8.99409 5 8.74346 5.02262 8.5 5.06597V3.75C8.5 3.05964 7.94036 2.5 7.25 2.5H3.75C3.05964 2.5 2.5 3.05964 2.5 3.75V7.25C2.5 7.94036 3.05964 8.5 3.75 8.5H5.06597C5.02262 8.74346 5 8.99409 5 9.25V10H3.75C2.23122 10 1 8.76878 1 7.25V3.75Z" fill="currentColor"/>
-                <path d="M14 19V20.25C14 21.7688 15.2312 23 16.75 23H20.25C21.7688 23 23 21.7688 23 20.25V16.75C23 15.2312 21.7688 14 20.25 14H19V14.75C19 15.0059 18.9774 15.2565 18.934 15.5H20.25C20.9404 15.5 21.5 16.0596 21.5 16.75V20.25C21.5 20.9404 20.9404 21.5 20.25 21.5H16.75C16.0596 21.5 15.5 20.9404 15.5 20.25V18.934C15.2565 18.9774 15.0059 19 14.75 19H14Z" fill="currentColor"/>
-                <path d="M6 9.25C6 7.45507 7.45507 6 9.25 6H14.75C16.5449 6 18 7.45507 18 9.25V14.75C18 16.5449 16.5449 18 14.75 18H9.25C7.45507 18 6 16.5449 6 14.75V9.25Z" fill="currentColor"/>
+                <path d="M1 3.75C1 2.23122 2.23122 1 3.75 1H7.25C8.76878 1 10 2.23122 10 3.75V5H9.25C8.99409 5 8.74346 5.02262 8.5 5.06597V3.75C8.5 3.05964 7.94036 2.5 7.25 2.5H3.75C3.05964 2.5 2.5 3.05964 2.5 3.75V7.25C2.5 7.94036 3.05964 8.5 3.75 8.5H5.06597C5.02262 8.74346 5 8.99409 5 9.25V10H3.75C2.23122 10 1 8.76878 1 7.25V3.75Z" fill="currentColor"></path>
+                <path d="M14 19V20.25C14 21.7688 15.2312 23 16.75 23H20.25C21.7688 23 23 21.7688 23 20.25V16.75C23 15.2312 21.7688 14 20.25 14H19V14.75C19 15.0059 18.9774 15.2565 18.934 15.5H20.25C20.9404 15.5 21.5 16.0596 21.5 16.75V20.25C21.5 20.9404 20.9404 21.5 20.25 21.5H16.75C16.0596 21.5 15.5 20.9404 15.5 20.25V18.934C15.2565 18.9774 15.0059 19 14.75 19H14Z" fill="currentColor"></path>
+                <path d="M6 9.25C6 7.45507 7.45507 6 9.25 6H14.75C16.5449 6 18 7.45507 18 9.25V14.75C18 16.5449 16.5449 18 14.75 18H9.25C7.45507 18 6 16.5449 6 14.75V9.25Z" fill="currentColor"></path>
               </svg>
             </button>
             <button class="btn mini" data-z="down" title="Send backward" aria-label="Send backward">
               <svg class="icon" width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <g>
-                  <path fill="none" d="M0 0H24V24H0z"/>
-                  <path d="M11 3c.552 0 1 .448 1 1v2h5c.552 0 1 .448 1 1v5h2c.552 0 1 .448 1 1v7c0 .552-.448 1-1 1h-7c-.552 0-1-.448-1-1v-2H7c-.552 0-1-.448-1-1v-5H4c-.552 0-1-.448-1-1V4c0-.552.448-1 1-1h7zm5 5H8v8h8V8z"/>
+                  <path fill="none" d="M0 0H24V24H0z"></path>
+                  <path d="M11 3c.552 0 1 .448 1 1v2h5c.552 0 1 .448 1 1v5h2c.552 0 1 .448 1 1v7c0 .552-.448 1-1 1h-7c-.552 0-1-.448-1-1v-2H7c-.552 0-1-.448-1-1v-5H4c-.552 0-1-.448-1-1V4c0-.552.448-1 1-1h7zm5 5H8v8h8V8z"></path>
                 </g>
               </svg>
             </button>
             <button class="btn mini" data-z="back" title="Send to back" aria-label="Send to back">
               <svg class="icon" width="16" height="16" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                <path d="M28,10H22V4a2,2,0,0,0-2-2H4A2,2,0,0,0,2,4V20a2,2,0,0,0,2,2h6v6a2.0023,2.0023,0,0,0,2,2H28a2.0023,2.0023,0,0,0,2-2V12A2.0023,2.0023,0,0,0,28,10ZM12,28V12H28l.0015,16Z" fill="currentColor"/>
+                <path d="M28,10H22V4a2,2,0,0,0-2-2H4A2,2,0,0,0,2,4V20a2,2,0,0,0,2,2h6v6a2.0023,2.0023,0,0,0,2,2H28a2.0023,2.0023,0,0,0,2-2V12A2.0023,2.0023,0,0,0,28,10ZM12,28V12H28l.0015,16Z" fill="currentColor"></path>
               </svg>
             </button>
           </div>
@@ -562,26 +580,26 @@
   <!-- Minimal floating table action bar (appears when a table is selected) -->
   <div id="tableActions" class="hidden" role="toolbar" aria-label="Table actions">
     <button class="btn mini" data-tact="row-add" title="Insert row after" aria-label="Insert row after">
-      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14V15C3 16.1046 3.89543 17 5 17L19 17C20.1046 17 21 16.1046 21 15L21 13C21 11.8954 20.1046 11 19 11H13M10 8H7M7 8H4M7 8V5M7 8V11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14V15C3 16.1046 3.89543 17 5 17L19 17C20.1046 17 21 16.1046 21 15L21 13C21 11.8954 20.1046 11 19 11H13M10 8H7M7 8H4M7 8V5M7 8V11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
     </button>
     <button class="btn mini" data-tact="col-add" title="Insert column after" aria-label="Insert column after">
-      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17H8M8 17H11M8 17V14M8 17V20M14 21H15C16.1046 21 17 20.1046 17 19V5C17 3.89543 16.1046 3 15 3H13C11.8954 3 11 3.89543 11 5V11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17H8M8 17H11M8 17V14M8 17V20M14 21H15C16.1046 21 17 20.1046 17 19V5C17 3.89543 16.1046 3 15 3H13C11.8954 3 11 3.89543 11 5V11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
     </button>
     <button class="btn mini" data-tact="row-del" title="Delete row(s)" aria-label="Delete row(s)">
-      <svg class="icon" width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><path d="M24,30H4a2.0021,2.0021,0,0,1-2-2V22a2.0021,2.0021,0,0,1,2-2H24a2.0021,2.0021,0,0,1,2,2v6A2.0021,2.0021,0,0,1,24,30ZM4,22H3.9985L4,28H24V22Z" fill="currentColor"/><polygon points="30 3.41 28.59 2 25 5.59 21.41 2 20 3.41 23.59 7 20 10.59 21.41 12 25 8.41 28.59 12 30 10.59 26.41 7 30 3.41" fill="currentColor"/><path d="M4,14V8H18V6H4A2.0023,2.0023,0,0,0,2,8v6a2.0023,2.0023,0,0,0,2,2H26V14Z" fill="currentColor"/></svg>
+      <svg class="icon" width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><path d="M24,30H4a2.0021,2.0021,0,0,1-2-2V22a2.0021,2.0021,0,0,1,2-2H24a2.0021,2.0021,0,0,1,2,2v6A2.0021,2.0021,0,0,1,24,30ZM4,22H3.9985L4,28H24V22Z" fill="currentColor"></path><polygon points="30 3.41 28.59 2 25 5.59 21.41 2 20 3.41 23.59 7 20 10.59 21.41 12 25 8.41 28.59 12 30 10.59 26.41 7 30 3.41" fill="currentColor"></polygon><path d="M4,14V8H18V6H4A2.0023,2.0023,0,0,0,2,8v6a2.0023,2.0023,0,0,0,2,2H26V14Z" fill="currentColor"></path></svg>
     </button>
     <button class="btn mini" data-tact="col-del" title="Delete column(s)" aria-label="Delete column(s)">
-      <svg class="icon" width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><polygon points="30 3.41 28.59 2 25 5.59 21.41 2 20 3.41 23.59 7 20 10.59 21.41 12 25 8.41 28.59 12 30 10.59 26.41 7 30 3.41" fill="currentColor"/><path d="M24,14V28H18V6H16V28a2.0023,2.0023,0,0,0,2,2h6a2.0023,2.0023,0,0,0,2-2V14Z" fill="currentColor"/><path d="M10,30H4a2.0021,2.0021,0,0,1-2-2V8A2.0021,2.0021,0,0,1,4,6h6a2.0021,2.0021,0,0,1,2,2V28A2.0021,2.0021,0,0,1,10,30ZM4,8V28h6V8Z" fill="currentColor"/></svg>
+      <svg class="icon" width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><polygon points="30 3.41 28.59 2 25 5.59 21.41 2 20 3.41 23.59 7 20 10.59 21.41 12 25 8.41 28.59 12 30 10.59 26.41 7 30 3.41" fill="currentColor"></polygon><path d="M24,14V28H18V6H16V28a2.0023,2.0023,0,0,0,2,2h6a2.0023,2.0023,0,0,0,2-2V14Z" fill="currentColor"></path><path d="M10,30H4a2.0021,2.0021,0,0,1-2-2V8A2.0021,2.0021,0,0,1,4,6h6a2.0021,2.0021,0,0,1,2,2V28A2.0021,2.0021,0,0,1,10,30ZM4,8V28h6V8Z" fill="currentColor"></path></svg>
     </button>
     <button class="btn mini" data-tact="merge" title="Merge cells" aria-label="Merge cells">
-      <svg class="icon" width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><path d="M20 14V5C20 4.44772 19.5523 4 19 4H5C4.44772 4 4 4.44772 4 5V43C4 43.5523 4.44772 44 5 44H19C19.5523 44 20 43.5523 20 43V34" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M28 34V43C28 43.5523 28.4477 44 29 44H43C43.5523 44 44 43.5523 44 43V5C44 4.44772 43.5523 4 43 4H29C28.4477 4 28 4.44772 28 5V14" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M28 24H44" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M5 24H20" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M32.7485 28.8183L31.1575 27.2274L27.9756 24.0454L31.1575 20.8634L32.7485 19.2724" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.375 28.8183L16.966 27.2274L20.148 24.0454L16.966 20.8634L15.375 19.2724" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg class="icon" width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><path d="M20 14V5C20 4.44772 19.5523 4 19 4H5C4.44772 4 4 4.44772 4 5V43C4 43.5523 4.44772 44 5 44H19C19.5523 44 20 43.5523 20 43V34" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"></path><path d="M28 34V43C28 43.5523 28.4477 44 29 44H43C43.5523 44 44 43.5523 44 43V5C44 4.44772 43.5523 4 43 4H29C28.4477 4 28 4.44772 28 5V14" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"></path><path d="M28 24H44" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"></path><path d="M5 24H20" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"></path><path d="M32.7485 28.8183L31.1575 27.2274L27.9756 24.0454L31.1575 20.8634L32.7485 19.2724" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"></path><path d="M15.375 28.8183L16.966 27.2274L20.148 24.0454L16.966 20.8634L15.375 19.2724" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
     </button>
     <button class="btn mini" data-tact="unmerge" title="Unmerge cells" aria-label="Unmerge cells">
-      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12M12 6v12M8 8l-2-2M16 8l2-2M8 16l-2 2M16 16l2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12M12 6v12M8 8l-2-2M16 8l2-2M8 16l-2 2M16 16l2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
     </button>
     <div class="menu" style="position:relative">
       <button class="btn mini" data-menu="borders" title="Borders" aria-haspopup="true" aria-expanded="false">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1" ry="1" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 9h14M9 5v14" stroke="currentColor" stroke-width="2"/></svg>
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1" ry="1" fill="none" stroke="currentColor" stroke-width="2"></rect><path d="M5 9h14M9 5v14" stroke="currentColor" stroke-width="2"></path></svg>
       </button>
       <div class="dropdown hidden" data-menu-panel="borders" style="position:absolute;top:36px;left:0;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);padding:8px;display:flex;flex-direction:column;gap:8px;min-width:220px">
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
@@ -691,10 +709,10 @@
   </div>
 
 
-<div class="custom-color-picker hidden" style="left: 27.5781px; top: 77px;">
+<div class="custom-color-picker hidden" style="left: 37.3594px; top: 77px;">
     <div class="color-picker-section">
       <h4>Recent Colors</h4>
-      <div class="color-history-grid" id="colorHistoryGrid" data-role="colorHistoryGrid"><div class="color-history-circle" title="#c8c574" data-color="#c8c574" style="background-color: rgb(200, 197, 116);"></div><div class="color-history-circle" title="#7ec874" data-color="#7ec874" style="background-color: rgb(126, 200, 116);"></div><div class="color-history-circle" title="#787878" data-color="#787878" style="background-color: rgb(120, 120, 120);"></div><div class="color-history-circle" title="#e60505" data-color="#e60505" style="background-color: rgb(230, 5, 5);"></div><div class="color-history-circle" title="#fafafa" data-color="#fafafa" style="background-color: rgb(250, 250, 250);"></div><div class="color-history-circle" title="#f3f1f1" data-color="#f3f1f1" style="background-color: rgb(243, 241, 241);"></div><div class="color-history-circle" title="#e6e6e6" data-color="#e6e6e6" style="background-color: rgb(230, 230, 230);"></div><div class="color-history-circle" title="#e8a6a6" data-color="#e8a6a6" style="background-color: rgb(232, 166, 166);"></div></div>
+      <div class="color-history-grid" id="colorHistoryGrid" data-role="colorHistoryGrid"><div class="color-history-circle" title="#e60505" data-color="#e60505" style="background-color: rgb(230, 5, 5);"></div><div class="color-history-circle" title="#f3f1f1" data-color="#f3f1f1" style="background-color: rgb(243, 241, 241);"></div><div class="color-history-circle" title="#fafafa" data-color="#fafafa" style="background-color: rgb(250, 250, 250);"></div><div class="color-history-circle" title="#787878" data-color="#787878" style="background-color: rgb(120, 120, 120);"></div><div class="color-history-circle" title="#f9f21f" data-color="#f9f21f" style="background-color: rgb(249, 242, 31);"></div><div class="color-history-circle" title="#c8c574" data-color="#c8c574" style="background-color: rgb(200, 197, 116);"></div><div class="color-history-circle" title="#7ec874" data-color="#7ec874" style="background-color: rgb(126, 200, 116);"></div><div class="color-history-circle" title="#e6e6e6" data-color="#e6e6e6" style="background-color: rgb(230, 230, 230);"></div></div>
     </div>
     <div class="color-picker-section">
       <h4>Custom Color</h4>
@@ -703,4 +721,4 @@
         <input type="text" class="color-picker-hex" id="colorHexInput" data-role="colorHexInput" placeholder="#000000">
       </div>
     </div>
-  </div></body></html>
+  </div><span style="position: fixed; left: -9999px; top: -9999px; visibility: hidden; white-space: pre; font-family: ui-sans-serif, system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, Ubuntu, Cantarell, &quot;Noto Sans&quot;, &quot;Helvetica Neue&quot;, Arial; font-size: 12px; font-weight: 400; font-style: normal; letter-spacing: normal;">New document</span></body></html>

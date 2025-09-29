@@ -308,7 +308,18 @@ function renderTable(elModel, host) {
         });
       } catch {}
       applyCellStyles(div, cell); 
-      div.textContent = cell.content || '';
+      // Display numeric content with fixed decimals when styles.decimals is set (Excel-like formatting)
+      (function(){
+        const raw = String(cell.content ?? '');
+        let txt = raw;
+        try {
+          const places = Number(cell?.styles?.decimals);
+          if (Number.isFinite(places) && places >= 0 && typeof window.formatNumberForDisplay === 'function'){
+            txt = window.formatNumberForDisplay(raw, places);
+          }
+        } catch {}
+        div.textContent = txt;
+      })();
       div.addEventListener('mousedown', onTableCellMouseDown);
       // Double-click: enter edit mode and place caret at click position
       div.addEventListener('dblclick', (ev) => startEditCell(ev, { caret: 'at-click' }));

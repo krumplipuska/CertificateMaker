@@ -574,7 +574,6 @@ function confirmChoices({ title = 'Confirm', message = '', buttons = [] } = {}){
     dlg.classList.remove('hidden');
   });
 }
-
 // Standalone function for inline document renaming (extracted from renderHub)
 function beginInlineRename(row, opts){
   try {
@@ -653,7 +652,6 @@ function beginInlineRename(row, opts){
     if (shouldFocus) setTimeout(() => { try { input.focus(); input.select(); } catch {} }, 0);
   } catch {}
 }
-
 function newDocument(){
   const id = `doc-${(crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2))}`;
   const name = 'New document'; // Default name, will be immediately editable
@@ -798,7 +796,6 @@ function autosaveInline(){
     }, 500);
   } catch {}
 }
-
 function enforceVisibilityForAllPages(){
   try {
     // Skip global visibility enforcement in edit mode to avoid re-applying view-mode hidden flags
@@ -977,7 +974,6 @@ function setHeaderFooterHeights({ header, footer }){
   } catch {}
   try { reflowStacks(getCurrentPage()); } catch {}
 }
-
 function attachHeaderFooterResizers(pageNode, pageId){
   try {
     const header = pageNode.querySelector('.hf-guide.header .hf-resize');
@@ -1197,7 +1193,6 @@ function syncFormatToolbar(m){
   if (tbg) tbg.checked = m.styles.fill === 'transparent';
 }
 /* deepMerge moved to editor.core.js */
-
 /* ----------------------- Adding elements ----------------------- */
 let pendingAddType = null; // 'text'|'rect'|'line' for single insertion
 function armAdd(type){ pendingAddType = type; }
@@ -1301,7 +1296,6 @@ function getMostVisiblePageInfo(){
     return pageId ? { pageNode: best, pageId } : null;
   } catch { return null; }
 }
-
 // Return a visible, viewport-aware point (logical coords) on the most visible page
 function getVisibleInsertionPoint(){
   const info = getMostVisiblePageInfo(); if (!info) return null;
@@ -1552,7 +1546,7 @@ function reflowStacks(page){
     const affectedPages = Array.from(changedPageIds).map(id => doc.pages.find(p => p.id === id)).filter(Boolean);
     const pagesToProcess = affectedPages.length ? affectedPages : [page || getCurrentPage()];
     pagesToProcess.forEach((pg) => {
-      const blocks = (pg.elements || []).filter(e => e && e.type === 'block');
+      const blocks = (pg.elements || []).filter(e => e.type === 'block');
       blocks.forEach(b => {
         if (!b.stackChildren) return;
         const kids = pg.elements
@@ -1581,7 +1575,6 @@ function reflowStacks(page){
 
 // expose for userFunctions
 window.reflowStacks = reflowStacks;
-
 // ---------- Block parenting helpers ----------
 function elementBounds(el){ return { x: el.x || 0, y: el.y || 0, w: el.w || 0, h: el.h || 0 }; }
 function rectContainsPoint(r, px, py){ return px >= r.x && px <= (r.x + r.w) && py >= r.y && py <= (r.y + r.h); }
@@ -1618,7 +1611,6 @@ function reparentIntoBlocks(page, ids){
     }
   });
 }
-
 // Reparent root-level freeMove elements across pages when their centers move into another page.
 function reparentFreeMoveAcrossPages(ids){
   try {
@@ -1788,7 +1780,6 @@ function onMouseDown(e){
     clearSelection();
   }
 }
-
 function onMouseMove(e){
   // Safety: if no mouse button is down but a gesture is active, end it
   if ((e.buttons === 0 || e.type === 'mouseleave') && (drag || resize || dragSelection || resizeSelectionState || rotateSelectionState || dragMaybe)){
@@ -2383,7 +2374,6 @@ function applyPatchToSelection(patch, historyLabel = 'update-multi'){
   });
   renderPage(page); updateSelectionUI();
 }
-
 /* ----------------------- Align/Distribute ----------------------- */
 function alignSelection(where){
   if (selectedIds.size < 2) return;
@@ -2428,7 +2418,6 @@ function distributeSelection(axis){
   }
   renderPage(p); updateSelectionUI();
 }
-
 /* ----------------------- Grouping helpers & actions ----------------------- */
 function ensureGroupId(){ return 'grp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,6); }
 function getElementsByGroup(groupId){ return getCurrentPage().elements.filter(e => e.groupId === groupId); }
@@ -2547,6 +2536,8 @@ function bindFloatingToolbar(){
   const hBtn = document.getElementById('alignHBtn');
   const vBtn = document.getElementById('alignVBtn');
   const tbg = document.getElementById('bgTransparentToggle');
+  const decDownBtn = document.getElementById('decDownBtn');
+  const decUpBtn = document.getElementById('decUpBtn');
   const readAlignForContext = () => {
     if (tableSel){
       const tModel = getElementById(tableSel.tableId);
@@ -2611,7 +2602,7 @@ function bindFloatingToolbar(){
             updateElement(tModel.id, tableApplyTextColor(tModel, tableSel, raw));
             return;
           }
-          const cellStyleProps = ['styles.strokeColor', 'styles.strokeWidth', 'styles.fontFamily', 'styles.fontSize'];
+          const cellStyleProps = ['styles.strokeColor', 'styles.fontFamily', 'styles.fontSize', 'styles.strokeWidth'];
           if (cellStyleProps.includes(prop)) {
             const key = prop.split('.')[1];
             updateElement(tModel.id, tableApplyCellStyle(tModel, tableSel, key, raw));
@@ -2680,28 +2671,23 @@ function bindFloatingToolbar(){
       applyPatchToSelection(toPatch(key, anyOff));
       t.setAttribute('aria-pressed', String(anyOff));
     } else if (t.dataset.z){
-      if (t.dataset.z === 'front') sendSelectionToFront();
-      else if (t.dataset.z === 'back') sendSelectionToBack();
-      else if (t.dataset.z === 'up') bringSelectionForward();
-      else if (t.dataset.z === 'down') sendSelectionBackward();
+      const dir = t.dataset.z;
+      moveZ(dir);
     }
   });
 
-  if (tbg) {
-    tbg.addEventListener('change', () => {
-      if (selectedIds.size === 0) return;
-      const on = tbg.checked;
-      if (on) {
-        const first = getElementById([...selectedIds][0]);
-        tbg.dataset.prevFill = String(first?.styles?.fill ?? '');
-        applyPatchToSelection(toPatch('styles.fill', 'transparent'));
-      } else {
-        const prev = tbg.dataset.prevFill || '#ffffff';
-        applyPatchToSelection(toPatch('styles.fill', prev));
-        delete tbg.dataset.prevFill;
-      }
-    });
-  }
+  decDownBtn.addEventListener('click', () => {
+    changeDecimal(false);
+  });
+
+  decUpBtn.addEventListener('click', () => {
+    changeDecimal(true);
+  });
+
+  tbg.addEventListener('change', () => {
+    const patch = toPatch('styles.fill', tbg.checked ? 'transparent' : '#ffffff');
+    applyPatchToSelection(patch);
+  });
 
   const cycle = (val, list) => list[(list.indexOf(val) + 1) % list.length];
   const readAlign = () => {
@@ -2746,6 +2732,87 @@ function bindFloatingToolbar(){
   // Initialize align toggle state on load
   window.applyAlignButtonState();
 }
+
+function changeDecimal(increase){
+  // If there is an active table cell selection, adjust those cells
+  if (tableSel){
+    const tModel = getElementById(tableSel.tableId);
+    if (!tModel) return;
+
+    const r0 = Math.min(tableSel.r0, tableSel.r1);
+    const r1 = Math.max(tableSel.r0, tableSel.r1);
+    const c0 = Math.min(tableSel.c0, tableSel.c1);
+    const c1 = Math.max(tableSel.c0, tableSel.c1);
+
+    const next = deepClone(tModel);
+    let any = false;
+    const dpList = [];
+    const numericCells = [];
+    for (let r = r0; r <= r1; r++){
+      for (let c = c0; c <= c1; c++){
+        const cellId = next.grid[r]?.[c];
+        const cell = cellId ? next.cells[cellId] : null;
+        if (!cell) continue;
+        const raw = String(cell.content ?? '').trim();
+        if (raw === '') continue;
+        const num = Number(raw);
+        if (Number.isNaN(num)) continue;
+        let dp = 0;
+        const dot = raw.indexOf('.');
+        if (dot !== -1) dp = raw.length - dot - 1;
+        dpList.push(dp);
+        numericCells.push({ cell, num });
+      }
+    }
+    if (dpList.length === 0) return;
+    const targetDp = increase ? (Math.max(...dpList) + 1) : Math.max(0, Math.min(...dpList) - 1);
+    numericCells.forEach(({ cell, num }) => { cell.content = num.toFixed(targetDp); any = true; });
+    if (any){
+      commitHistory('table-decimal-change');
+      updateElement(next.id, next);
+    }
+    return;
+  }
+
+  // Otherwise, adjust decimal places for any selected elements with numeric content
+  if (selectedIds.size > 0){
+    const prevSelected = [...selectedIds];
+    let any = false;
+    commitHistory('decimal-change');
+    const page = getCurrentPage();
+    const idToIndex = new Map();
+    page.elements.forEach((el, idx) => { idToIndex.set(el.id, idx); });
+    const dpList = [];
+    const targets = [];
+    [...selectedIds].forEach(id => {
+      const idx = idToIndex.get(id);
+      if (idx == null) return;
+      const el = page.elements[idx];
+      if (!el || !('content' in el)) return;
+      const raw = String(el.content ?? '').trim();
+      if (raw === '') return;
+      const num = Number(raw);
+      if (Number.isNaN(num)) return;
+      let dp = 0;
+      const dot = raw.indexOf('.');
+      if (dot !== -1) dp = raw.length - dot - 1;
+      dpList.push(dp);
+      targets.push({ el, num });
+    });
+    if (dpList.length === 0) return;
+    const targetDp = increase ? (Math.max(...dpList) + 1) : Math.max(0, Math.min(...dpList) - 1);
+    targets.forEach(({ el, num }) => {
+      const nextContent = num.toFixed(targetDp);
+      if (nextContent !== el.content){ el.content = nextContent; any = true; }
+    });
+    if (any){
+      renderPage(page);
+      try { setSelection(prevSelected); updateSelectionUI(); } catch {}
+    }
+  }
+}
+
+// ... existing code ...
 
 function toPatch(path, value){
   const keys = path.split('.');
@@ -2883,7 +2950,6 @@ function getCustomAttributesFromModel(model){
   }
   return attrs;
 }
-
 function renderProperties(){
   const box = propertiesContent();
   try { console.log('[RENDER] renderProperties: selectionSize=', selectedIds.size, 'tableSel=', !!tableSel); } catch {}
@@ -2956,7 +3022,6 @@ function renderProperties(){
       });
     }
   }
-
   // Share the keys with the filter menu builder
   try { window.__CURRENT_PROP_KEYS = new Set(rows.map(r => r[0])); } catch {}
 
@@ -3286,7 +3351,6 @@ function renderProperties(){
             try { fn.apply(null, argVals); } finally { window.__ALLOW_USER_FUNCTIONS_IN_EDIT = prev; }
           } catch(err){ console.warn('Play function failed', err); }
         });
-
   top.appendChild(expBtn); top.appendChild(fnSel); top.appendChild(trgSel); top.appendChild(delBtn); top.appendChild(playBtn);
         bubble.appendChild(top);
 
@@ -3598,7 +3662,6 @@ function onPropsInput(e){
   }
   propertiesContent().addEventListener('change', onPropsInput, { once: true });
 }
-
 function showAddPropRow(container){
   // Replace trigger with input row
   const row = document.createElement('div');
@@ -3675,9 +3738,6 @@ function sendSelectionBackward(){
 /* ===== PDF Export Utilities ===== */
 //onclick of the export pdf button, export the page to pdf
 document.getElementById('savePdfBtn').addEventListener('click', () => ExportService.exportDocumentToPdf());
-
-
-
 // Dynamically ensure required libs are available without changing app logic
 async function loadExternalScript(src){
   return new Promise((resolve, reject) => {
@@ -3948,7 +4008,6 @@ async function saveDocument(){
   triggerExtensionSave();
   // Do NOT call indicateSaved() here; we wait for cm-save-done / cm-save-error
 }
-
 function getCurrentFilename(){
   // Extract filename from the current URL
   const path = window.location.pathname;
@@ -3969,8 +4028,6 @@ async function saveDocumentAs(){
     if (res && res.ok) { indicateSaved(); return; }
   } catch {}
 }
-
-
 /* ----------------------- Init & Events ----------------------- */
 async function bootstrap(){
   try { console.info('[App] bootstrap start'); } catch {}
@@ -4300,7 +4357,6 @@ async function bootstrap(){
     rulerV.style.backgroundImage = `linear-gradient(to bottom, transparent 0, transparent 9px, #ddd 9px, #ddd 10px)`;
     rulerV.style.backgroundSize = '100% 10px';
   }
-
   function drawMinimap(){
     if (!minimap) return; const ctx = minimap.getContext('2d'); if (!ctx) return;
     const page = getPageNode(); if (!page) { ctx.clearRect(0,0,minimap.width,minimap.height); return; }
@@ -4463,7 +4519,6 @@ async function bootstrap(){
   // undo/redo
   undoBtn().addEventListener('click', undo);
   redoBtn().addEventListener('click', redo);
-
   // Keyboard shortcuts: Undo/Redo
   // - Ctrl/Cmd + Z => Undo
   // - Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y => Redo
@@ -4543,7 +4598,6 @@ async function bootstrap(){
       try { startInlineFormulaPicker(elNode); } catch {}
     }
   });
-
   // Inline picker that inserts #id tokens into a contenteditable host while composing a formula
   function startInlineFormulaPicker(host){
     if (window.__PICKING) return () => {};
@@ -4996,7 +5050,6 @@ function selectColor(color) {
   // Fire a change event to signal commit
   currentColorInput.dispatchEvent(new Event('change', { bubbles: true }));
 }
-
 function showCustomColorPicker(input, x, y) {
   currentColorInput = input;
   
@@ -5154,7 +5207,6 @@ function togglePanelCollapse(panelId) {
   requestAnimationFrame(() => updateWorkspacePadding());
   setTimeout(updateWorkspacePadding, 350);
 }
-
 function initializePanelResizing() {
   let currentResize = null;
   
@@ -5252,7 +5304,6 @@ function restorePanelStates() {
   
   updateWorkspacePadding();
 }
-
 function initializePanelControls() {
   // Add click handlers for toggle buttons
   document.getElementById('elementsToggle')?.addEventListener('click', () => {
@@ -5307,7 +5358,3 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize hub/router after base editor wiring
   try { initializeHubRouter(); } catch {}
 });
-
-
-
-
