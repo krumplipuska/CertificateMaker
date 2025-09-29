@@ -23,7 +23,7 @@ It follows a model-driven architecture:
 - Controller/interactions: selection, drag/resize, keyboard, toolbar actions
 - Services: persistence (save/load) and export (PDF/image)
 
-Script modules (load order from `index.html`):
+Script modules (load order from `indewe.html`):
 
 - `editor.core.js`: global model, history (undo/redo), zoom, common utils
 - `core.update.js`: pure model update helpers (no DOM). Element and table-cell patchers
@@ -36,7 +36,60 @@ Script modules (load order from `index.html`):
 - `export.service.js`: export to PDF and page to PNG/JPG (html2canvas/jsPDF)
 - `userFunctions.js`: end-user extension hooks and helpers
 - `app.view.render.js`: idempotent view-only render helpers
-- `editor.app.js`: app bootstrap, render list/pages, updateElement, interactions
+- `editor.app.js`: app bootstrap and orchestration
+
+## Planned split of `editor.app.js`
+
+The `editor.app.js` file has grown large. We will split it by logical concerns while keeping public APIs stable. New modules will be referenced before `editor.app.js`, and `editor.app.js` will delegate to them.
+
+Proposed modules (names and responsibilities):
+
+- `app.bootstrap.js`
+  - Initialize app on `DOMContentLoaded` (wiring, hub/router startup)
+  - Version label, save button initial states
+  - Calls into other modules’ init hooks
+
+- `app.hub.js`
+  - Hub view rendering: `renderHub`, folders, inline docs store (`InlineDocs`), app state (`AppState`, `Settings`), hub actions (open/rename/delete/duplicate/move)
+  - Router between hub/editor: `setView`
+
+- `app.selection.properties.js`
+  - Properties panel rendering: `renderProperties`, property filters, parsing/writing element patches, action builder UI for `attrs.on*`
+  - Helpers: `parsePropertyValue`, `toPatch`, `getByPath`, visibility filters
+
+- `app.ui.panels.js`
+  - Side panel sizing/collapse: `initializePanelControls`, `initializePanelResizing`, `restorePanelStates`, `updateWorkspacePadding`, `togglePanelCollapse`
+
+- `app.ui.colorpicker.js`
+  - Custom color picker widget: creation, show/hide, history, events (`initializeCustomColorPicker`)
+
+- `app.toolbar.actions.js`
+  - Floating toolbar and element actions: alignment, distribute, z-order, decimal +/- for text and tables
+
+- `app.interactions.js`
+  - High-level editor interactions not covered by selection/tables: keyboard shortcuts, context menus, lasso, drag/drop add element stubs
+
+- `app.update.api.js`
+  - Public mutation surface wrappers that orchestrate model updates and re-rendering while preserving selection
+  - Delegates to `core.update.js` and `style.map.js` as today; keeps `updateElement` API stable
+
+Load order changes (before `editor.app.js`):
+
+1. Core and services (unchanged): `editor.core.js`, `core.update.js`, `selection.store.js`, `style.map.js`, `editor.selection.js`, `editor.tables.js`, `tables.ops.js`, `persistence.service.js`, `export.service.js`, `userFunctions.js`, `app.view.render.js`
+2. New app modules: `app.update.api.js`, `app.hub.js`, `app.ui.panels.js`, `app.ui.colorpicker.js`, `app.selection.properties.js`, `app.toolbar.actions.js`, `app.interactions.js`, `app.bootstrap.js`
+3. Final orchestrator: `editor.app.js` (kept thin; delegates to above)
+
+Backward compatibility:
+
+- Existing globals remain available. New modules attach functions to the same namespaces used by `editor.app.js` or to a `window.App` namespace where appropriate.
+- `updateElement`, `renderAll`, and other critical entry points keep signatures and behavior.
+
+Migration strategy:
+
+1. Create new files with extracted code, preserving function names and minimal surface changes.
+2. Move call sites in `editor.app.js` to reference new modules; re-export if needed.
+3. Update `indewe.html` to include the new scripts before `editor.app.js`.
+4. Smoke test core flows listed in Regression checklist.
 
 ## Data model (core types)
 
