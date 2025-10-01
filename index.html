@@ -19,16 +19,23 @@
   <script src="export.service.js" defer=""></script>
   <script src="userFunctions.js" defer=""></script>
   <script src="app.view.render.js" defer=""></script>
-  <!-- New modular app layers (loaded before editor.app.js) -->
-  <script src="app.update.api.js" defer=""></script>
-  <script src="app.hub.js" defer=""></script>
-  <script src="app.ui.panels.js" defer=""></script>
-  <script src="app.ui.colorpicker.js" defer=""></script>
-  <script src="app.selection.properties.js" defer=""></script>
-  <script src="app.toolbar.actions.js" defer=""></script>
-  <script src="app.interactions.js" defer=""></script>
-  <script src="app.bootstrap.js" defer=""></script>
-  <script src="editor.app.js" defer=""></script>
+  <script src="app.01-preface.js" defer=""></script>
+  <script src="app.02-rendering.js" defer=""></script>
+  <script src="app.03-hub-and-inline-docs.js" defer=""></script>
+  <script src="app.04-header-and-footer-guides.js" defer=""></script>
+  <script src="app.05-updates.js" defer=""></script>
+  <script src="app.06-toolbar-sync.js" defer=""></script>
+  <script src="app.07-adding-elements.js" defer=""></script>
+  <script src="app.08-interaction.js" defer=""></script>
+  <script src="app.09-resize-helpers.js" defer=""></script>
+  <script src="app.10-selection-resize-helpers-multi.js" defer=""></script>
+  <script src="app.11-guides.js" defer=""></script>
+  <script src="app.12-selection-utilities.js" defer=""></script>
+  <script src="app.13-align-distribute.js" defer=""></script>
+  <script src="app.14-grouping-helpers-and-actions.js" defer=""></script>
+  <script src="app.15-multi-copy-delete.js" defer=""></script>
+  <script src="app.16-properties-and-toolbar.js" defer=""></script>
+  <script src="app.17-init-and-events.js" defer=""></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" async="" crossorigin="anonymous" referrerpolicy="no-referrer" data-dynamic-src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" data-loaded="true"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" async="" crossorigin="anonymous" referrerpolicy="no-referrer" data-dynamic-src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" data-loaded="true"></script></head>
 <body class="in-hub edit-off">
   <!-- Hub view (hidden by default). All documents are stored inline in __docs__ -->
@@ -44,7 +51,7 @@
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
           <span>New document</span>
         </button>
-        <button id="hubSaveBtn" class="btn hub-save" title="Save this file" data-original-text="Save">Save</button>
+        <button id="hubSaveBtn" class="btn hub-save saving" title="Save this file" data-original-text="Save" aria-busy="true">Saving…</button>
         <div class="menu" style="position:relative">
           <button class="btn" id="hubMoreMenuBtn" title="More options" aria-haspopup="true" aria-expanded="false">
             <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
@@ -69,10 +76,23 @@
         </button><button class="folder-plus" id="addFolderBtn" title="New folder" aria-label="New folder">+
         </button></div>
       <div id="docList" class="doc-list" aria-label="Documents">
-      <div class="doc-row" data-id="doc-4f1b2c36-a2ae-4fcf-a881-a9c9b064d5af" draggable="true">
-        <div class="doc-name">New document 1</div>
+      <div class="doc-row" data-id="doc-32a6e75c-53f5-41d2-b9f3-e4ec693324f6" draggable="true">
+        <div class="doc-name">po</div>
         <div style="display:flex;align-items:center;gap:8px">
-          <div class="doc-meta">9/28/2025, 8:41:52 PM</div>
+          <div class="doc-meta">10/1/2025, 9:29:18 PM</div>
+          <div class="doc-actions">
+            <button class="btn" data-act="open" title="Open"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            <button class="btn" data-act="rename" title="Rename"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"></path></svg></button>
+            <button class="btn" data-act="duplicate" title="Duplicate"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect><rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect></svg></button>
+            <button class="btn" data-act="delete" title="Delete"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg></button>
+          </div>
+        </div>
+      </div>
+    
+      <div class="doc-row" data-id="doc-4f1b2c36-a2ae-4fcf-a881-a9c9b064d5af" draggable="true">
+        <div class="doc-name">makao</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="doc-meta">10/1/2025, 9:18:08 PM</div>
           <div class="doc-actions">
             <button class="btn" data-act="open" title="Open"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
             <button class="btn" data-act="rename" title="Rename"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"></path></svg></button>
@@ -83,9 +103,9 @@
       </div>
     
       <div class="doc-row" data-id="doc-59daefdc-3faf-4b72-a493-96e2a96bd079" draggable="true">
-        <div class="doc-name">New document 3</div>
+        <div class="doc-name">dwqd</div>
         <div style="display:flex;align-items:center;gap:8px">
-          <div class="doc-meta">9/28/2025, 8:41:59 PM</div>
+          <div class="doc-meta">10/1/2025, 9:19:26 PM</div>
           <div class="doc-actions">
             <button class="btn" data-act="open" title="Open"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
             <button class="btn" data-act="rename" title="Rename"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"></path></svg></button>
@@ -94,29 +114,9 @@
           </div>
         </div>
       </div>
-    
-      <div class="doc-row" data-id="doc-32a6e75c-53f5-41d2-b9f3-e4ec693324f6" draggable="true">
-        <div class="doc-name">New document 2</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <div class="doc-meta">9/28/2025, 8:41:55 PM</div>
-          <div class="doc-actions">
-            <button class="btn" data-act="open" title="Open"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
-            <button class="btn" data-act="rename" title="Rename"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"></path></svg></button>
-            <button class="btn" data-act="duplicate" title="Duplicate"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect><rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect></svg></button>
-            <button class="btn" data-act="delete" title="Delete"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg></button>
-          </div>
-        </div>
-      </div>
-    
-      <div class="doc-add-wrap" style="display:flex;justify-content:center;margin-top:4px;">
-        <button id="newDocInListBtn" class="btn" title="Create new document">
-          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
-          <span>New document</span>
-        </button>
-      </div>
     </div>
     </div>
-    <script id="__docs__" type="application/json">{"catalog":[{"id":"doc-4f1b2c36-a2ae-4fcf-a881-a9c9b064d5af","name":"New document 1","createdAt":1759084900693,"updatedAt":1759084912550},{"id":"doc-59daefdc-3faf-4b72-a493-96e2a96bd079","name":"New document 3","createdAt":1759084908418,"updatedAt":1759084919261},{"id":"doc-32a6e75c-53f5-41d2-b9f3-e4ec693324f6","name":"New document 2","createdAt":1759084905715,"updatedAt":1759084915954}],"docs":{"doc-4f1b2c36-a2ae-4fcf-a881-a9c9b064d5af":{"pages":[{"id":"page-1759084900692-9o3ag","name":"Page 1","elements":[]}],"currentPageId":"page-1759084900692-9o3ag","nextElementId":1,"editMode":true,"headerHeight":10,"footerHeight":10},"doc-32a6e75c-53f5-41d2-b9f3-e4ec693324f6":{"pages":[{"id":"page-1759084905715-5pk33","name":"Page 1","elements":[]}],"currentPageId":"page-1759084905715-5pk33","nextElementId":1,"editMode":true,"headerHeight":10,"footerHeight":10},"doc-59daefdc-3faf-4b72-a493-96e2a96bd079":{"pages":[{"id":"page-1759084908418-2tszp","name":"Page 1","elements":[]}],"currentPageId":"page-1759084908418-2tszp","nextElementId":1,"editMode":true,"headerHeight":10,"footerHeight":10}},"folders":[{"id":"fld-395d5d8e-909f-4add-84cd-3b50bd9ac20c","name":"template","createdAt":1759084925761,"updatedAt":1759084928260}],"docFolders":{"doc-4f1b2c36-a2ae-4fcf-a881-a9c9b064d5af":"fld-395d5d8e-909f-4add-84cd-3b50bd9ac20c"}}</script>
+    <script id="__docs__" type="application/json">{"catalog":[{"id":"doc-32a6e75c-53f5-41d2-b9f3-e4ec693324f6","name":"po","createdAt":1759084905715,"updatedAt":1759346958409},{"id":"doc-4f1b2c36-a2ae-4fcf-a881-a9c9b064d5af","name":"makao","createdAt":1759084900693,"updatedAt":1759346288431},{"id":"doc-59daefdc-3faf-4b72-a493-96e2a96bd079","name":"dwqd","createdAt":1759084908418,"updatedAt":1759346366839}],"docs":{"doc-4f1b2c36-a2ae-4fcf-a881-a9c9b064d5af":{"pages":[{"id":"page-1759084900692-9o3ag","name":"Page 1","elements":[]}],"currentPageId":"page-1759084900692-9o3ag","nextElementId":1,"editMode":true,"headerHeight":10,"footerHeight":10},"doc-32a6e75c-53f5-41d2-b9f3-e4ec693324f6":{"pages":[{"id":"page-1759084905715-5pk33","name":"Page 1","elements":[{"id":"el-1","type":"rect","x":197.84375,"y":92.5,"w":160,"h":60,"z":1,"styles":{"fill":"#dbeafe","strokeColor":"#111827","strokeWidth":1,"radius":4,"textColor":"#111827","fontFamily":"system-ui","fontSize":14,"bold":false,"italic":false,"underline":false},"freeMove":false}]}],"currentPageId":"page-1759084905715-5pk33","nextElementId":2,"editMode":true,"headerHeight":10,"footerHeight":10},"doc-59daefdc-3faf-4b72-a493-96e2a96bd079":{"pages":[{"id":"page-1759084908418-2tszp","name":"Page 1","elements":[]}],"currentPageId":"page-1759084908418-2tszp","nextElementId":1,"editMode":true,"headerHeight":10,"footerHeight":10}},"folders":[{"id":"fld-395d5d8e-909f-4add-84cd-3b50bd9ac20c","name":"template","createdAt":1759084925761,"updatedAt":1759084928260}],"docFolders":{"doc-4f1b2c36-a2ae-4fcf-a881-a9c9b064d5af":"fld-395d5d8e-909f-4add-84cd-3b50bd9ac20c"}}</script>
   </div>
 
   <div id="editorView" hidden="">
@@ -159,7 +159,7 @@
     </div>
     <div class="spacer"></div>
     <div class="group">
-      <button id="saveBtn" class="btn" data-original-text="Save">Save</button>
+      <button id="saveBtn" class="btn saving" data-original-text="Save" aria-busy="true">Saving…</button>
       <div class="menu" style="position:relative">
         <button class="btn" id="moreMenuBtn" title="More options" aria-haspopup="true" aria-expanded="false">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
@@ -283,7 +283,42 @@
 
     <main class="workspace">
       <div id="pageViewport" style="padding-left: 0px; padding-right: 0px;">
-        <div id="pagesList" aria-label="Pages list"></div>
+        <div id="pagesList" aria-label="Pages list"><div class="page-wrapper" data-page-id="page-1759346947948-eub9v"><div class="page-title">
+      <strong>Page 1</strong>
+      <span style="margin-left:6px;color:var(--muted)">Page 1</span>
+      <span class="title-actions" style="float:right;display:inline-flex;gap:6px">
+        <button class="btn mini" data-act="move-up" title="Move up" aria-label="Move up">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6l-6 6h12z" fill="currentColor"></path></svg>
+        </button>
+        <button class="btn mini" data-act="move-down" title="Move down" aria-label="Move down">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18l6-6H6z" fill="currentColor"></path></svg>
+        </button>
+        <button class="btn mini" data-act="toggle-visibility" title="Show/Hide" aria-label="Show or hide">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M1.5 12s4-7.5 10.5-7.5S22.5 12 22.5 12s-4 7.5-10.5 7.5S1.5 12 1.5 12z" fill="none" stroke="currentColor" stroke-width="2"></path>
+            <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
+          </svg>
+        </button>
+        <button class="btn mini" data-act="duplicate" title="Duplicate" aria-label="Duplicate">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+            <rect x="3" y="9" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+          </svg>
+        </button>
+        <button class="btn mini" data-act="delete" title="Delete" aria-label="Delete">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            <rect x="6" y="6" width="12" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+            <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+          </svg>
+        </button>
+        <button class="btn mini" data-act="add-below" title="Add page below" aria-label="Add page below">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+          </svg>
+        </button>
+      </span></div><div class="page-stage"><div class="page" aria-label="A4 canvas"><div class="guide v hidden"></div><div class="guide h hidden"></div><div class="hf-guide header" style="height: 10px; display: block;"><div class="hf-label"></div><div class="hf-resize"></div></div><div class="hf-guide footer" style="height: 10px; display: block;"><div class="hf-label"></div><div class="hf-resize"></div></div></div></div></div></div>
       </div>
     </main>
 
@@ -412,20 +447,20 @@
       </button>
       <button class="btn mini" id="decDownBtn" title="Decrease decimal places" aria-label="Decrease decimal places">
         <svg class="icon" width="16" height="16" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="48" height="48" fill="currentColor" fill-opacity="0"/>
-          <path d="M27 9C27 6.23858 24.7614 4 22 4C19.2386 4 17 6.23858 17 9V19C17 21.7614 19.2386 24 22 24C24.7614 24 27 21.7614 27 19V9Z" stroke="currentColor" stroke-width="4"/>
-          <path d="M25 32L19 38L25 44" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M8 24H9" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-          <path d="M40 38H19" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect width="48" height="48" fill="currentColor" fill-opacity="0"></rect>
+          <path d="M27 9C27 6.23858 24.7614 4 22 4C19.2386 4 17 6.23858 17 9V19C17 21.7614 19.2386 24 22 24C24.7614 24 27 21.7614 27 19V9Z" stroke="currentColor" stroke-width="4"></path>
+          <path d="M25 32L19 38L25 44" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="M8 24H9" stroke="currentColor" stroke-width="4" stroke-linecap="round"></path>
+          <path d="M40 38H19" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
           </svg>
         </button>
       <button class="btn mini" id="decUpBtn" title="Increase decimal places" aria-label="Increase decimal places">
         <svg class="icon" width="16" height="16" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" transform="matrix(-1, 0, 0, 1, 0, 0)">
-          <rect width="48" height="48" fill="currentColor" fill-opacity="0"/>
-          <path d="M27 9C27 6.23858 24.7614 4 22 4C19.2386 4 17 6.23858 17 9V19C17 21.7614 19.2386 24 22 24C24.7614 24 27 21.7614 27 19V9Z" stroke="currentColor" stroke-width="4"/>
-          <path d="M25 32L19 38L25 44" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M8 24H9" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-          <path d="M40 38H19" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect width="48" height="48" fill="currentColor" fill-opacity="0"></rect>
+          <path d="M27 9C27 6.23858 24.7614 4 22 4C19.2386 4 17 6.23858 17 9V19C17 21.7614 19.2386 24 22 24C24.7614 24 27 21.7614 27 19V9Z" stroke="currentColor" stroke-width="4"></path>
+          <path d="M25 32L19 38L25 44" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="M8 24H9" stroke="currentColor" stroke-width="4" stroke-linecap="round"></path>
+          <path d="M40 38H19" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
           </svg>
         </button>
       <label class="btn" style="gap:6px; align-items:center"><input type="checkbox" id="bgTransparentToggle"> Transparent BG</label>
@@ -437,7 +472,7 @@
     /* Suppress lasso only while header/footer resizing is active */
     .hf-resizing #lasso { display:none !important; }
   </style>
-  <div id="selectionBox" class="selbox hidden" style="left: 456.88px; top: 195.088px; width: 60.2911px; height: 180.873px; z-index: 800;">
+  <div id="selectionBox" class="selbox hidden" style="left: 363.844px; top: 230.5px; width: 160px; height: 60px; z-index: 800;">
     <div class="sb-h" data-handle="nw"></div>
     <div class="sb-h" data-handle="n"></div>
     <div class="sb-h" data-handle="ne"></div>
@@ -458,7 +493,7 @@
     </div>
   </div>
 
-  <div id="elementActions" class="actions hidden" role="toolbar" aria-label="Element actions" data-shown-at="1759065891501" style="left: 487.026px; top: 187.088px;">
+  <div id="elementActions" class="actions hidden" role="toolbar" aria-label="Element actions" data-shown-at="1759346401472" style="left: 443.844px; top: 222.5px;">
     <button class="btn mini" data-action="copy" title="Copy" aria-label="Copy">
       <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
         <rect x="9" y="3" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
@@ -700,7 +735,7 @@
           <div style="font-weight:600">Autosave</div>
           <div style="font-size:12px;color:#555">When on, hub docs are saved to this file automatically.</div>
         </div>
-        <label class="switch"><input id="autosaveToggle" type="checkbox" checked=""><span>Off</span></label>
+        <label class="switch"><input id="autosaveToggle" type="checkbox" checked=""><span>On</span></label>
       </div>
     </div>
   </div>
