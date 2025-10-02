@@ -325,7 +325,8 @@ const RESERVED_MODEL_KEYS = new Set(['id','type','groupId','parentId','stackChil
 const PROPS_FILTER_STORAGE_KEY = 'propertiesPanel.filter.hiddenKeys.v1';
 const DEFAULT_FILTER_KEYS = [
   'id','type','groupId','cellId','x','y','w','h','z','content','formula',
-  'stackChildren','stackByPage','pageBreak','repeatOnAllPages','freeMove','Actions'
+  'stackChildren','stackByPage','pageBreak','repeatOnAllPages','freeMove','Actions',
+  'docHeaderHeight','docFooterHeight'
 ];
 function loadHiddenPropKeys(){
   try {
@@ -490,6 +491,15 @@ function renderProperties(){
       });
     }
   }
+
+  // Add document-level properties (header/footer height)
+  if (isPropVisibleKey('docHeaderHeight')) {
+    rows.push(['docHeaderHeight', Model.document?.headerHeight || 10]);
+  }
+  if (isPropVisibleKey('docFooterHeight')) {
+    rows.push(['docFooterHeight', Model.document?.footerHeight || 10]);
+  }
+
   // Share the keys with the filter menu builder
   try { window.__CURRENT_PROP_KEYS = new Set(rows.map(r => r[0])); } catch {}
 
@@ -1104,6 +1114,30 @@ function onPropsInput(e){
     applyPatchToSelection(toPatch('attrs.formula', String(val || '')));
     try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
     renderPage(getCurrentPage());
+    propertiesContent().addEventListener('change', onPropsInput, { once: true });
+    return;
+  }
+
+  // Special case: document-level properties
+  if (key === 'docHeaderHeight' || key === 'docFooterHeight'){
+    if (Model && Model.document){
+      const patch = {};
+      if (key === 'docHeaderHeight') {
+        patch.headerHeight = Number(val) || 0;
+      } else if (key === 'docFooterHeight') {
+        patch.footerHeight = Number(val) || 0;
+      }
+      // Update the document model directly
+      Object.assign(Model.document, patch);
+      // Re-render all pages to reflect the new header/footer heights
+      try {
+        const pages = (Model && Model.document && Array.isArray(Model.document.pages)) ? Model.document.pages : [];
+        pages.forEach(p => { try { renderPage(p); } catch {} });
+      } catch {}
+      // Update the input fields in the static HTML section
+      const input = document.getElementById(key);
+      if (input) input.value = val;
+    }
     propertiesContent().addEventListener('change', onPropsInput, { once: true });
     return;
   }

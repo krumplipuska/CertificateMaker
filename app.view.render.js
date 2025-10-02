@@ -218,8 +218,81 @@ function renderPage(page) {
 					const txt = typeof clone.content === 'string' ? clone.content : '';
 					if (node.textContent !== txt) node.textContent = txt;
 				} else if (clone.type === 'image'){
-					if (!node.querySelector('img')){ const img = document.createElement('img'); img.alt=''; node.appendChild(img); }
-					const img = node.querySelector('img'); if (img && clone.src) img.src = clone.src;
+					// Create image container for repeated elements if it doesn't exist
+					let imgContainer = node.querySelector('.image-container');
+					if (!imgContainer) {
+						imgContainer = document.createElement('div');
+						imgContainer.className = 'image-container';
+						imgContainer.style.width = '100%';
+						imgContainer.style.height = '100%';
+						imgContainer.style.display = 'flex';
+						imgContainer.style.flexDirection = 'column';
+						imgContainer.style.alignItems = 'center';
+						imgContainer.style.justifyContent = 'center';
+						imgContainer.style.position = 'relative';
+						node.appendChild(imgContainer);
+
+						// Create placeholder
+						const placeholder = document.createElement('div');
+						placeholder.className = 'image-placeholder';
+						placeholder.style.display = 'flex';
+						placeholder.style.flexDirection = 'column';
+						placeholder.style.alignItems = 'center';
+						placeholder.style.justifyContent = 'center';
+						placeholder.style.width = '100%';
+						placeholder.style.height = '100%';
+						placeholder.style.backgroundColor = '#f8f9fa';
+						placeholder.style.border = '2px dashed #dee2e6';
+						placeholder.style.borderRadius = '8px';
+						placeholder.style.color = '#6c757d';
+						placeholder.style.fontSize = '12px';
+						placeholder.style.textAlign = 'center';
+
+						// Create SVG icon using the exact file content
+						const svgIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+						svgIcon.setAttribute('width', '32');
+						svgIcon.setAttribute('height', '32');
+						svgIcon.setAttribute('viewBox', '0 0 32 32');
+						svgIcon.setAttribute('version', '1.1');
+						svgIcon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+						svgIcon.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+						svgIcon.style.marginBottom = '4px';
+
+						// Use the exact SVG content from the file
+						svgIcon.innerHTML = '<g transform="translate(-360.000000, -99.000000)" fill="currentColor"><path d="M368,109 C366.896,109 366,108.104 366,107 C366,105.896 366.896,105 368,105 C369.104,105 370,105.896 370,107 C370,108.104 369.104,109 368,109 L368,109 Z M368,103 C365.791,103 364,104.791 364,107 C364,109.209 365.791,111 368,111 C370.209,111 372,109.209 372,107 C372,104.791 370.209,103 368,103 L368,103 Z M390,116.128 L384,110 L374.059,120.111 L370,116 L362,123.337 L362,103 C362,101.896 362.896,101 364,101 L388,101 C389.104,101 390,101.896 390,103 L390,116.128 L390,116.128 Z M390,127 C390,128.104 389.104,129 388,129 L382.832,129 L375.464,121.535 L384,112.999 L390,118.999 L390,127 L390,127 Z M364,129 C362.896,129 362,128.104 362,127 L362,126.061 L369.945,118.945 L380.001,129 L364,129 L364,129 Z M388,99 L364,99 C361.791,99 360,100.791 360,103 L360,127 C360,129.209 361.791,131 364,131 L388,131 C390.209,131 392,129.209 392,127 L392,103 C392,100.791 390.209,99 388,99 L388,99 Z"></path></g>';
+						placeholder.appendChild(svgIcon);
+
+						// Create text
+						const text = document.createElement('div');
+						text.textContent = 'Image';
+						text.style.fontSize = '10px';
+						text.style.fontWeight = '500';
+						placeholder.appendChild(text);
+
+						imgContainer.appendChild(placeholder);
+
+						// Create actual image element (initially hidden)
+						const img = document.createElement('img');
+						img.alt = '';
+						img.style.width = '100%';
+						img.style.height = '100%';
+						img.style.objectFit = 'contain';
+						img.style.display = 'none';
+						imgContainer.appendChild(img);
+					}
+
+					// Update image visibility for repeated elements
+					const placeholder = imgContainer.querySelector('.image-placeholder');
+					const img = imgContainer.querySelector('img');
+
+					if (clone.src) {
+						img.src = clone.src;
+						img.style.display = 'block';
+						placeholder.style.display = 'none';
+					} else {
+						img.style.display = 'none';
+						placeholder.style.display = 'flex';
+					}
 				} else if (clone.type === 'table'){
 					renderTable(clone, node);
 				}
@@ -253,20 +326,82 @@ function renderPage(page) {
             if (node.textContent !== txt) node.textContent = txt;
         }
 		if (elm.type === 'image') {
-			if (!node.querySelector('img')) {
+			// Create image container if it doesn't exist
+			let imgContainer = node.querySelector('.image-container');
+			if (!imgContainer) {
+				imgContainer = document.createElement('div');
+				imgContainer.className = 'image-container';
+				imgContainer.style.width = '100%';
+				imgContainer.style.height = '100%';
+				imgContainer.style.display = 'flex';
+				imgContainer.style.flexDirection = 'column';
+				imgContainer.style.alignItems = 'center';
+				imgContainer.style.justifyContent = 'center';
+				imgContainer.style.position = 'relative';
+				node.appendChild(imgContainer);
+
+				// Create placeholder
+				const placeholder = document.createElement('div');
+				placeholder.className = 'image-placeholder';
+				placeholder.style.display = 'flex';
+				placeholder.style.flexDirection = 'column';
+				placeholder.style.alignItems = 'center';
+				placeholder.style.justifyContent = 'center';
+				placeholder.style.width = '100%';
+				placeholder.style.height = '100%';
+				placeholder.style.backgroundColor = '#f8f9fa';
+				placeholder.style.border = '2px dashed #dee2e6';
+				placeholder.style.borderRadius = '8px';
+				placeholder.style.color = '#6c757d';
+				placeholder.style.fontSize = '12px';
+				placeholder.style.textAlign = 'center';
+				placeholder.style.cursor = 'pointer';
+
+				// Create SVG icon using the exact file content
+				const svgIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+				svgIcon.setAttribute('width', '48');
+				svgIcon.setAttribute('height', '48');
+				svgIcon.setAttribute('viewBox', '0 0 32 32');
+				svgIcon.setAttribute('version', '1.1');
+				svgIcon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+				svgIcon.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+				svgIcon.style.marginBottom = '8px';
+
+				// Use the exact SVG content from the file
+				svgIcon.innerHTML = '<g transform="translate(-360.000000, -99.000000)" fill="currentColor"><path d="M368,109 C366.896,109 366,108.104 366,107 C366,105.896 366.896,105 368,105 C369.104,105 370,105.896 370,107 C370,108.104 369.104,109 368,109 L368,109 Z M368,103 C365.791,103 364,104.791 364,107 C364,109.209 365.791,111 368,111 C370.209,111 372,109.209 372,107 C372,104.791 370.209,103 368,103 L368,103 Z M390,116.128 L384,110 L374.059,120.111 L370,116 L362,123.337 L362,103 C362,101.896 362.896,101 364,101 L388,101 C389.104,101 390,101.896 390,103 L390,116.128 L390,116.128 Z M390,127 C390,128.104 389.104,129 388,129 L382.832,129 L375.464,121.535 L384,112.999 L390,118.999 L390,127 L390,127 Z M364,129 C362.896,129 362,128.104 362,127 L362,126.061 L369.945,118.945 L380.001,129 L364,129 L364,129 Z M388,99 L364,99 C361.791,99 360,100.791 360,103 L360,127 C360,129.209 361.791,131 364,131 L388,131 C390.209,131 392,129.209 392,127 L392,103 C392,100.791 390.209,99 388,99 L388,99 Z"></path></g>';
+				placeholder.appendChild(svgIcon);
+
+				// Create text
+				const text = document.createElement('div');
+				text.textContent = 'Double click to add image';
+				text.style.fontSize = '11px';
+				text.style.fontWeight = '500';
+				placeholder.appendChild(text);
+
+				imgContainer.appendChild(placeholder);
+
+				// Create actual image element (initially hidden)
 				const img = document.createElement('img');
 				img.alt = '';
-				node.appendChild(img);
-				node.addEventListener('dblclick', async () => {
+				img.style.width = '100%';
+				img.style.height = '100%';
+				img.style.objectFit = 'contain';
+				img.style.display = 'none';
+				imgContainer.appendChild(img);
+
+				// Set up double-click handler on the placeholder
+				placeholder.addEventListener('dblclick', async () => {
 					if (!Model.document.editMode) return;
 					const input = document.createElement('input');
 					input.type = 'file'; input.accept = 'image/*';
 					input.onchange = () => {
 						const file = input.files?.[0]; if (!file) return;
 						const reader = new FileReader();
-						reader.onload = () => { 
+						reader.onload = () => {
 							const src = String(reader.result || '');
 							img.src = src;
+							img.style.display = 'block';
+							placeholder.style.display = 'none';
 							updateElement(elm.id, { src: src });
 						};
 						reader.readAsDataURL(file);
@@ -274,8 +409,19 @@ function renderPage(page) {
 					input.click();
 				});
 			}
-			const img = node.querySelector('img');
-			if (img && elm.src) img.src = elm.src;
+
+			// Update image visibility based on whether we have a source
+			const placeholder = imgContainer.querySelector('.image-placeholder');
+			const img = imgContainer.querySelector('img');
+
+			if (elm.src) {
+				img.src = elm.src;
+				img.style.display = 'block';
+				placeholder.style.display = 'none';
+			} else {
+				img.style.display = 'none';
+				placeholder.style.display = 'flex';
+			}
 		} else if (elm.type === 'table') {
 			renderTable(elm, node);
 		}

@@ -305,18 +305,6 @@ async function bootstrap(){
   });
   if (minimap && minimapToggle && minimapToggle.checked) minimap.classList.remove('hidden');
 
-  // Document header/footer inputs
-  const docHeaderInput = document.getElementById('docHeaderHeight');
-  const docFooterInput = document.getElementById('docFooterHeight');
-  if (docHeaderInput) docHeaderInput.value = String(Model?.document?.headerHeight || 0);
-  if (docFooterInput) docFooterInput.value = String(Model?.document?.footerHeight || 0);
-  function onHFChange(){
-    const h = Number(docHeaderInput?.value || 0);
-    const f = Number(docFooterInput?.value || 0);
-    setHeaderFooterHeights({ header: h, footer: f });
-  }
-  docHeaderInput?.addEventListener('change', onHFChange);
-  docFooterInput?.addEventListener('change', onHFChange);
 
   function drawRulers(){
     if (!rulers || !rulerH || !rulerV) return;

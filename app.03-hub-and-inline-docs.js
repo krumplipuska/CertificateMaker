@@ -189,6 +189,18 @@ function renderHub(){
     const list = (activeFolder ? allList.filter(r => InlineDocs.docFolderId(r.id) === activeFolder) : allList);
     const host = document.getElementById('docList');
     if (!host) return;
+
+    // Animate the bottom "New Document" button
+    const bottomBtn = document.getElementById('bottomNewDocBtn');
+    if (bottomBtn) {
+      // Always show the button (it should be visible even when no documents exist)
+      bottomBtn.classList.remove('hidden');
+      // Add a slight delay to allow for smooth transitions on initial load
+      setTimeout(() => {
+        bottomBtn.style.transform = 'translateY(0)';
+        bottomBtn.style.opacity = '1';
+      }, 50);
+    }
     // Render folder bar
     const folderBar = document.getElementById('folderBar');
     if (folderBar){
@@ -446,7 +458,14 @@ function renderHub(){
       if (act) {
         if (act === 'open') openDocument(id);
         if (act === 'rename') beginInlineRename(row);
-        if (act === 'delete') { if (confirm('Delete this document?')) { InlineDocs.remove(id); renderHub(); } }
+        if (act === 'delete') { if (confirm('Delete this document?')) { InlineDocs.remove(id);
+          // Animate the bottom button sliding up before re-rendering
+          const bottomBtn = document.getElementById('bottomNewDocBtn');
+          if (bottomBtn) {
+            bottomBtn.style.transform = 'translateY(-10px)';
+            bottomBtn.style.opacity = '0';
+          }
+          renderHub(); } }
         if (act === 'duplicate') {
           const copyId = `doc-${(crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2))}`;
           const cur = InlineDocs.get(id);
@@ -686,6 +705,15 @@ function newDocument(){
   }, 0);
 
   try { const t = document.getElementById('docTitleInput'); if (t) t.value = name; } catch {}
+
+  // Animate the bottom button sliding down after adding a document
+  setTimeout(() => {
+    const bottomBtn = document.getElementById('bottomNewDocBtn');
+    if (bottomBtn) {
+      bottomBtn.style.transform = 'translateY(0)';
+      bottomBtn.style.opacity = '1';
+    }
+  }, 100);
 }
 
 function openDocument(id){
@@ -866,7 +894,6 @@ function renderPagesList() {
     title.className = 'page-title';
     title.innerHTML = `
       <strong>Page ${index + 1}</strong>
-      <span style="margin-left:6px;color:var(--muted)">${p.name}</span>
       <span class="title-actions" style="float:right;display:inline-flex;gap:6px">
         <button class="btn mini" data-act="move-up" title="Move up" aria-label="Move up">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6l-6 6h12z" fill="currentColor"/></svg>

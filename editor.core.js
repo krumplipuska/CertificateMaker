@@ -297,6 +297,14 @@ function duplicateCurrentPage() {
   Model.document.pages.splice(idx + 1, 0, clone);
   Model.document.currentPageId = clone.id;
   renderAll();
+
+  // Scroll to the newly duplicated page after rendering
+  setTimeout(() => {
+    const duplicatedPageWrapper = document.querySelector(`[data-page-id="${Model.document.currentPageId}"]`);
+    if (duplicatedPageWrapper) {
+      duplicatedPageWrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 0);
 }
 
 function moveCurrentPage(delta) {
@@ -307,6 +315,14 @@ function moveCurrentPage(delta) {
   const [pg] = Model.document.pages.splice(idx, 1);
   Model.document.pages.splice(target, 0, pg);
   renderAll();
+
+  // Scroll to the moved page after rendering
+  setTimeout(() => {
+    const movedPageWrapper = document.querySelector(`[data-page-id="${Model.document.currentPageId}"]`);
+    if (movedPageWrapper) {
+      movedPageWrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 0);
 }
 
 /* ----------------------- Formula Engine ----------------------- */
