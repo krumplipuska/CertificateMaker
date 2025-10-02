@@ -365,6 +365,12 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 .guide.v { width: 2px; height: 100%; top: 0; }
 .guide.h { height: 2px; width: 100%; left: 0; }
 
+/* Smart spacing (pattern-aware) gap guides */
+.smart-gap-line { position: absolute; pointer-events: none; opacity: .9; z-index: 1500; }
+.smart-gap-line.h { left: 0; right: 0; height: 0; border-top: 1px dashed var(--primary); }
+.smart-gap-line.v { top: 0; bottom: 0; width: 0; border-left: 1px dashed var(--primary); }
+.gap-badge { position: absolute; pointer-events: none; font-size: 11px; line-height: 1; background:#fff; color: var(--primary); border: 1px solid var(--primary); border-radius: 999px; padding: 2px 6px; z-index: 1501; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+
 /* generic hidden utility */
 .hidden { display: none !important; }
 
@@ -559,6 +565,7 @@ input[type="color"].circle:hover::-webkit-color-swatch { border-color: var(--pri
 .edit-off .selbox,
 .edit-off #lasso,
 .edit-off .guide { display: none !important; }
+.edit-off .smart-gap-line, .edit-off .gap-badge { display: none !important; }
 .edit-off .page .element { cursor: default; }
 .edit-off .page .element.selected { box-shadow: none; }
 .edit-off .element.repeated { pointer-events: none; }

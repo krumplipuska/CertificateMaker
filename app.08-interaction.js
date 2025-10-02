@@ -53,6 +53,12 @@ function getVisibleInsertionPoint(){
   if (!(right > left && bottom > top)) { cx = pr.left + pr.width/2; cy = pr.top + pr.height/2; }
   let x = (cx - pr.left) / z;
   let y = (cy - pr.top) / z;
+
+  // Add random offset to prevent elements from stacking exactly on top of each other
+  const randomOffset = () => (Math.random() - 0.5) * 40; // ±20px range
+  x += randomOffset();
+  y += randomOffset();
+
   // Nudge to stay within visible/safe area, accounting for header/footer
   try {
     const header = Number(Model?.document?.headerHeight || 0);
@@ -85,7 +91,7 @@ let __addingByDrag = false;
 let drag = null; // {id, start:{x,y}, orig:{...}, descendants?: Map}
 let dragMaybe = null; // tentative single-element drag starter
 let resize = null; // {id, start:{x,y}, orig:{...}, mode:'n|s|e|w|ne|nw|se|sw'}
-const Controller = { snapState: { x:null, y:null }, suppressReflow: 0 };
+const Controller = { snapState: { x:null, y:null }, suppressReflow: 0, smartGap: null };
 let dragSelection = null; // { startBounds, starts: Map }
 let resizeSelectionState = null; // { handle, startBounds, starts: Map }
 let rotateSelectionState = null; // { startBounds, center:{x,y}, startAngle, starts: Map(id->startRotate) }
@@ -513,8 +519,8 @@ function onMouseDown(e){
         console.log(`[GESTURE] drag:maybe id=${id} x=${pt.x} y=${pt.y}`);
       }
     }
-    // hide actions while dragging
-    elementActions().classList.add('hidden');
+    // hide actions while dragging/resizing/rotating
+    try { elementActions().classList.add('hidden'); } catch {}
     e.preventDefault();
   } else {
     clearSelection();
@@ -759,7 +765,11 @@ function onMouseMove(e){
       pages.forEach(p => { try { renderPage(p); } catch {} });
     }
   } catch {}
-  updateFormatToolbarVisibility(); positionElementActions(); updateSelectionBox();
+  updateFormatToolbarVisibility();
+  if (!drag && !resize && !dragSelection && !resizeSelectionState && !rotateSelectionState) {
+    positionElementActions();
+  }
+  updateSelectionBox();
 }
 
 function onMouseUp(){
@@ -806,7 +816,8 @@ function onMouseUp(){
   if (dragMaybe){ dragMaybe = null; }
   // hide guides and reshow actions
   hideGuides();
-  positionElementActions();
+  try { positionElementActions(); } catch {}
   Controller.snapState = { x: null, y: null };
+  Controller.smartGap = null;
 }
 

@@ -885,6 +885,8 @@ async function bootstrap(){
     // Disallow resizing when edit mode is off (fields should remain editable-only)
     if (!Model.document.editMode) return;
     const h = e.target.closest('.sb-h'); if (!h) return;
+    // Hide element actions while resizing/moving/rotating from selection box
+    try { elementActions().classList.add('hidden'); } catch {}
     startSelectionResize(h.dataset.handle, e);
     const onMove = (ev) => { applySelectionResize(ev); };
     const onUp = () => {
@@ -892,6 +894,8 @@ async function bootstrap(){
       window.removeEventListener('mouseup', onUp);
       if (resizeSelectionState){ commitHistory('resize-multi'); resizeSelectionState = null; hideGuides(); updateSelectionBox(); }
       if (rotateSelectionState){ rotateSelectionState = null; hideGuides(); updateSelectionBox(); }
+      // Re-show the actions bubble after gesture end
+      try { positionElementActions(); } catch {}
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);

@@ -6,6 +6,7 @@ function startSelectionResize(handle, event){
   const pt = getCanvasPoint(event, pageNode);
   const starts = new Map();
   [...selectedIds].forEach(id => starts.set(id, deepClone(getElementById(id))));
+  try { elementActions().classList.add('hidden'); } catch {}
   if (handle === 'move'){
     const pointerOffset = { ox: pt.x - startBounds.x, oy: pt.y - startBounds.y };
     commitHistory('move');

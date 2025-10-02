@@ -92,12 +92,29 @@ function hideFormatToolbar(){ formatToolbar().classList.add('hidden'); }
 function positionElementActions(){
   const bubble = elementActions();
   if (selectedIds.size === 0 || !Model.document.editMode) { bubble.classList.add('hidden'); return; }
-  const firstId = [...selectedIds][0];
-  const el = document.querySelector(`.page .element[data-id="${firstId}"]`);
-  if (!el) { bubble.classList.add('hidden'); return; }
-  const r = el.getBoundingClientRect();
-  bubble.style.left = (r.left + r.width / 2) + 'px';
-  bubble.style.top = (r.top - 8) + 'px';
+
+  if (selectedIds.size === 1) {
+    // Single element: use current behavior
+    const firstId = [...selectedIds][0];
+    const el = document.querySelector(`.page .element[data-id="${firstId}"]`);
+    if (!el) { bubble.classList.add('hidden'); return; }
+    const r = el.getBoundingClientRect();
+    bubble.style.left = (r.left + r.width / 2) + 'px';
+    bubble.style.top = (r.top - 8) + 'px';
+  } else {
+    // Multiple elements: position above the selection bounds center
+    const bounds = getSelectionBounds();
+    if (!bounds) { bubble.classList.add('hidden'); return; }
+    const page = getPageNode();
+    if (!page) { bubble.classList.add('hidden'); return; }
+    const pr = page.getBoundingClientRect();
+    const z = getZoom();
+    const cx = pr.left + (bounds.x + bounds.w / 2) * z;
+    const cy = pr.top + bounds.y * z - 8;
+    bubble.style.left = cx + 'px';
+    bubble.style.top = cy + 'px';
+  }
+
   bubble.classList.remove('hidden');
   // Mark the moment of this reposition so clicks immediately following
   // a selection change don't trigger the actions dropdown unintentionally
