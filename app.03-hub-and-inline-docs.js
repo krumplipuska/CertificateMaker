@@ -968,10 +968,9 @@ function renderPagesList() {
     wrap.addEventListener('mousedown', (e) => {
       const clickedInsidePage = !!e.target.closest('.page');
       if (Model.document.currentPageId !== p.id) {
+        // Activate the page immediately, but do not re-render here so the
+        // same click can proceed to element selection/drag handlers.
         Model.document.currentPageId = p.id;
-        renderAll();
-        e.preventDefault();
-        return; // stop initiating drag on a different page
       }
       if (!clickedInsidePage) return;
     });

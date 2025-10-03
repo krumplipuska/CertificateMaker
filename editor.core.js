@@ -261,6 +261,14 @@ function addPage() {
   Model.document.pages.push(p);
   Model.document.currentPageId = p.id;
   renderAll();
+
+  // Scroll to the newly added page after rendering
+  setTimeout(() => {
+    const newPageWrapper = document.querySelector(`[data-page-id="${Model.document.currentPageId}"]`);
+    if (newPageWrapper) {
+      newPageWrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 0);
 }
 
 function removeCurrentPage() {

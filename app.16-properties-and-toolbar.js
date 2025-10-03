@@ -578,7 +578,7 @@ function renderProperties(){
   if (m){
     if (isPropVisibleKey('stackByPage')){
       const row2 = document.createElement('div'); row2.className = 'row'; row2.style.display = 'flex'; row2.style.alignItems = 'center';
-      const lab2 = document.createElement('label'); lab2.textContent = 'stackByPage';
+      const lab2 = document.createElement('label'); lab2.textContent = 'Page Flow'; lab2.title = 'Auto-flow this element across pages based on vertical order.';
       const ctl2 = document.createElement('input'); ctl2.type='checkbox'; ctl2.dataset.prop = 'stackByPage'; ctl2.checked = !!m.stackByPage;
       row2.appendChild(lab2); row2.appendChild(ctl2); box.appendChild(row2);
     }
@@ -586,7 +586,7 @@ function renderProperties(){
     // Page break toggle: forces this element to start on a new page
     if (isPropVisibleKey('pageBreak')){
       const row3 = document.createElement('div'); row3.className = 'row'; row3.style.display = 'flex'; row3.style.alignItems = 'center';
-      const lab3 = document.createElement('label'); lab3.textContent = 'pageBreak';
+      const lab3 = document.createElement('label'); lab3.textContent = 'Start New Page'; lab3.title = 'Force this element to start on a new page.';
       const ctl3 = document.createElement('input'); ctl3.type='checkbox'; ctl3.dataset.prop = 'pageBreak'; ctl3.checked = !!m.pageBreak;
       row3.appendChild(lab3); row3.appendChild(ctl3); box.appendChild(row3);
     }
@@ -594,7 +594,7 @@ function renderProperties(){
     // Repeat flag (single checkbox)
     if (isPropVisibleKey('repeatOnAllPages')){
       const row4 = document.createElement('div'); row4.className = 'row'; row4.style.display = 'flex'; row4.style.alignItems = 'center';
-      const lab4 = document.createElement('label'); lab4.textContent = 'repeatOnAllPages';
+      const lab4 = document.createElement('label'); lab4.textContent = 'Repeat Every Page'; lab4.title = 'Show this element on every page (for headers/footers).';
       const ctl4 = document.createElement('input'); ctl4.type='checkbox'; ctl4.dataset.prop = 'repeatOnAllPages'; ctl4.checked = !!m.repeatOnAllPages;
       row4.appendChild(lab4); row4.appendChild(ctl4); box.appendChild(row4);
     }
@@ -602,7 +602,7 @@ function renderProperties(){
     // Free move (allow positioning outside page bounds, visible overflow)
     if (isPropVisibleKey('freeMove')){
       const row5 = document.createElement('div'); row5.className = 'row'; row5.style.display = 'flex'; row5.style.alignItems = 'center';
-      const lab5 = document.createElement('label'); lab5.textContent = 'freeMove'; lab5.title = 'Allow this element to move/appear outside page bounds and across pages (live reparent).';
+      const lab5 = document.createElement('label'); lab5.textContent = 'Free Position'; lab5.title = 'Allow this element to move/appear outside page bounds and across pages (live reparent).';
       const ctl5 = document.createElement('input'); ctl5.type='checkbox'; ctl5.dataset.prop = 'freeMove'; ctl5.checked = !!m.freeMove;
       row5.appendChild(lab5); row5.appendChild(ctl5); box.appendChild(row5);
     }
