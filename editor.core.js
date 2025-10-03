@@ -124,6 +124,21 @@ function setZoomScale(scale){
 }
 function setZoomPercent(pct){ setZoomScale((Number(pct)||100) / 100); }
 
+/* ----------------------- Number formatting helpers ----------------------- */
+/**
+ * Format a numeric string/number with fixed decimal places for display only.
+ * Returns the original string when not a finite number.
+ */
+function formatNumberForDisplay(raw, places){
+  try {
+    const n = Number(String(raw ?? '').trim());
+    if (!Number.isFinite(n)) return String(raw ?? '');
+    const p = Math.max(0, Number(places) || 0);
+    return n.toFixed(p);
+  } catch { return String(raw ?? ''); }
+}
+try { window.formatNumberForDisplay = formatNumberForDisplay; } catch {}
+
 // Zoom helpers that keep a focal point stable on screen
 function zoomAtClientPoint(clientX, clientY, nextScale){
   const vp = document.getElementById('pageViewport');
@@ -349,11 +364,11 @@ function evaluateFormulaExpression(expr){
     if (!raw.startsWith('=')) return { value: raw };
     const body = raw.slice(1);
 
-    // Support both raw #id tokens (numeric context) and quoted "#id" tokens (string context)
+    // Support both raw #id tokens (numeric context) and quoted "#id" tokens (auto value)
     //   - #id     -> r('id') returns numeric value (or 0)
-    //   - "#id"  -> s('id') returns string content (or '')
+    //   - "#id"  -> v('id') returns numeric if possible, otherwise string content
     let toEval = body
-      .replace(/"#([A-Za-z0-9_\-:]+)"/g, (m, id) => `s('${id}')`)
+      .replace(/"#([A-Za-z0-9_\-:]+)"/g, (m, id) => `v('${id}')`)
       .replace(/#([A-Za-z0-9_\-:]+)/g, (m, id) => `r('${id}')`);
 
     // Helper to resolve a numeric value from an element or table cell by id
@@ -396,6 +411,15 @@ function evaluateFormulaExpression(expr){
       return '';
     }
 
+    // Helper to resolve a value with auto numeric coercion when possible.
+    // If the referenced content looks like a number (including decimals), return Number.
+    // Otherwise, return the raw string so text formulas still work.
+    function v(id){
+      const str = s(id);
+      const num = Number(str);
+      return Number.isFinite(num) ? num : str;
+    }
+
     // Whitelist functions
     const SUM = (...args) => args.reduce((a,b)=>a + (Number(b)||0), 0);
     const AVG = (...args) => { const arr = args.map(v=>Number(v)||0); return arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length) : 0; };
@@ -417,8 +441,8 @@ function evaluateFormulaExpression(expr){
 
     // Evaluate in a restricted scope
     // eslint-disable-next-line no-new-func
-    const fn = new Function('r','s','SUM','AVG','MIN','MAX','ROUND','FLOOR','CEIL','ABS', `return (${toEval});`);
-    const num = fn(r, s, SUM, AVG, MIN, MAX, ROUND, FLOOR, CEIL, ABS);
+    const fn = new Function('r','s','v','SUM','AVG','MIN','MAX','ROUND','FLOOR','CEIL','ABS', `return (${toEval});`);
+    const num = fn(r, s, v, SUM, AVG, MIN, MAX, ROUND, FLOOR, CEIL, ABS);
     const asNum = Number(num);
     if (Number.isFinite(asNum)) return { value: String(asNum) };
     return { value: String(num ?? '') };

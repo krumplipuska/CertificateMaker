@@ -18,8 +18,8 @@ function pasteFromClipboard() {
   
   clipboardElements.forEach(src => {
     const clone = deepClone(src);
-    clone.id = generateId();
-    clone.x += offset; 
+    // Keep original ID when pasting cut elements
+    clone.x += offset;
     clone.y += offset;
     if (clone.type === 'line' && typeof clone.x2 === 'number' && typeof clone.y2 === 'number') {
       clone.x2 += offset; 
@@ -54,6 +54,23 @@ function copySelection(offset = 12){
   page.elements.push(...clones);
   setSelection(clones.map(c => c.id));
   renderPage(page);
+}
+
+function cutToClipboard() {
+  if (selectedIds.size === 0) return;
+  // Copy selected elements to clipboard first
+  clipboardElements = [...selectedIds].map(id => {
+    const element = deepClone(getElementById(id));
+    return element;
+  });
+  // Then delete them from the page
+  const page = getCurrentPage();
+  commitHistory('cut-multi');
+  page.elements = page.elements.filter(e => !selectedIds.has(e.id));
+  clearSelection();
+  renderPage(page);
+  // Hide actions bubble after cut
+  elementActions().classList.add('hidden');
 }
 
 function deleteSelection(){

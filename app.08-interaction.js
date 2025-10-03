@@ -458,7 +458,7 @@ function onMouseDown(e){
   if (pendingAddType){ placePendingAt(pt.x, pt.y); return; }
   if (target){
     const id = target.dataset.id;
-    console.log('[MOUSE] down on element', id);
+    //console.log('[MOUSE] down on element', id);
     const page = getCurrentPage();
     const model = page.elements.find(el => el.id === id);
     // Respect locked layers
@@ -493,7 +493,7 @@ function onMouseDown(e){
       // snapshot before resize starts for undo
       commitHistory('resize');
       resize = { id, start: pt, orig: deepClone(model), mode };
-      console.log(`[GESTURE] resize:start id=${id} mode=${mode}`);
+      //console.log(`[GESTURE] resize:start id=${id} mode=${mode}`);
     } else {
       if (selectedIds.has(id) && selectedIds.size > 1){
         const starts = new Map();
@@ -504,7 +504,7 @@ function onMouseDown(e){
         // keep pointer offset to avoid jumping to top-left
         const pointerOffset = { ox: pt.x - startBounds.x, oy: pt.y - startBounds.y };
         dragSelection = { startBounds, starts, pointerOffset };
-        console.log(`[GESTURE] multi-drag:start count=${selectedIds.size}`);
+        //console.log(`[GESTURE] multi-drag:start count=${selectedIds.size}`);
       } else {
         // Defer starting a drag until the pointer actually moves beyond a threshold
         // Capture possible descendants for blocks to move them together
@@ -516,7 +516,7 @@ function onMouseDown(e){
           descendants = map;
         }
         dragMaybe = { id, start: pt, orig: deepClone(model), descendants };
-        console.log(`[GESTURE] drag:maybe id=${id} x=${pt.x} y=${pt.y}`);
+        //console.log(`[GESTURE] drag:maybe id=${id} x=${pt.x} y=${pt.y}`);
       }
     }
     // hide actions while dragging/resizing/rotating
@@ -555,7 +555,7 @@ function onMouseMove(e){
     const dx0 = Math.abs(pt.x - dragMaybe.start.x);
     const dy0 = Math.abs(pt.y - dragMaybe.start.y);
     if (dx0 >= 3 || dy0 >= 3){
-      console.log(`[GESTURE] drag:promote id=${dragMaybe.id}`);
+      //console.log(`[GESTURE] drag:promote id=${dragMaybe.id}`);
       commitHistory('move');
       drag = dragMaybe; dragMaybe = null;
     }
@@ -777,9 +777,9 @@ function onMouseUp(){
   const hadGesture = !!drag || !!resize || !!dragSelection || !!resizeSelectionState || !!rotateSelectionState;
   const type = dragSelection ? 'multi-drag' : (resize ? 'resize' : (drag ? 'drag' : (rotateSelectionState ? 'rotate' : (dragMaybe ? 'dragMaybe' : 'none'))));
   if (hadGesture) {
-    console.log(`[GESTURE] ${type}:end`);
+    //console.log(`[GESTURE] ${type}:end`);
   } else if (dragMaybe) {
-    console.log('[GESTURE] drag:cancel');
+    //console.log('[GESTURE] drag:cancel');
   }
   // After a move/resize/rotate, reparent elements into blocks (if applicable) and reflow stacks
   if (hadGesture){

@@ -19,5 +19,8 @@ function applyPatchToSelection(patch, historyLabel = 'update-multi'){
     const idx = page.elements.findIndex(e => e.id === id);
     if (idx !== -1) page.elements[idx] = deepMerge(page.elements[idx], patch);
   });
-  renderPage(page); updateSelectionUI();
+  // Changing selected element content may affect formulas anywhere; recalc and re-render all pages
+  try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
+  try { if (Model && Model.document && Array.isArray(Model.document.pages)) { Model.document.pages.forEach((p)=>{ try { renderPage(p); } catch {} }); } } catch {}
+  updateSelectionUI();
 }

@@ -371,7 +371,7 @@ html, body {
 /* Element actions bubble */
 #elementActions { position: fixed; transform: translate(-50%, -100%); background:var(--panel); border:1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow); padding: 6px; display: inline-flex; gap: 6px; z-index: 900; transition: background .15s ease, border-color .15s ease; }
 #elementActions.hidden { display: none; }
-#elementActions:hover { background: color-mix(in srgb, var(--primary) 4%, #fff); border-color: color-mix(in srgb, var(--primary) 20%, var(--border)); }
+#elementActions:hover { background: var(--panel); border-color: color-mix(in srgb, var(--primary) 20%, var(--border)); }
 #elementActions .menu { display: inline-flex; gap: 6px; }
 #elementActions .dropdown.hidden { display: none; }
 /* Compact icon menu inside actions dropdown */
@@ -618,6 +618,40 @@ input[type="color"].circle:hover::-webkit-color-swatch { border-color: var(--pri
 .align.v-top .v-icon.v-top { display: block; }
 .align.v-middle .v-icon.v-middle { display: block; }
 .align.v-bottom .v-icon.v-bottom { display: block; }
+
+/* Text overflow button states */
+.text-overflow { position: relative; width: 28px; height: 28px; }
+.text-overflow .icon { width: 16px; height: 16px; }
+.text-overflow .overflow-icon { display: none; }
+.text-overflow.overflow-cut .overflow-icon.overflow-cut { display: block; }
+.text-overflow.overflow-wrap .overflow-icon.overflow-wrap { display: block; }
+
+/* Text overflow behavior based on textOverflow property */
+.element:not([data-text-overflow]),
+.element[data-text-overflow="wrap"],
+.element:not([data-text-overflow]) .text,
+.element:not([data-text-overflow]) .field,
+.element:not([data-text-overflow]) .rect,
+.element[data-text-overflow="wrap"] .text,
+.element[data-text-overflow="wrap"] .field,
+.element[data-text-overflow="wrap"] .rect,
+.table-cell:not([data-text-overflow]),
+.table-cell[data-text-overflow="wrap"] {
+  white-space: pre-wrap;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.element[data-text-overflow="cut"],
+.element[data-text-overflow="cut"] .text,
+.element[data-text-overflow="cut"] .field,
+.element[data-text-overflow="cut"] .rect,
+.table-cell[data-text-overflow="cut"] {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
+}
 
 /* View mode: hide editing UI */
 .edit-off #formatToolbar,

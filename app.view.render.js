@@ -106,6 +106,14 @@ function applyElementStyles(node, m, pageForParentLookup) {
 	}
 	if (typeof m.z === 'number') node.style.zIndex = String(100 + (m.z||0));
 
+	// Apply textOverflow as data attribute for CSS targeting
+	if (m.styles && m.styles.textOverflow) {
+		node.dataset.textOverflow = m.styles.textOverflow;
+	} else {
+		// Default to wrap for backward compatibility
+		node.dataset.textOverflow = 'wrap';
+	}
+
 	// Finally, enforce visibility
 	// Respect model hidden state in both modes; mode only gates inline handlers
 	if (isHidden) {
@@ -190,7 +198,7 @@ function renderPage(page) {
 	if (!container) return;
 	// Before rendering, recalc formulas so displayed content is up to date
 	try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
-	try { console.log('[RENDER] renderPage', { pageId: page.id, elements: page.elements?.length }); } catch {}
+	//try { console.log('[RENDER] renderPage', { pageId: page.id, elements: page.elements?.length }); } catch {}
 	Array.from(container.querySelectorAll('.element')).forEach(n => n.remove());
 	if (!page) return;
 
@@ -311,7 +319,7 @@ function renderPage(page) {
 		const node = ensureElementNode({ ...elm, pageId: page.id });
 		applyElementStyles(node, elm, page);
 		// (no extra clamping needed; header/footer sizing only affects stacking, not rendering)
-		try { console.log('[RENDER] applyElementStyles', elm.id, elm.type); } catch {}
+		//try { console.log('[RENDER] applyElementStyles', elm.id, elm.type); } catch {}
 		// Populate content for text-like elements so edits persist after re-render
         if (elm.type === 'text' || elm.type === 'field' || elm.type === 'rect') {
             const raw = typeof elm.content === 'string' ? elm.content : '';

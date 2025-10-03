@@ -62,8 +62,9 @@ function updateElement(id, patch) {
           });
         }
         Model.document = doc;
-        // Re-render all pages because the change may be off the current page
-        renderAll();
+        // Recalculate all formulas and re-render all pages because the change may be off the current page
+        try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
+        try { if (Model && Model.document && Array.isArray(Model.document.pages)) { Model.document.pages.forEach((p)=>{ try { renderPage(p); } catch {} }); } } catch {}
         updateSelectionUI();
       }
 
@@ -92,7 +93,8 @@ function updateElement(id, patch) {
     if (selectedIds.size === 0) return;
     commitHistory('update-multi');
     Model.document = applyPatchToElements(Model.document, [...selectedIds], patch);
-    renderPage(getCurrentPage());
+    try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
+    try { if (Model && Model.document && Array.isArray(Model.document.pages)) { Model.document.pages.forEach((p)=>{ try { renderPage(p); } catch {} }); } } catch {}
     updateSelectionUI();
     return;
   }
@@ -105,7 +107,8 @@ function updateElement(id, patch) {
   const curHas = !!(page && page.elements && page.elements.some(e => e.id === id));
   Model.document = curHas ? applyPatchToElements(Model.document, [id], patch)
                           : applyPatchToElementsAnyPage(Model.document, [id], patch);
-  renderPage(getCurrentPage());
+  try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
+  try { if (Model && Model.document && Array.isArray(Model.document.pages)) { Model.document.pages.forEach((p)=>{ try { renderPage(p); } catch {} }); } } catch {}
   
   if (prevTableSel) {
     // Re-apply table cell selection after re-render (don't change element selection)

@@ -163,6 +163,46 @@ function bindFloatingToolbar(){
     const m = getElementById([...selectedIds][0]);
     return { h: m?.styles?.textAlignH || 'left', v: m?.styles?.textAlignV || 'top' };
   };
+  const readTextOverflow = () => {
+    if (selectedIds.size !== 1) return 'wrap';
+    const m = getElementById([...selectedIds][0]);
+    // Check model first, then fall back to DOM data attribute
+    const modelValue = m?.styles?.textOverflow;
+    if (modelValue) return modelValue;
+
+    // Check if element exists in DOM and has data attribute
+    const element = document.querySelector(`[data-id="${m.id}"]`);
+    if (element && element.dataset.textOverflow) {
+      return element.dataset.textOverflow;
+    }
+
+    return 'wrap';
+  };
+  const readTextOverflowForContext = () => {
+    if (tableSel){
+      const tModel = getElementById(tableSel.tableId);
+      if (tModel){
+        const ar = Math.min(tableSel.r0, tableSel.r1);
+        const ac = Math.min(tableSel.c0, tableSel.c1);
+        const id = tModel.grid[ar]?.[ac];
+        const cell = id ? tModel.cells[id] : null;
+        if (cell) {
+          // Check cell model first, then fall back to DOM data attribute
+          const modelValue = cell.styles?.textOverflow;
+          if (modelValue) return modelValue;
+
+          // Check if table cell exists in DOM and has data attribute
+          const tableCell = document.querySelector(`.table-cell[data-id="${id}"]`);
+          if (tableCell && tableCell.dataset.textOverflow) {
+            return tableCell.dataset.textOverflow;
+          }
+
+          return 'wrap';
+        }
+      }
+    }
+    return readTextOverflow();
+  };
   window.applyAlignButtonState = function applyAlignButtonState(){
     const {h,v} = readAlign();
     hBtn.classList.remove('h-left','h-center','h-right');
@@ -174,6 +214,17 @@ function bindFloatingToolbar(){
     hBtn.setAttribute('aria-pressed', String(pressed));
     vBtn.setAttribute('aria-pressed', String(pressed));
   };
+  window.applyTextOverflowButtonState = function applyTextOverflowButtonState(){
+    const overflow = readTextOverflow();
+    const btn = document.getElementById('textOverflowBtn');
+    if (btn) {
+      btn.classList.remove('overflow-cut', 'overflow-wrap');
+      btn.classList.add('overflow-' + overflow);
+      const t = selectedIds.size === 1 ? getElementById([...selectedIds][0])?.type : null;
+      const pressed = selectedIds.size === 1 && (t === 'text' || t === 'field' || t === 'rect');
+      btn.setAttribute('aria-pressed', String(pressed));
+    }
+  };
   hBtn.addEventListener('click', () => {
     const {h} = readAlignForContext();
     const next = cycle(h, ['left','center','right']);
@@ -183,6 +234,7 @@ function bindFloatingToolbar(){
     } else {
       applyPatchToSelection(toPatch('styles.textAlignH', next));
       window.applyAlignButtonState();
+      window.applyTextOverflowButtonState();
     }
   });
   vBtn.addEventListener('click', () => {
@@ -194,15 +246,63 @@ function bindFloatingToolbar(){
     } else {
       applyPatchToSelection(toPatch('styles.textAlignV', next));
       window.applyAlignButtonState();
+      window.applyTextOverflowButtonState();
     }
+  });
+
+  const textOverflowBtn = document.getElementById('textOverflowBtn');
+  textOverflowBtn.addEventListener('click', () => {
+    const current = readTextOverflowForContext();
+    const next = cycle(current, ['wrap', 'cut']);
+
+    // PRIORITY 1: If we have active table cell selection, always apply to cells
+    if (tableSel){
+      const tModel = getElementById(tableSel.tableId);
+      if (tModel) {
+        // Apply to table cells
+        const updated = tableApplyCellStyle(tModel, tableSel, 'textOverflow', next);
+        updateElement(tModel.id, updated);
+      }
+    } else {
+      // PRIORITY 2: If table elements are selected but no cells, try to restore last cell selection
+      const selectedElements = [...selectedIds].map(id => getElementById(id)).filter(Boolean);
+      const hasOnlyTables = selectedElements.length > 0 && selectedElements.every(el => el.type === 'table');
+
+      if (hasOnlyTables && !tableSel && lastTableSel) {
+        const selectedTable = selectedElements[0];
+        if (selectedTable.id === lastTableSel.tableId) {
+          setTableSelection(lastTableSel.tableId, lastTableSel.r0, lastTableSel.c0, lastTableSel.r1, lastTableSel.c1);
+          // Now apply the formatting to the restored selection
+          const tModel = getElementById(lastTableSel.tableId);
+          if (tModel) {
+            const updated = tableApplyCellStyle(tModel, tableSel, 'textOverflow', next);
+            updateElement(tModel.id, updated);
+          }
+        }
+      } else {
+        // PRIORITY 3: Prevent styling table containers when no cell selection exists
+        if (hasOnlyTables && !tableSel) {
+          // Block styling of table containers - user should select cells instead
+          return;
+        }
+
+        // PRIORITY 4: Apply to regular element selection (non-table elements)
+        if (selectedIds.size === 0) return;
+        applyPatchToSelection(toPatch('styles.textOverflow', next));
+      }
+    }
+    window.applyTextOverflowButtonState();
   });
 
   // Initialize align toggle state on load
   window.applyAlignButtonState();
+
+  // Initialize text overflow toggle state on load
+  window.applyTextOverflowButtonState();
 }
 
 function changeDecimal(increase){
-  // If there is an active table cell selection, adjust those cells
+  // If there is an active table cell selection, adjust the style flag on those cells
   if (tableSel){
     const tModel = getElementById(tableSel.tableId);
     if (!tModel) return;
@@ -213,70 +313,47 @@ function changeDecimal(increase){
     const c1 = Math.max(tableSel.c0, tableSel.c1);
 
     const next = deepClone(tModel);
-    let any = false;
-    const dpList = [];
-    const numericCells = [];
+    let current = 0;
+    let hasAny = false;
+    // Read current max decimals across the selection (default 0)
     for (let r = r0; r <= r1; r++){
       for (let c = c0; c <= c1; c++){
-        const cellId = next.grid[r]?.[c];
-        const cell = cellId ? next.cells[cellId] : null;
-        if (!cell) continue;
-        const raw = String(cell.content ?? '').trim();
-        if (raw === '') continue;
-        const num = Number(raw);
-        if (Number.isNaN(num)) continue;
-        let dp = 0;
-        const dot = raw.indexOf('.');
-        if (dot !== -1) dp = raw.length - dot - 1;
-        dpList.push(dp);
-        numericCells.push({ cell, num });
+        const id = next.grid[r]?.[c]; const cell = id ? next.cells[id] : null; if (!cell) continue;
+        const dp = Number(cell?.styles?.decimals);
+        if (Number.isFinite(dp) && dp >= 0){ current = Math.max(current, dp); hasAny = true; }
       }
     }
-    if (dpList.length === 0) return;
-    const targetDp = increase ? (Math.max(...dpList) + 1) : Math.max(0, Math.min(...dpList) - 1);
-    numericCells.forEach(({ cell, num }) => { cell.content = num.toFixed(targetDp); any = true; });
-    if (any){
-      commitHistory('table-decimal-change');
-      updateElement(next.id, next);
+    const target = Math.max(0, current + (increase ? 1 : -1));
+    for (let r = r0; r <= r1; r++){
+      for (let c = c0; c <= c1; c++){
+        const id = next.grid[r]?.[c]; const cell = id ? next.cells[id] : null; if (!cell) continue;
+        cell.styles = cell.styles || {};
+        cell.styles.decimals = target;
+      }
     }
+    updateElement(next.id, next);
+    renderPage(getCurrentPage());
     return;
   }
 
-  // Otherwise, adjust decimal places for any selected elements with numeric content
+  // Otherwise, set decimals on selected elements (text/field/rect)
   if (selectedIds.size > 0){
-    const prevSelected = [...selectedIds];
-    let any = false;
-    commitHistory('decimal-change');
     const page = getCurrentPage();
-    const idToIndex = new Map();
-    page.elements.forEach((el, idx) => { idToIndex.set(el.id, idx); });
-    const dpList = [];
-    const targets = [];
-    [...selectedIds].forEach(id => {
-      const idx = idToIndex.get(id);
-      if (idx == null) return;
-      const el = page.elements[idx];
-      if (!el || !('content' in el)) return;
-      const raw = String(el.content ?? '').trim();
-      if (raw === '') return;
-      const num = Number(raw);
-      if (Number.isNaN(num)) return;
-      let dp = 0;
-      const dot = raw.indexOf('.');
-      if (dot !== -1) dp = raw.length - dot - 1;
-      dpList.push(dp);
-      targets.push({ el, num });
+    const ids = [...selectedIds];
+    let current = 0;
+    ids.forEach(id => {
+      const el = page.elements.find(e => e.id === id);
+      const dp = Number(el?.styles?.decimals);
+      if (Number.isFinite(dp) && dp >= 0) current = Math.max(current, dp);
     });
-    if (dpList.length === 0) return;
-    const targetDp = increase ? (Math.max(...dpList) + 1) : Math.max(0, Math.min(...dpList) - 1);
-    targets.forEach(({ el, num }) => {
-      const nextContent = num.toFixed(targetDp);
-      if (nextContent !== el.content){ el.content = nextContent; any = true; }
+    const target = Math.max(0, current + (increase ? 1 : -1));
+    ids.forEach(id => {
+      const el = page.elements.find(e => e.id === id);
+      if (!el) return;
+      el.styles = el.styles || {};
+      el.styles.decimals = target;
     });
-    if (any){
-      renderPage(page);
-      try { setSelection(prevSelected); updateSelectionUI(); } catch {}
-    }
+    renderPage(page);
   }
 }
 
@@ -421,7 +498,7 @@ function getCustomAttributesFromModel(model){
 }
 function renderProperties(){
   const box = propertiesContent();
-  try { console.log('[RENDER] renderProperties: selectionSize=', selectedIds.size, 'tableSel=', !!tableSel); } catch {}
+  //try { console.log('[RENDER] renderProperties: selectionSize=', selectedIds.size, 'tableSel=', !!tableSel); } catch {}
   box.innerHTML = '';
   if (selectedIds.size === 0 && !tableSel) return;
   const page = getCurrentPage();
@@ -568,7 +645,7 @@ function renderProperties(){
   if (m && m.type === 'block'){
     if (isPropVisibleKey('stackChildren')){
       const row = document.createElement('div'); row.className = 'row'; row.style.display = 'flex'; row.style.alignItems = 'center';
-      const lab = document.createElement('label'); lab.textContent = 'stackChildren';
+      const lab = document.createElement('label'); lab.textContent = 'Stack children elements'; lab.title = 'Stack children elements vertically.';
       const ctl = document.createElement('input'); ctl.type='checkbox'; ctl.dataset.prop = 'stackChildren'; ctl.checked = !!m.stackChildren;
       row.appendChild(lab); row.appendChild(ctl); box.appendChild(row);
     }
@@ -578,7 +655,7 @@ function renderProperties(){
   if (m){
     if (isPropVisibleKey('stackByPage')){
       const row2 = document.createElement('div'); row2.className = 'row'; row2.style.display = 'flex'; row2.style.alignItems = 'center';
-      const lab2 = document.createElement('label'); lab2.textContent = 'Page Flow'; lab2.title = 'Auto-flow this element across pages based on vertical order.';
+      const lab2 = document.createElement('label'); lab2.textContent = 'Stack on the page'; lab2.title = 'Auto-flow this element across pages based on vertical order.';
       const ctl2 = document.createElement('input'); ctl2.type='checkbox'; ctl2.dataset.prop = 'stackByPage'; ctl2.checked = !!m.stackByPage;
       row2.appendChild(lab2); row2.appendChild(ctl2); box.appendChild(row2);
     }
@@ -1048,7 +1125,21 @@ function renderProperties(){
     if (val.startsWith('=')){
       // move value to formula field and clear content field
       const formCtl = box.querySelector('textarea[data-prop="formula"]');
-      if (formCtl && formCtl !== t){ formCtl.value = val; formCtl.dispatchEvent(new Event('change', { bubbles:true })); }
+      if (formCtl && formCtl !== t){
+        formCtl.value = val;
+        // Place cursor at the end of the formula field after moving content
+        formCtl.focus();
+        const sel = window.getSelection(); if (sel) {
+          const range = document.createRange();
+          const textNode = formCtl.firstChild;
+          if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+            range.setStart(textNode, textNode.textContent?.length || 0);
+            range.collapse(true);
+            sel.removeAllRanges(); sel.addRange(range);
+          }
+        }
+        formCtl.dispatchEvent(new Event('change', { bubbles:true }));
+      }
       t.value = '';
     }
   });

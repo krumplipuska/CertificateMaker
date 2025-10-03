@@ -473,6 +473,14 @@ function applyCellStyles(div, cell) {
   div.style.borderRight = sides.right ? `${bw}px solid ${bc}` : '0 solid transparent';
   div.style.borderBottom = sides.bottom ? `${bw}px solid ${bc}` : '0 solid transparent';
   div.style.borderLeft = sides.left ? `${bw}px solid ${bc}` : '0 solid transparent';
+
+  // Apply textOverflow as data attribute for CSS targeting
+  if (cell.styles && cell.styles.textOverflow) {
+    div.dataset.textOverflow = cell.styles.textOverflow;
+  } else {
+    // Default to wrap for backward compatibility
+    div.dataset.textOverflow = 'wrap';
+  }
 }
 
 // --- Table geometry helpers
@@ -529,7 +537,59 @@ function clearTableSelection(){
   document.querySelectorAll('.table-selection').forEach(n=> n.remove());
   updateToolbarForSelection(); updateFormatToolbarVisibility();
   const bar = document.getElementById('tableActions'); if (bar) bar.classList.add('hidden');
+  // Re-enable main toolbar stroke controls when table selection is cleared
+  enableMainToolbarStrokeControls();
 }
+function disableMainToolbarStrokeControls(){
+  // Disable stroke color, width, and radius controls in the main toolbar when table cells are selected
+  const strokeColorInput = document.getElementById('strokeColorInput');
+  const strokeWidthInput = document.getElementById('strokeWidthInput');
+  const strokeRadiusInput = document.getElementById('strokeRadiusInput');
+
+  if (strokeColorInput) strokeColorInput.disabled = true;
+  if (strokeWidthInput) strokeWidthInput.disabled = true;
+  if (strokeRadiusInput) strokeRadiusInput.disabled = true;
+}
+
+function enableMainToolbarStrokeControls(){
+  // Re-enable stroke color, width, and radius controls in the main toolbar when table selection is cleared
+  const strokeColorInput = document.getElementById('strokeColorInput');
+  const strokeWidthInput = document.getElementById('strokeWidthInput');
+  const strokeRadiusInput = document.getElementById('strokeRadiusInput');
+
+  if (strokeColorInput) strokeColorInput.disabled = false;
+  if (strokeWidthInput) strokeWidthInput.disabled = false;
+  if (strokeRadiusInput) strokeRadiusInput.disabled = false;
+}
+
+function syncTableBordersDropdown(tModel, tableSel){
+  // Sync border color and width inputs in the table actions dropdown with current selection
+  if (!tModel || !tableSel) return;
+
+  const bar = document.getElementById('tableActions');
+  if (!bar) return;
+
+  const colorInput = bar.querySelector('#tblBorderColor');
+  const widthInput = bar.querySelector('#tblBorderWidth');
+
+  if (!colorInput || !widthInput) return;
+
+  // Get border properties from the anchor cell (top-left of selection)
+  const anchorR = Math.min(tableSel.r0, tableSel.r1);
+  const anchorC = Math.min(tableSel.c0, tableSel.c1);
+  const anchorId = tModel.grid[anchorR][anchorC];
+  const anchorCell = tModel.cells[anchorId];
+
+  if (!anchorCell || !anchorCell.styles) return;
+
+  // Use the cell's border properties if available, otherwise fallback to toolbar values
+  const borderColor = anchorCell.styles.borderColor || anchorCell.styles.strokeColor || '#000000';
+  const borderWidth = anchorCell.styles.borderWidth || anchorCell.styles.strokeWidth || 1;
+
+  colorInput.value = borderColor;
+  widthInput.value = borderWidth;
+}
+
 function highlightTableSelection(){
   document.querySelectorAll('.table-cell.is-selected,.table-cell.is-range,.table-cell.selected').forEach(n=>{
     n.classList.remove('is-selected','is-range','selected');
@@ -576,6 +636,10 @@ function highlightTableSelection(){
   // Reflect anchor cell styles in toolbar every time selection changes
   const tModel = getElementById(tableSel.tableId);
   if (tModel) syncFormatToolbar(tModel);
+  // Sync table borders dropdown with current border properties
+  syncTableBordersDropdown(tModel, tableSel);
+  // Disable main toolbar stroke controls when table cells are selected
+  disableMainToolbarStrokeControls();
   // Update Properties panel for cellId
   renderProperties();
 }
@@ -616,7 +680,7 @@ function startEditCell(e, opts){
   if (opts && Object.prototype.hasOwnProperty.call(opts, 'initialText')) {
     div.textContent = String(opts.initialText ?? '');
   }
-  // Helper: place caret
+  // Helper: place caret at end of content
   const placeCaret = () => {
     const sel = window.getSelection(); if (!sel) return;
     const textNode = div.firstChild;
@@ -664,7 +728,9 @@ function startEditCell(e, opts){
       const cust = new CustomEvent('cellchange', { bubbles: true, detail: { tableId, r, c, value: text } });
       div.dispatchEvent(cust);
     } catch {}
-    renderPage(getCurrentPage());
+    // Recalculate all formulas and re-render all pages to reflect cross-page dependencies
+    try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
+    try { if (Model && Model.document && Array.isArray(Model.document.pages)) { Model.document.pages.forEach((p)=>{ try { renderPage(p); } catch {} }); } } catch {}
     const cell = getElementNode(tableId)?.querySelector(`.table-cell[data-r="${r}"][data-c="${c}"]`);
     if (cell) cell.focus();
   };
@@ -678,6 +744,16 @@ function startEditCell(e, opts){
       // Start formula mode when first character is '='
       ev.preventDefault();
       div.textContent = '=';
+      // Place cursor at the end after inserting '='
+      const sel = window.getSelection(); if (sel) {
+        const range = document.createRange();
+        const textNode = div.firstChild;
+        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+          range.setStart(textNode, 1);
+          range.collapse(true);
+          sel.removeAllRanges(); sel.addRange(range);
+        }
+      }
       try { if (typeof window.startInlineFormulaPicker === 'function') window.startInlineFormulaPicker(div); } catch {}
     }
     else if (ev.key === 'Tab') {
@@ -816,7 +892,7 @@ function pasteGridIntoTable(t, startR, startC, grid, opts) {
   return next;
 }
 
-/** Clear text content in all cells within [r0..r1] x [c0..c1] (anchors only). */
+/** Clear text and formulas in all cells within [r0..r1] x [c0..c1] (anchors only). */
 function tableClearRangeContent(t, r0, c0, r1, c1) {
   t = clone(t);
   const rr0 = Math.min(r0, r1), rr1 = Math.max(r0, r1);
@@ -828,6 +904,8 @@ function tableClearRangeContent(t, r0, c0, r1, c1) {
       if (!cell || cell.hidden) continue;
       if (cell.row === r && cell.col === c) {
         cell.content = "";
+        // Explicitly clear formula so deepMerge-based updates overwrite existing values
+        cell.attrs = Object.assign({}, cell.attrs, { formula: '' });
       }
     }
   }
@@ -1089,6 +1167,27 @@ function cmdTableUnmerge(){ if (!tableSel) return; const {tableId,r0,c0,r1,c1} =
       e.stopPropagation();
       return;
     }
+
+    // Handle border button clicks in dropdown
+    const borderBtn = e.target.closest('[data-borders]');
+    if (borderBtn && tableSel){
+      const mode = borderBtn.dataset.borders;
+      const t = getElementById(tableSel.tableId);
+      if (t){
+        // Get border color and width from the dropdown inputs or fallback to toolbar values
+        const colorInput = bar.querySelector('#tblBorderColor');
+        const widthInput = bar.querySelector('#tblBorderWidth');
+        const color = colorInput ? colorInput.value : '#000000';
+        const width = widthInput ? parseInt(widthInput.value) || 1 : 1;
+
+        updateElement(t.id, tableApplyBorders(t, tableSel, mode, color, width));
+        renderPage(getCurrentPage());
+        highlightTableSelection();
+      }
+      e.stopPropagation();
+      return;
+    }
+
     const btn = e.target.closest('[data-tact]');
     if (!btn || !tableSel) return;
     const t = getElementById(tableSel.tableId);
@@ -1129,6 +1228,39 @@ function cmdTableUnmerge(){ if (!tableSel) return; const {tableId,r0,c0,r1,c1} =
     const isInside = bar.contains(ev.target);
     if (!isInside) panel.classList.add('hidden');
   });
+
+  // Add event listeners for border color and width inputs
+  const colorInput = bar.querySelector('#tblBorderColor');
+  const widthInput = bar.querySelector('#tblBorderWidth');
+
+  function applyCurrentBorderSettings(){
+    if (!tableSel) return;
+    const t = getElementById(tableSel.tableId);
+    if (!t) return;
+
+    const currentMode = 'all'; // Default mode - could be enhanced to remember last selected mode
+    const color = colorInput ? colorInput.value : '#000000';
+    const width = widthInput ? parseInt(widthInput.value) || 1 : 1;
+
+    updateElement(t.id, tableApplyBorders(t, tableSel, currentMode, color, width));
+    renderPage(getCurrentPage());
+    highlightTableSelection();
+  }
+
+  if (colorInput) {
+    colorInput.addEventListener('input', (e) => {
+      if (tableSel) {
+        applyCurrentBorderSettings();
+      }
+    });
+  }
+  if (widthInput) {
+    widthInput.addEventListener('input', (e) => {
+      if (tableSel) {
+        applyCurrentBorderSettings();
+      }
+    });
+  }
 
   // Initial state
   showIfTableSelection();

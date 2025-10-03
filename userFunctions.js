@@ -298,7 +298,7 @@ function simpleConsoleLogFunction(message){
         if (typeof Model === 'undefined' || !Model.document) return;
         // Allow preview execution in edit mode when override flag set
         if (Model.document.editMode && !window.__ALLOW_USER_FUNCTIONS_IN_EDIT) return;
-        console.log(message);
+        //console.log(message);
     } catch {}
 }
 

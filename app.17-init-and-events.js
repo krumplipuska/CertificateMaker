@@ -1,6 +1,6 @@
 /* ----------------------- Init & Events ----------------------- */
 async function bootstrap(){
-  try { console.info('[App] bootstrap start'); } catch {}
+  //try { console.info('[App] bootstrap start'); } catch {}
   // When running in editor view, we'll load from InlineDocs if available; otherwise fall back
   let loaded = false;
   try {
@@ -424,17 +424,15 @@ async function bootstrap(){
         applyPatchToSelection(toPatch('attrs.formula', text.trim()));
         // Recalculate now so user sees value
         try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
-        const m = getElementById(id);
-        updateElement(id, { content: m?.content || '' });
+        // Re-render all pages so cross-page formula dependencies reflect latest values
+        try { if (Model && Model.document && Array.isArray(Model.document.pages)) { Model.document.pages.forEach((p)=>{ try { renderPage(p); } catch {} }); } } catch {}
       } else {
         // Plain text: update content and clear any existing formula attribute
         updateElement(id, { content: text, attrs: { formula: null } });
       }
       
       // Re-render to show placeholder if content is empty
-      if (!text) {
-        renderPage(getCurrentPage());
-      }
+      if (!text) { renderPage(getCurrentPage()); }
     };
     const onKey = (ke) => {
       if (ke.key === 'Enter' && ke.shiftKey){
@@ -531,6 +529,9 @@ async function bootstrap(){
     if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedIds.size > 0) {
       e.preventDefault();
       copyToClipboard();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'x' && selectedIds.size > 0) {
+      e.preventDefault();
+      cutToClipboard();
     } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
       e.preventDefault();
       pasteFromClipboard();
@@ -553,6 +554,16 @@ async function bootstrap(){
       // Insert '=' and optionally allow picking elements by clicking while holding Alt
       e.preventDefault();
       elNode.textContent = '=';
+      // Place cursor at the end after inserting '='
+      const sel = window.getSelection(); if (sel) {
+        const range = document.createRange();
+        const textNode = elNode.firstChild;
+        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+          range.setStart(textNode, 1);
+          range.collapse(true);
+          sel.removeAllRanges(); sel.addRange(range);
+        }
+      }
       try { startInlineFormulaPicker(elNode); } catch {}
     }
   });
@@ -627,7 +638,18 @@ async function bootstrap(){
       if (cell){ const cid = cell.getAttribute('data-id'); if (cid) token = `"#${cid}"`; }
       else { const id = el.getAttribute('data-id'); if (id) token = `"#${id}"`; }
       // Insert token at end (no extra spaces; quotes make it distinct)
-      host.textContent = String(host.textContent || '') + token;
+      const oldContent = String(host.textContent || '');
+      host.textContent = oldContent + token;
+      // Place cursor at the end after inserting token
+      const sel = window.getSelection(); if (sel) {
+        const range = document.createRange();
+        const textNode = host.firstChild;
+        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+          range.setStart(textNode, textNode.textContent?.length || 0);
+          range.collapse(true);
+          sel.removeAllRanges(); sel.addRange(range);
+        }
+      }
       host.focus();
     };
     document.addEventListener('mousemove', onMove, true);
@@ -848,8 +870,8 @@ async function bootstrap(){
       const isEditing = active && (active.isContentEditable || active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
       if (!isEditing && (!window.tableSel)) { clearSelection(); }
     }
-    // Delete selection via keyboard when not typing in inputs
-    if (e.key === 'Delete' || e.key === 'Backspace'){
+    // Delete selection via keyboard when not typing in inputs (Backspace no longer deletes elements)
+    if (e.key === 'Delete'){
       const active = document.activeElement;
       const isEditing = active && (active.isContentEditable || active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
       if (!isEditing && selectedIds.size > 0){ e.preventDefault(); deleteSelection(); }
