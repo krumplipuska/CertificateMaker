@@ -316,6 +316,23 @@ html, body {
 .rect { border:1px solid var(--border); background:var(--brand-light); border-radius:6px; min-width:10px; min-height:10px; padding:6px 8px; line-height:1.4; overflow:hidden; white-space:pre-wrap; word-break:break-word; }
 .line { height:2px; width:40px; background:#111827; transform-origin:0 0; }
 
+/* Stacking icons for visual helpers in edit mode */
+.stacking-icon {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.stacking-icon:hover {
+  opacity: 1;
+}
+
+.stacking-icon svg {
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+}
+
 /* Block container (stacked column) */
 .element.block {
   background:#fff;

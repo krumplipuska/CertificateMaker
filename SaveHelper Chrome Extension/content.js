@@ -16,6 +16,24 @@ function gatherHtml() {
 
 // Allow page scripts to explicitly request a save without synthesizing a key event
 document.addEventListener("cm-request-save", () => { requestSave(); });
+// Native PDF (headless) request from the page
+document.addEventListener("cm-request-native-pdf", (e) => {
+    console.log('Content script received cm-request-native-pdf event', e);
+    try {
+        const filename = e?.detail?.filename || 'document.pdf';
+        console.log('Sending PRINT_NATIVE_PDF message to background', { filename });
+        chrome.runtime.sendMessage({ type: 'PRINT_NATIVE_PDF', filename }, (response) => {
+            console.log('Background script response:', response);
+        });
+        showToast('Exporting PDF…');
+    } catch (error) {
+        console.error('Error in content script:', error);
+        showToast('PDF export failed');
+    }
+});
+
+// Debug: Log when content script loads
+console.log('SaveHelper content script loaded and listening for events');
 
 // Allow the page to request a file rename (without reload). We keep an override
 // URL so subsequent saves go to the renamed path, even if the address bar did
@@ -90,17 +108,21 @@ async function requestSave() {
     }
 }
 
-// Optional: intercept Ctrl/Cmd+S
-document.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        requestSave();
-    }
-});
+// Ctrl/Cmd+S is now handled by the main app instead of the extension
+// This allows the app to control the save flow and avoid conflicts
+// document.addEventListener("keydown", (e) => {
+//     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+//         e.preventDefault();
+//         requestSave();
+//     }
+// });
 
 // Allow toolbar click -> background -> here
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === "REQUEST_SAVE") requestSave();
+    if (msg?.type === "REQUEST_NATIVE_PDF") {
+        chrome.runtime.sendMessage({ type: 'PRINT_NATIVE_PDF', filename: msg?.filename || 'document.pdf' });
+    }
 });
 
 // Tiny visual feedback

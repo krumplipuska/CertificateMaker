@@ -252,6 +252,11 @@ function setEditMode(on) {
   } catch {}
   // Update padding after mode change
   if (typeof window.updateWorkspacePadding === 'function') window.updateWorkspacePadding();
+  
+  // Re-render pages to show/hide stacking icons
+  try {
+    if (typeof window.renderAll === 'function') window.renderAll();
+  } catch {}
 }
 
 /* ----------------------- Page & Elements ----------------------- */

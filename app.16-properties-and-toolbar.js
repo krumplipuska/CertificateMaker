@@ -1239,7 +1239,7 @@ function onPropsInput(e){
   applyPatchToSelection(toPatch(path, val));
   // If stackByPage was toggled on/off, reflow immediately so element jumps in place
   if (key === 'stackByPage' || key === 'pageBreak' || key === 'repeatOnAllPages' || key === 'freeMove') {
-    try { reflowStacks(getCurrentPage()); } catch {}
+    try { reflowStacks(getCurrentPage(), { removeEmptyPages: false }); } catch {}
     // Ensure visual update immediately:
     // - For repeatOnAllPages we must re-render all pages, since clones are injected
     //   on non-first pages during renderPage().
@@ -1329,8 +1329,7 @@ function sendSelectionBackward(){
 }
 
 /* ===== PDF Export Utilities ===== */
-//onclick of the export pdf button, export the page to pdf
-document.getElementById('savePdfBtn').addEventListener('click', () => ExportService.exportDocumentToPdf());
+// PDF export is handled in app.17-init-and-events.js to avoid duplicate event listeners
 // Dynamically ensure required libs are available without changing app logic
 async function loadExternalScript(src){
   return new Promise((resolve, reject) => {

@@ -124,7 +124,7 @@ function isElementHidden(el){
   return false;
 }
 
-function reflowStacks(page){
+function reflowStacks(page, options = {}){
   // Cross-page stack reflow for elements that opt-in via stackByPage.
   // 1) Lay out visible stackers top-to-bottom within each page
   // 2) If an item would overflow the page, move it to the next page and continue
@@ -273,20 +273,30 @@ function reflowStacks(page){
       changedPageIds.add(p.id);
     }
 
-    // Remove trailing empty pages (only at the end to be safe)
-    for (let i = doc.pages.length - 1; i >= 0 && doc.pages.length > 1; i--){
-      const pg = doc.pages[i];
-      const hasAnyElements = Array.isArray(pg.elements) && pg.elements.length > 0;
-      if (hasAnyElements) break; // stop at first non-empty from the end
-      const removed = doc.pages.pop();
-      deletedPages = true;
-      // Fix currentPageId if we removed the current one
-      if (removed && removed.id === Model.document.currentPageId){
-        const newIdx = Math.min(doc.pages.length - 1, i - 1);
-        const safeIdx = newIdx >= 0 ? newIdx : 0;
-        Model.document.currentPageId = doc.pages[safeIdx]?.id || doc.pages[0].id;
+    // Hide trailing empty pages (only from the end) - only if explicitly requested
+    if (options.removeEmptyPages !== false){
+      try {
+        for (let i = doc.pages.length - 1; i >= 0 && doc.pages.length > 1; i--){
+          const pg = doc.pages[i];
+          // Count only non-freeMove elements for page visibility logic
+          const hasStackingElements = Array.isArray(pg.elements) && pg.elements.some(el => el && !el.freeMove);
+          if (hasStackingElements) break; // stop at first page with stacking elements
+          console.log('reflowStacks: hiding empty page', pg.id);
+          if (typeof setPageHiddenById === 'function') setPageHiddenById(pg.id, true);
+        }
+      } catch (e) {
+        console.error('reflowStacks: error hiding pages:', e);
       }
     }
+
+    // Ensure any pages that now contain non-freeMove elements are shown again
+    try {
+      const pages = (Model && Model.document && Array.isArray(Model.document.pages)) ? Model.document.pages : [];
+      pages.forEach(pg => {
+        const hasStackingElements = Array.isArray(pg.elements) && pg.elements.some(el => el && !el.freeMove);
+        if (hasStackingElements && typeof setPageHiddenById === 'function') setPageHiddenById(pg.id, false);
+      });
+    } catch {}
 
     // After page-level reflow, stack children within blocks on affected pages
     const affectedPages = Array.from(changedPageIds).map(id => doc.pages.find(p => p.id === id)).filter(Boolean);
@@ -791,7 +801,26 @@ function onMouseUp(){
       reparentFreeMoveAcrossPages([...selectedIds]);
       // Now reparent into blocks and reflow only for non-freeMove stackers
       reparentIntoBlocks(getCurrentPage(), [...selectedIds]);
-      reflowStacks(getCurrentPage());
+      // Always run stacking logic for proper layout
+      reflowStacks(getCurrentPage(), { removeEmptyPages: false });
+
+      // Only remove empty pages if resizing stackByPage elements
+      let shouldRemoveEmptyPages = false;
+      try {
+        if (resize){
+          const m = getElementById(resize.id);
+          shouldRemoveEmptyPages = !!(m && m.stackByPage === true);
+        } else if (resizeSelectionState){
+          shouldRemoveEmptyPages = [...selectedIds].some((sid) => {
+            const m = getElementById(sid);
+            return m && m.stackByPage === true;
+          });
+        }
+      } catch {}
+
+      if (shouldRemoveEmptyPages){
+        reflowStacks(getCurrentPage(), { removeEmptyPages: true });
+      }
       // Re-evaluate header/footer repeat rule once at gesture end and render
       try {
         const ids = [...selectedIds];

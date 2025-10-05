@@ -5,6 +5,41 @@ function getPageNode(id = Model.document.currentPageId) {
 	return document.querySelector(`.page-wrapper[data-page-id="${id}"] .page`);
 }
 
+function getPageWrapper(id = Model.document.currentPageId) {
+	return document.querySelector(`.page-wrapper[data-page-id="${id}"]`);
+}
+
+function setPageHiddenById(id, hidden){
+	try {
+		const wrap = getPageWrapper(id);
+		if (!wrap) {
+			console.warn('setPageHiddenById: page wrapper not found for id:', id);
+			return;
+		}
+		const stage = wrap.querySelector('.page-stage');
+		if (!stage) {
+			console.warn('setPageHiddenById: page-stage not found for id:', id);
+			return;
+		}
+		if (hidden) {
+			stage.classList.add('hidden');
+			console.log('setPageHiddenById: hiding page', id);
+		} else {
+			stage.classList.remove('hidden');
+			console.log('setPageHiddenById: showing page', id);
+		}
+		// Optionally reflect in model for persistence if used later
+		try {
+			const pages = (Model && Model.document && Array.isArray(Model.document.pages)) ? Model.document.pages : [];
+			const idx = pages.findIndex(p => p && p.id === id);
+			if (idx >= 0) pages[idx].isHidden = !!hidden;
+		} catch {}
+	} catch (e) {
+		console.error('setPageHiddenById error:', e);
+	}
+}
+try { window.setPageHiddenById = setPageHiddenById; } catch {}
+
 function ensureElementNode(elModel) {
 	const pageNode = getPageNode(elModel.pageId || Model.document.currentPageId);
 	let node = pageNode.querySelector(`[data-id="${elModel.id}"]`);
@@ -200,6 +235,8 @@ function renderPage(page) {
 	try { if (typeof window.recalculateAllFormulas === 'function') window.recalculateAllFormulas(); } catch {}
 	//try { console.log('[RENDER] renderPage', { pageId: page.id, elements: page.elements?.length }); } catch {}
 	Array.from(container.querySelectorAll('.element')).forEach(n => n.remove());
+	// Remove any existing stacking icons
+	Array.from(container.querySelectorAll('.stacking-icon')).forEach(n => n.remove());
 	if (!page) return;
 
 	// Repeat-in-header/footer elements: clone from the nearest previous page
@@ -394,6 +431,8 @@ function renderPage(page) {
 				img.style.width = '100%';
 				img.style.height = '100%';
 				img.style.objectFit = 'contain';
+				img.style.objectPosition = 'center';
+				img.style.imageRendering = 'high-quality';
 				img.style.display = 'none';
 				imgContainer.appendChild(img);
 
@@ -438,7 +477,169 @@ function renderPage(page) {
 		if (kids.length){ kids.forEach(k => renderOne(k, node)); }
 	};
 	roots.forEach(r => renderOne(r, null));
+	
+	// Add stacking icons in edit mode
+	if (Model && Model.document && Model.document.editMode) {
+		renderStackingIcons(page, container);
+	}
+	
 	updateSelectionBox();
 }
+
+// Render stacking icons between stacked objects in edit mode
+function renderStackingIcons(page, container) {
+	try {
+		if (!page || !container) return;
+		
+		// Find all stackByPage elements (cross-page stacking)
+		const stackByPageElements = (page.elements || [])
+			.filter(e => e && e.stackByPage === true && !e.freeMove && !e.parentId && !isElementHidden(e))
+			.sort((a, b) => a.y - b.y);
+		
+		// Find all stackChildren containers (within-block stacking)
+		const stackChildrenContainers = (page.elements || [])
+			.filter(e => e && e.type === 'block' && e.stackChildren === true);
+		
+		// Add icons between stackByPage elements
+		for (let i = 0; i < stackByPageElements.length - 1; i++) {
+			const current = stackByPageElements[i];
+			const next = stackByPageElements[i + 1];
+			
+			// Calculate position between the two elements
+			const currentBottom = current.y + (current.h || 0);
+			const nextTop = next.y;
+			const gap = nextTop - currentBottom;
+			
+			// Only show icon if there's a reasonable gap (not overlapping)
+			if (gap > 10) {
+				const iconX = current.x + (current.w || 0) / 2 - 12.5; // Center horizontally, adjust for icon size
+				const iconY = currentBottom + gap / 2 - 12.5; // Center vertically in the gap
+				
+				createStackingIcon(container, iconX, iconY, 'connect', 'Cross-page stacking');
+			}
+		}
+		
+		// Add plug icon below the last stackByPage element on this page only
+		// Only show if this is actually the last element in the entire stack (not just this page)
+		if (stackByPageElements.length > 0) {
+			const lastElement = stackByPageElements[stackByPageElements.length - 1];
+			
+			// Check if this is truly the last element in the entire stack across all pages
+			const allStackByPageElements = [];
+			const doc = Model && Model.document ? Model.document : { pages: [] };
+			for (const pg of doc.pages || []) {
+				const pageStackers = (pg.elements || [])
+					.filter(e => e && e.stackByPage === true && !e.freeMove && !e.parentId && !isElementHidden(e))
+					.sort((a, b) => a.y - b.y);
+				allStackByPageElements.push(...pageStackers);
+			}
+			
+			// Only show plug if this is the very last element in the entire stack
+			if (allStackByPageElements.length > 0 && lastElement.id === allStackByPageElements[allStackByPageElements.length - 1].id) {
+				const iconX = lastElement.x + (lastElement.w || 0) / 2 - 12.5; // Center horizontally
+				const iconY = lastElement.y + (lastElement.h || 0) + 12.5; // Below the element
+				
+				createStackingIcon(container, iconX, iconY, 'plug', 'End of stack');
+			} else {
+				// If this is not the last element in the entire stack, add a connector icon
+				// to indicate the stack continues to the next page
+				const iconX = lastElement.x + (lastElement.w || 0) / 2 - 12.5; // Center horizontally
+				const iconY = lastElement.y + (lastElement.h || 0) + 12.5; // Below the element
+				
+				createStackingIcon(container, iconX, iconY, 'connect', 'Stack continues to next page');
+			}
+		}
+		
+        // Add icons between children in stackChildren containers
+        stackChildrenContainers.forEach(sc => {
+            const children = (page.elements || [])
+                .filter(e => e && e.parentId === sc.id && !isElementHidden(e))
+				.sort((a, b) => a.y - b.y);
+			
+			for (let i = 0; i < children.length - 1; i++) {
+				const current = children[i];
+				const next = children[i + 1];
+				
+                // Calculate position between the two children (absolute page coords)
+				const currentBottom = current.y + (current.h || 0);
+				const nextTop = next.y;
+				const gap = nextTop - currentBottom;
+				
+				// Only show icon if there's a reasonable gap (not overlapping)
+				if (gap > 10) {
+					const iconX = current.x + (current.w || 0) / 2 - 12.5; // Center horizontally, adjust for icon size
+					const iconY = currentBottom + gap / 2 - 12.5; // Center vertically in the gap
+					
+                    // Append to the page DOM container (not the model object)
+                    createStackingIcon(container, iconX, iconY, 'connect', 'Stacked children');
+				}
+			}
+			
+			// Add plug icon below the last child in the container
+			if (children.length > 0) {
+				const lastChild = children[children.length - 1];
+				const iconX = lastChild.x + (lastChild.w || 0) / 2 - 12.5; // Center horizontally
+				const iconY = lastChild.y + (lastChild.h || 0) + 12.5; // Below the element
+				
+                // Append to the page DOM container (not the model object)
+                createStackingIcon(container, iconX, iconY, 'plug', 'End of stack');
+			}
+        });
+		
+	} catch (e) {
+		console.warn('renderStackingIcons error:', e);
+	}
+}
+
+// Create a single stacking icon
+function createStackingIcon(container, x, y, iconType, tooltip) {
+	try {
+		const icon = document.createElement('div');
+		icon.className = 'stacking-icon';
+		icon.style.position = 'absolute';
+		icon.style.left = x + 'px';
+		icon.style.top = y + 'px';
+		icon.style.width = '25px';
+		icon.style.height = '25px';
+		icon.style.pointerEvents = 'none';
+		icon.style.zIndex = '1000';
+		icon.title = tooltip;
+		
+		// Create SVG icon
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('width', '25');
+		svg.setAttribute('height', '25');
+		svg.style.width = '100%';
+		svg.style.height = '100%';
+		svg.style.fill = '#ef4444'; // Red color for visibility
+		
+		// Use different icons based on type
+		if (iconType === 'connect') {
+			// Connect icon between stacked objects
+			svg.setAttribute('viewBox', '0 0 70 70');
+			const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+			path.setAttribute('d', 'M 25.7639,28.0031L 20.0866,22.3258C 19.4683,21.7075 19.4683,20.705 20.0866,20.0866C 20.705,19.4683 21.7075,19.4683 22.3258,20.0867L 28.0031,25.7639C 32.3443,22.5092 38.5302,22.856 42.4783,26.8042L 26.8041,42.4784C 22.856,38.5302 22.5092,32.3443 25.7639,28.0031 Z M 49.1958,33.5217C 53.144,37.4699 53.4908,43.6557 50.2361,47.9969L 55.9133,53.6742C 56.5317,54.2925 56.5317,55.295 55.9133,55.9134C 55.295,56.5317 54.2925,56.5317 53.6742,55.9134L 47.9969,50.2361C 43.6557,53.4908 37.4698,53.1441 33.5216,49.1959L 36.8804,45.8371L 34.0814,43.0381C 33.1539,42.1107 33.1539,40.6069 34.0814,39.6794C 35.0089,38.7519 36.5127,38.7519 37.4402,39.6794L 40.2392,42.4784L 42.4783,40.2392L 39.6794,37.4402C 38.7519,36.5127 38.7519,35.009 39.6794,34.0815C 40.6069,33.154 42.1106,33.154 43.0381,34.0815L 45.8371,36.8804L 49.1958,33.5217 Z');
+			svg.appendChild(path);
+        } else if (iconType === 'plug') {
+            // Plug icon below the last object
+            svg.setAttribute('viewBox', '0 0 50 50');
+            // The plug glyph visually fills its viewBox more than the connector.
+            // Scale it down slightly so the perceived size matches the connector icon.
+            svg.style.transformOrigin = '50% 50%';
+            svg.style.transform = 'scale(0.85)';
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+			path.setAttribute('d', 'M29 8.75h-4.757l0.017-6.747c0-0.001 0-0.002 0-0.003 0-0.689-0.557-1.248-1.246-1.25h-0.004c0 0 0 0 0 0-0.689 0-1.248 0.558-1.25 1.247v0l-0.017 6.753h-11.454l0.050-6.73c0-0.003 0-0.006 0-0.009 0-0.687-0.554-1.245-1.24-1.25h-0.010c-0 0-0 0-0 0-0.687 0-1.244 0.554-1.25 1.24v0l-0.050 6.75h-4.789c-0.69 0-1.25 0.56-1.25 1.25s0.56 1.25 1.25 1.25v0h1.826c0 0.001 0 0.002 0 0.004 0 4.009 1.229 7.73 3.331 10.809l-0.043-0.066c1.54 2.177 3.876 3.702 6.577 4.153l0.059 0.008v3.843c0 0.69 0.56 1.25 1.25 1.25s1.25-0.56 1.25-1.25v0-3.846c2.748-0.461 5.076-1.979 6.592-4.113l0.021-0.031c2.070-3.015 3.307-6.743 3.31-10.759v-0.001h1.827c0.69 0 1.25-0.56 1.25-1.25s-0.56-1.25-1.25-1.25v0zM15.993 23.75h-0.005c-2.442-0.086-4.573-1.344-5.857-3.226l-0.016-0.026c-1.75-2.597-2.793-5.797-2.793-9.24 0-0.003 0-0.006 0-0.008v0h17.389c-0.388 8.57-4.694 12.5-8.718 12.5z');
+			svg.appendChild(path);
+		}
+		
+		icon.appendChild(svg);
+		container.appendChild(icon);
+		
+	} catch (e) {
+		console.warn('createStackingIcon error:', e);
+	}
+}
+
+try { window.renderStackingIcons = renderStackingIcons; } catch {}
 
 

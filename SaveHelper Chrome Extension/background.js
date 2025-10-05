@@ -12,6 +12,55 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // Relay SAVE_HTML messages from the content script to the native host
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    // Simple ping handler for debugging
+    if (msg?.type === 'ping') {
+        console.log('Background script received ping');
+        sendResponse({ ok: true, message: 'Extension is loaded and responding' });
+        return true;
+    }
+
+    // Native PDF (headless) using DevTools Protocol
+    if (msg?.type === 'PRINT_NATIVE_PDF') {
+        console.log('Background script received PRINT_NATIVE_PDF message', msg);
+        (async () => {
+            let target = null;
+            try {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                console.log('Active tab found:', tab);
+                if (!tab?.id) throw new Error('No active tab');
+                target = { tabId: tab.id };
+                console.log('Attaching debugger to tab:', target);
+                await chrome.debugger.attach(target, '1.3');
+                console.log('Debugger attached, enabling Page domain');
+                await chrome.debugger.sendCommand(target, 'Page.enable');
+                console.log('Setting emulated media to print');
+                await chrome.debugger.sendCommand(target, 'Emulation.setEmulatedMedia', { media: 'print' });
+                console.log('Generating PDF with printToPDF');
+                const { data } = await chrome.debugger.sendCommand(target, 'Page.printToPDF', {
+                    printBackground: true,
+                    marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0,
+                    paperWidth: 8.27, paperHeight: 11.69, // A4 inches
+                    preferCSSPageSize: true,
+                    scale: 1
+                });
+                console.log('PDF generated, detaching debugger');
+                try { await chrome.debugger.detach(target); } catch {}
+
+                console.log('Converting PDF data to blob');
+                const blob = await (await fetch('data:application/pdf;base64,' + data)).blob();
+                const url = URL.createObjectURL(blob);
+                console.log('Starting download for file:', msg.filename || 'document.pdf');
+                await chrome.downloads.download({ url, filename: msg.filename || 'document.pdf', saveAs: true });
+                console.log('Download started successfully');
+                sendResponse({ ok: true });
+            } catch (e) {
+                console.error('Error in PRINT_NATIVE_PDF:', e);
+                try { if (target) await chrome.debugger.detach(target); } catch {}
+                sendResponse({ ok: false, error: String(e) });
+            }
+        })();
+        return true;
+    }
     // Persist/restore zoom across a rename navigation
     if (msg?.type === "GET_SAVED_ZOOM") {
         const tabId = sender?.tab?.id;

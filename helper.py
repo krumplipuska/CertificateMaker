@@ -131,14 +131,14 @@ def combine_files(html_file='index.html', output_file='combined.html', document_
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
-        print(f"✅ Successfully created {output_file}")
+        print(f"Successfully created {output_file}")
 
         size = os.path.getsize(output_file)
-        print(f"📁 File size: {size:,} bytes ({size/1024:.1f} KB)")
+        print(f"File size: {size:,} bytes ({size/1024:.1f} KB)")
         return True
 
     except Exception as e:
-        print(f"❌ Error writing {output_file}: {e}")
+        print(f"Error writing {output_file}: {e}")
         return False
 
 def create_export(document_data, output_file='export.html'):
@@ -153,7 +153,7 @@ def create_export(document_data, output_file='export.html'):
 
 def main():
     """Main function - can be called from command line or imported"""
-    print("🔧 HTML Combiner Helper")
+    print("HTML Combiner Helper")
     print("=" * 30)
     
     # Check if required files exist
@@ -161,19 +161,19 @@ def main():
     missing_files = [f for f in required_files if not Path(f).exists()]
     
     if missing_files:
-        print(f"⚠️  Missing files: {', '.join(missing_files)}")
+        print(f"Missing files: {', '.join(missing_files)}")
         if 'index.html' in missing_files:
-            print("❌ Cannot proceed without index.html")
+            print("Cannot proceed without index.html")
             return False
     
     # Combine files
     success = combine_files()
     
     if success:
-        print("\n✨ All files combined successfully!")
-        print("📝 You can now use the combined.html file")
+        print("\nAll files combined successfully!")
+        print("You can now use the combined.html file")
     else:
-        print("\n❌ Failed to combine files")
+        print("\nFailed to combine files")
     
     return success
 

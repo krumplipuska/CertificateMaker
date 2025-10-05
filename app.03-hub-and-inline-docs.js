@@ -930,7 +930,10 @@ function renderPagesList() {
     wrap.appendChild(title);
 
     const stage = document.createElement('div');
-    stage.className = 'page-stage';
+    try {
+      const cls = (p && p.isHidden) ? 'page-stage hidden' : 'page-stage';
+      stage.className = cls;
+    } catch { stage.className = 'page-stage'; }
 
     const page = document.createElement('div');
     page.className = 'page';
@@ -985,7 +988,11 @@ function renderPagesList() {
       else if (btn.dataset.act === 'add-below') { Model.document.currentPageId = p.id; addPage(); }
       else if (btn.dataset.act === 'toggle-visibility') {
         const stage = wrap.querySelector('.page-stage');
-        if (stage) stage.classList.toggle('hidden');
+        if (stage) {
+          const nowHidden = !stage.classList.contains('hidden');
+          stage.classList.toggle('hidden');
+          try { p.isHidden = nowHidden; } catch {}
+        }
       }
     });
 

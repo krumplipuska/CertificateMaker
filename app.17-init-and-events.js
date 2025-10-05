@@ -709,6 +709,8 @@ async function bootstrap(){
   const jpgBtn = document.getElementById('exportJpgBtn');
   const pdfBtn = document.getElementById('savePdfBtn');
   if (pdfBtn) pdfBtn.addEventListener('click', () => ExportService.exportDocumentToPdf());
+  const pdfNativeBtn = document.getElementById('savePdfNativeBtn');
+  if (pdfNativeBtn) pdfNativeBtn.addEventListener('click', () => ExportService.exportDocumentToPdfNative());
   if (pngBtn) pngBtn.addEventListener('click', () => ExportService.exportCurrentPageToImage({ format: 'png' }));
   if (jpgBtn) jpgBtn.addEventListener('click', () => ExportService.exportCurrentPageToImage({ format: 'jpg', quality: 0.85 }));
   
@@ -816,6 +818,7 @@ async function bootstrap(){
   function renderCmds(q){ if (!cl) return; const qq = q.trim().toLowerCase(); cl.innerHTML=''; COMMANDS.filter(c=>c.label.toLowerCase().includes(qq)).forEach(c=>{ const b=document.createElement('button'); b.className='btn'; b.textContent=c.label; b.style.justifyContent='flex-start'; b.addEventListener('click', ()=>{ c.run(); closePalette(); }); cl.appendChild(b); }); }
   document.addEventListener('keydown', (e)=>{
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); try { saveDocument(); } catch {} }
     if (cp && !cp.classList.contains('hidden') && e.key === 'Escape') { e.preventDefault(); closePalette(); }
   });
   ci?.addEventListener('input', ()=> renderCmds(ci.value));

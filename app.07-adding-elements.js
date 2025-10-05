@@ -57,7 +57,12 @@ function placePendingAt(x, y, pageId = Model.document.currentPageId){
   // If dropped inside a block, parent it before reflow
   try { reparentIntoBlocks(page, [base.id]); } catch {}
   // Immediately reflow page stacks so newly added elements snap into place
-  try { reflowStacks(page); } catch {}
+  try { reflowStacks(page, { removeEmptyPages: false }); } catch {}
+  // Show the page if it was hidden (now that it has stacking elements)
+  try {
+    const hasStackingElements = Array.isArray(page.elements) && page.elements.some(el => el && !el.freeMove);
+    if (hasStackingElements && typeof setPageHiddenById === 'function') setPageHiddenById(page.id, false);
+  } catch {}
   pendingAddType = null; // single insertion
   renderPage(page);
   setSelection([base.id]);

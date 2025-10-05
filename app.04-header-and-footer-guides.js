@@ -19,7 +19,15 @@ function setHeaderFooterHeights({ header, footer }){
   try {
     document.querySelectorAll('.page').forEach(p => updateHeaderFooterGuides(p));
   } catch {}
-  try { reflowStacks(getCurrentPage()); } catch {}
+  try { reflowStacks(getCurrentPage(), { removeEmptyPages: false }); } catch {}
+  // If a page became effectively empty/non-empty due to bands, just adjust visibility
+  try {
+    const pages = (Model && Model.document && Array.isArray(Model.document.pages)) ? Model.document.pages : [];
+    pages.forEach(pg => {
+      const hasStackingElements = Array.isArray(pg.elements) && pg.elements.some(el => el && !el.freeMove);
+      if (typeof setPageHiddenById === 'function') setPageHiddenById(pg.id, !hasStackingElements);
+    });
+  } catch {}
 }
 function attachHeaderFooterResizers(pageNode, pageId){
   try {

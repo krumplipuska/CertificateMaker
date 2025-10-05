@@ -252,7 +252,6 @@ function setVisibility(targetSelector, visible){
         const nextHidden = !Boolean(visible);
         // Use CSS selector targeting so updates re-render all pages
         ids.forEach(id => updateElement(`[data-id="${id}"]`, { attrs: { hidden: nextHidden } }));
-        try { if (typeof window.reflowStacks === 'function') window.reflowStacks(getCurrentPage()); } catch {}
         try { if (typeof renderPage === 'function') renderPage(getCurrentPage()); } catch {}
     } catch(err){ console.warn('setVisibility failed', err); }
 }
@@ -278,7 +277,15 @@ function toggleVisibility(targetSelector){
             // Apply via selector so cross-page updates trigger renderAll()
             updateElement(`[data-id="${id}"]`, { attrs: { hidden: !hidden } });
         });
-        try { if (typeof window.reflowStacks === 'function') window.reflowStacks(getCurrentPage()); } catch {}
+        try { if (typeof window.reflowStacks === 'function') window.reflowStacks(getCurrentPage(), { removeEmptyPages: true }); } catch {}
+        // Ensure pages reflect content after visibility change
+        try {
+            const pages = (Model && Model.document && Array.isArray(Model.document.pages)) ? Model.document.pages : [];
+            pages.forEach(pg => {
+                const hasStackingElements = Array.isArray(pg.elements) && pg.elements.some(el => el && !el.freeMove);
+                if (typeof setPageHiddenById === 'function') setPageHiddenById(pg.id, !hasStackingElements);
+            });
+        } catch {}
         try { if (typeof renderPage === 'function') renderPage(getCurrentPage()); } catch {}
     } catch(err){ console.warn('toggleVisibility failed', err); }
 }
