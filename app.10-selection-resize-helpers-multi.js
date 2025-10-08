@@ -80,6 +80,9 @@ function applySelectionResize(event){
   const sx = nw / sb.w;
   const sy = nh / sb.h;
   
+  // For corner resizing of images, lock to uniform scaling (aspect ratio lock)
+  const isCornerResize = h.includes('n') && h.includes('w') || h.includes('n') && h.includes('e') || h.includes('s') && h.includes('w') || h.includes('s') && h.includes('e');
+  
   const page = getCurrentPage();
   [...selectedIds].forEach(id => {
     const start = resizeSelectionState.starts.get(id);
@@ -92,8 +95,23 @@ function applySelectionResize(event){
     } else {
       const rx = start.x - sb.x; const ry = start.y - sb.y;
       out.x = nx + rx * sx; out.y = ny + ry * sy;
-      if (typeof start.w === 'number') out.w = Math.max(minW, (start.w || 0) * sx);
-      if (typeof start.h === 'number') out.h = Math.max(minH, (start.h || 0) * sy);
+      if (typeof start.w === 'number' && typeof start.h === 'number') {
+        // For images with corner resize: preserve aspect ratio
+        if (start.type === 'image' && isCornerResize) {
+          const aspectRatio = start.w / start.h;
+          // Use the average scale factor to maintain aspect ratio
+          const uniformScale = (sx + sy) / 2;
+          out.w = Math.max(minW, (start.w || 0) * uniformScale);
+          out.h = Math.max(minH, (start.h || 0) * uniformScale);
+        } else {
+          // Normal scaling for other elements
+          out.w = Math.max(minW, (start.w || 0) * sx);
+          out.h = Math.max(minH, (start.h || 0) * sy);
+        }
+      } else {
+        if (typeof start.w === 'number') out.w = Math.max(minW, (start.w || 0) * sx);
+        if (typeof start.h === 'number') out.h = Math.max(minH, (start.h || 0) * sy);
+      }
     }
     const idx = page.elements.findIndex(e => e.id === id); if (idx !== -1) page.elements[idx] = out;
     const node = document.querySelector(`.page [data-id="${id}"]`); if (node) applyElementStyles(node, out);

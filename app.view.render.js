@@ -430,7 +430,7 @@ function renderPage(page) {
 				img.alt = '';
 				img.style.width = '100%';
 				img.style.height = '100%';
-				img.style.objectFit = 'contain';
+				img.style.objectFit = 'cover';
 				img.style.objectPosition = 'center';
 				img.style.imageRendering = 'high-quality';
 				img.style.display = 'none';
@@ -445,11 +445,51 @@ function renderPage(page) {
 						const file = input.files?.[0]; if (!file) return;
 						const reader = new FileReader();
 						reader.onload = () => {
-							const src = String(reader.result || '');
-							img.src = src;
-							img.style.display = 'block';
-							placeholder.style.display = 'none';
-							updateElement(elm.id, { src: src });
+							const originalSrc = String(reader.result || '');
+							
+							// Convert PNG to JPEG to save file size
+							if (file.type === 'image/png' || originalSrc.startsWith('data:image/png')) {
+								const tempImg = new Image();
+								tempImg.onload = () => {
+									try {
+										const canvas = document.createElement('canvas');
+										canvas.width = tempImg.naturalWidth || tempImg.width;
+										canvas.height = tempImg.naturalHeight || tempImg.height;
+										const ctx = canvas.getContext('2d');
+										// White background for transparency
+										ctx.fillStyle = '#ffffff';
+										ctx.fillRect(0, 0, canvas.width, canvas.height);
+										ctx.drawImage(tempImg, 0, 0);
+										// Convert to JPEG with 85% quality
+										const jpegSrc = canvas.toDataURL('image/jpeg', 0.85);
+										img.src = jpegSrc;
+										img.style.display = 'block';
+										placeholder.style.display = 'none';
+										updateElement(elm.id, { src: jpegSrc });
+									} catch (err) {
+										// Fallback to original if conversion fails
+										console.warn('PNG to JPEG conversion failed, using original:', err);
+										img.src = originalSrc;
+										img.style.display = 'block';
+										placeholder.style.display = 'none';
+										updateElement(elm.id, { src: originalSrc });
+									}
+								};
+								tempImg.onerror = () => {
+									// Fallback to original if image load fails
+									img.src = originalSrc;
+									img.style.display = 'block';
+									placeholder.style.display = 'none';
+									updateElement(elm.id, { src: originalSrc });
+								};
+								tempImg.src = originalSrc;
+							} else {
+								// For JPEG and other formats, use as-is
+								img.src = originalSrc;
+								img.style.display = 'block';
+								placeholder.style.display = 'none';
+								updateElement(elm.id, { src: originalSrc });
+							}
 						};
 						reader.readAsDataURL(file);
 					};

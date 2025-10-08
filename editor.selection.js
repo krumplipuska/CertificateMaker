@@ -19,32 +19,26 @@ function clearSelection(){
   updateSelectionUI(); 
 }
 function setSelection(ids){ 
-  selectedIds = new Set((ids||[]).filter(Boolean)); 
+  selectedIds = new Set((ids||[]).filter(Boolean));
   //console.log('[SELECTION] set', Array.from(selectedIds));
-  // Clear table selection unless we're selecting the same table that has active cell selection
-  if (tableSel && (selectedIds.size !== 1 || !selectedIds.has(tableSel.tableId))) {
-    clearTableSelection();
-  }
+  // Note: We no longer automatically clear table selection when selecting elements
+  // This allows for multiple selections across different tables
   updateSelectionUI(); 
 }
 function addToSelection(id){ 
   if (!id) return; 
   selectedIds.add(id); 
   //console.log('[SELECTION] add', id, '→', Array.from(selectedIds));
-  // Clear table selection when adding non-table elements or different tables
-  if (tableSel && (!selectedIds.has(tableSel.tableId) || selectedIds.size > 1)) {
-    clearTableSelection();
-  }
+  // Note: We no longer automatically clear table selection when adding elements
+  // This allows for multiple selections across different tables
   updateSelectionUI(); 
 }
 function toggleSelection(id){ 
   if (!id) return; 
   selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id); 
   //console.log('[SELECTION] toggle', id, '→', Array.from(selectedIds));
-  // Clear table selection when toggling creates a multi-selection or removes the table
-  if (tableSel && (!selectedIds.has(tableSel.tableId) || selectedIds.size > 1)) {
-    clearTableSelection();
-  }
+  // Note: We no longer automatically clear table selection when toggling elements
+  // This allows for multiple selections across different tables
   updateSelectionUI(); 
 }
 function isSelected(id){ return selectedIds.has(id); }

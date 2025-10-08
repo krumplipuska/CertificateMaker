@@ -339,147 +339,130 @@ const ExportService = (function(){
     }
 
     // Legacy raster export kept as fallback
-    async function exportDocumentToPdfRaster({ filename = 'myfile.pdf', dpi = 220, orientation = 'portrait' } = {}){
-		if (isExporting) {
-			console.warn('PDF export already in progress, ignoring duplicate call');
-			return;
-		}
-		isExporting = true;
-		try {
-		const pages = Array.from(document.querySelectorAll('.page')); if (!pages.length) return;
-		// Preflight
-		try { if (document.fonts && document.fonts.ready) { await document.fonts.ready; } } catch {}
-			const originalZoom = typeof getZoom === 'function' ? getZoom() : 1; 
-			if (typeof setZoomScale === 'function') setZoomScale(1);
-			
-			// Force CSS zoom to 1 and wait for full propagation
-			document.documentElement.style.setProperty('--zoom', '1');
-			
-			// Stabilize layout: neutralize scroll and wait for styles to apply
-			const vp = document.getElementById('pageViewport');
-			const prevVpScrollLeft = vp ? vp.scrollLeft : 0;
-			const prevVpScrollTop  = vp ? vp.scrollTop  : 0;
-			const prevWinScrollX = window.scrollX, prevWinScrollY = window.scrollY;
-			try { if (vp) vp.scrollTo(0,0); window.scrollTo(0,0); } catch {}
-			
-			// Triple RAF to ensure CSS var --zoom=1 takes effect before measuring/capture
-			await new Promise(res => requestAnimationFrame(() => 
-				requestAnimationFrame(() => requestAnimationFrame(res))));
+    async function exportDocumentToPdfRaster({  dpi = 220, orientation = 'portrait' } = {}){
+		//ctach the all the pages from the page-list
+		//and create an image for each page by using only html2canvas
+		//and add it to the pdf
+		//save the pdf
 
-		const html2canvasFn = await ensureHtml2Canvas();
-		const jsPDF = await ensureJsPDF();
-			const scale = 1; // Always use 1:1 scale for exact PDF reproduction
-			const canvasScrollX = 0;
-			const canvasScrollY = 0;
+		//sanitize the #docTitleInput value and use it as a filename
+		const filename = sanitizeFileBaseName(document.getElementById('docTitleInput').value) + '.pdf';
+
+		//if filename is empty, use a default filename
+		if (!filename) filename = 'myfile.pdf';
+
+		//make sure that the zoom level is set to a size to perfectly fit a a4 page. get the current zoom level and set it back after the export
+		const originalZoom = typeof getZoom === 'function' ? getZoom() : 1; if (typeof setZoomScale === 'function') setZoomScale(1);
+		if (typeof setZoomScale === 'function') setZoomScale(1.5);
+
+		//hide all the selection boxes, cell selection, cell selection, and header and footer guides
+		const selectionBoxes = document.querySelectorAll('.selection-box');
+		const cellSelection = document.querySelectorAll('.cell-selection');
+		const headerGuides = document.querySelectorAll('.hf-guide');
+		selectionBoxes.forEach(box => box.style.display = 'none');
+		cellSelection.forEach(box => box.style.display = 'none');
+		headerGuides.forEach(box => box.style.display = 'none');
+
+		try {
+			//capture the each page one by one
+			const pages = Array.from(document.querySelectorAll('.page'));
+			if (!pages.length) return;
 			
-			// Measure page dimensions after zoom stabilization
-			const firstPage = pages[0]; 
-			const widthPx = firstPage.offsetWidth; 
-			const heightPx = firstPage.offsetHeight;
-			
-			console.log(`Page dimensions after zoom=1: ${widthPx}x${heightPx}`);
-			console.log(`Page computed style transform: ${window.getComputedStyle(firstPage).transform}`);
-			console.log(`CSS --zoom value: ${getComputedStyle(document.documentElement).getPropertyValue('--zoom')}`);
-			
-			// Log some element positions for debugging
-			const elements = firstPage.querySelectorAll('.element');
-			if (elements.length > 0) {
-				console.log(`Found ${elements.length} elements on page`);
-				elements.forEach((el, idx) => {
-					const rect = el.getBoundingClientRect();
-					const computed = window.getComputedStyle(el);
-					console.log(`Element ${idx}: pos(${el.style.left}, ${el.style.top}) size(${el.style.width}, ${el.style.height}) transform(${computed.transform})`);
-				});
-			}
-		const pdf = new jsPDF({ unit:'px', format:[widthPx, heightPx], orientation, compress:true });
-		for (let i=0;i<pages.length;i++){
-			const page = pages[i];
-				const prevShadow = page.style.boxShadow; 
-				const prevRadius = page.style.borderRadius; 
-				const prevTransform = page.style.transform;
-				const prevTransformOrigin = page.style.transformOrigin;
+			// Pre-process images to work around html2canvas object-fit:cover issues
+			const imageFixups = [];
+			pages.forEach(page => {
+			const imageElements = page.querySelectorAll('.element.image img');
+			imageElements.forEach(img => {
+				if (!img.src || img.style.display === 'none') return;
 				
-				// Remove all transforms for clean capture
-				page.style.boxShadow = 'none'; 
-				page.style.borderRadius = '0';
-				page.style.transform = 'none';
-				page.style.transformOrigin = 'initial';
-			// Hide editor-only guides (including header/footer bands) while capturing
-			const guides = Array.from(page.querySelectorAll('.guide, .hf-guide'));
-			const prevGuideDisplay = guides.map(n => n.style.display);
-			guides.forEach(n => n.style.display = 'none');
-			
-			// Prepare images for better export quality
-			const images = Array.from(page.querySelectorAll('img'));
-			const prevImageStyles = images.map(img => ({
-				objectFit: img.style.objectFit,
-				objectPosition: img.style.objectPosition
-			}));
-			
-			// Ensure all images are loaded and properly styled
-			await Promise.all(images.map(img => {
-				if (img.complete && img.naturalWidth > 0) {
-					return Promise.resolve();
-				}
-				return new Promise((resolve) => {
-					img.onload = resolve;
-					img.onerror = resolve;
-					// Timeout after 5 seconds
-					setTimeout(resolve, 5000);
+				const container = img.closest('.element.image');
+				if (!container) return;
+					
+					// Save original state
+					const originalImgStyle = {
+						width: img.style.width,
+						height: img.style.height,
+						objectFit: img.style.objectFit,
+						objectPosition: img.style.objectPosition,
+						maxWidth: img.style.maxWidth,
+						maxHeight: img.style.maxHeight,
+						position: img.style.position,
+						top: img.style.top,
+						left: img.style.left,
+						transform: img.style.transform
+					};
+					
+					// Calculate the cover-fit dimensions
+					const containerW = container.offsetWidth;
+					const containerH = container.offsetHeight;
+					const naturalW = img.naturalWidth || img.width;
+					const naturalH = img.naturalHeight || img.height;
+					
+					if (naturalW && naturalH && containerW && containerH) {
+						// Calculate scale to cover (same as object-fit: cover)
+						const scaleX = containerW / naturalW;
+						const scaleY = containerH / naturalH;
+						const scale = Math.max(scaleX, scaleY);
+						
+						const scaledW = naturalW * scale;
+						const scaledH = naturalH * scale;
+						
+						// Center the image
+						const offsetX = (containerW - scaledW) / 2;
+						const offsetY = (containerH - scaledH) / 2;
+						
+						// Apply explicit positioning and sizing for html2canvas
+						img.style.position = 'absolute';
+						img.style.left = offsetX + 'px';
+						img.style.top = offsetY + 'px';
+						img.style.width = scaledW + 'px';
+						img.style.height = scaledH + 'px';
+						img.style.maxWidth = 'none';
+						img.style.maxHeight = 'none';
+						img.style.objectFit = 'none';
+						img.style.transform = 'none';
+						
+						imageFixups.push({ img, originalImgStyle });
+					}
 				});
-			}));
-			
-			images.forEach(img => {
-				img.style.objectFit = 'contain';
-				img.style.objectPosition = 'center';
-				img.style.imageRendering = 'high-quality';
 			});
 			
-			// Small delay to ensure styles are applied
-			await new Promise(resolve => setTimeout(resolve, 100));
-				const canvas = await html2canvasFn(page, { 
-				scale, 
-				useCORS: true, 
-				backgroundColor: '#ffffff', 
-				scrollX: canvasScrollX, 
-				scrollY: canvasScrollY,
-				allowTaint: true,
-				foreignObjectRendering: true,
-				imageTimeout: 15000,
-				logging: false,
-				width: widthPx,
-				height: heightPx
-			});
-			// Restore styles
-			page.style.boxShadow = prevShadow; 
-			page.style.borderRadius = prevRadius;
-			page.style.transform = prevTransform;
-			page.style.transformOrigin = prevTransformOrigin;
-			guides.forEach((n, idx) => { n.style.display = prevGuideDisplay[idx]; });
-			
-			// Restore image styles
-			images.forEach((img, idx) => {
-				const prevStyle = prevImageStyles[idx];
-				img.style.objectFit = prevStyle.objectFit;
-				img.style.objectPosition = prevStyle.objectPosition;
-				img.style.imageRendering = '';
+			const html2canvasFn = await ensureHtml2Canvas();
+			const jsPDF = await ensureJsPDF();
+			const scale = Math.max(1, Math.round(dpi / 96));
+			const canvasScrollX = -window.scrollX || -7;
+			const canvasScrollY = -window.scrollY || 0;
+			const firstPage = pages[0]; const widthPx = firstPage.offsetWidth; const heightPx = firstPage.offsetHeight;
+			const pdf = new jsPDF({ unit:'px', format:[widthPx, heightPx], orientation, compress:true });
+
+			for (let i=0; i<pages.length; i++){
+				if (i>0) pdf.addPage([widthPx, heightPx], orientation);
+				const page = pages[i];
+				const canvas = await html2canvasFn(page, { scale, useCORS:true, backgroundColor:'#ffffff', scrollX: canvasScrollX, scrollY: canvasScrollY });
+				const imgData = canvas.toDataURL('image/jpeg', 0.8);
+				pdf.addImage(imgData, 'JPEG', 0, 0, widthPx, heightPx);
+			}
+
+			// Restore original image styles
+			imageFixups.forEach(({ img, originalImgStyle }) => {
+				Object.keys(originalImgStyle).forEach(key => {
+					img.style[key] = originalImgStyle[key];
+				});
 			});
 			
-			console.log(`Page ${i+1}: Canvas dimensions: ${canvas.width}x${canvas.height}, Page dimensions: ${widthPx}x${heightPx}`);
-			
-			const imgData = canvas.toDataURL('image/jpeg', 0.75);
-			if (i>0) pdf.addPage([widthPx, heightPx], orientation);
-			pdf.addImage(imgData, 'JPEG', 0, 0, widthPx, heightPx);
-		}
-		pdf.save(filename);
-		if (typeof setZoomScale === 'function') setZoomScale(originalZoom);
+			pdf.save(filename);
 		} finally {
-			// Restore viewport/window scroll and zoom regardless of outcome
-			try { if (typeof setZoomScale === 'function') setZoomScale(originalZoom); } catch {}
-			try { document.documentElement.style.setProperty('--zoom', String(originalZoom)); } catch {}
-			try { if (vp) vp.scrollTo(prevVpScrollLeft, prevVpScrollTop); window.scrollTo(prevWinScrollX, prevWinScrollY); } catch {}
 			isExporting = false;
+			selectionBoxes.forEach(box => box.style.display = 'block');
+			cellSelection.forEach(box => box.style.display = 'block');
+			headerGuides.forEach(box => box.style.display = 'block');
 		}
+	}
+
+	// New: Strict raster-only export at target DPI (no vector path)
+	async function exportDocumentToPdfRasterOnly({ filename = 'myfile.pdf', dpi = 220, orientation } = {}){
+		// Reuse the proven raster path 1:1 to avoid any vector steps
+		return exportDocumentToPdfRaster({ filename, dpi, orientation });
 	}
 
     let isExporting = false;
@@ -643,7 +626,7 @@ const ExportService = (function(){
 						img.style.display = 'block';
 						img.style.visibility = 'visible';
 						img.style.opacity = '1';
-						img.style.objectFit = 'contain';
+						img.style.objectFit = 'cover';
 						img.style.objectPosition = 'center';
 						img.style.imageRendering = 'high-quality';
 						// Compress very large images down to near their printed size to reduce PDF size
@@ -810,7 +793,7 @@ const ExportService = (function(){
 		}
 	}
 
-    return { exportDocumentToPdf, exportCurrentPageToImage, exportDocumentToPdfNative };
+	return { exportDocumentToPdf, exportCurrentPageToImage, exportDocumentToPdfNative, exportDocumentToPdfRasterOnly };
 })();
 
 

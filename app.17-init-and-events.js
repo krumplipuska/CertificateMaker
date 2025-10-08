@@ -711,6 +711,8 @@ async function bootstrap(){
   if (pdfBtn) pdfBtn.addEventListener('click', () => ExportService.exportDocumentToPdf());
   const pdfNativeBtn = document.getElementById('savePdfNativeBtn');
   if (pdfNativeBtn) pdfNativeBtn.addEventListener('click', () => ExportService.exportDocumentToPdfNative());
+  const pdfRasterBtn = document.getElementById('savePdfRasterBtn');
+  if (pdfRasterBtn) pdfRasterBtn.addEventListener('click', () => ExportService.exportDocumentToPdfRasterOnly({ dpi: 300 }));
   if (pngBtn) pngBtn.addEventListener('click', () => ExportService.exportCurrentPageToImage({ format: 'png' }));
   if (jpgBtn) jpgBtn.addEventListener('click', () => ExportService.exportCurrentPageToImage({ format: 'jpg', quality: 0.85 }));
   
@@ -792,6 +794,15 @@ async function bootstrap(){
     if (!actions.contains(e.target)) panel.classList.add('hidden');
   });
 
+  // Clear all selections when clicking anywhere on the topbar
+  const topbar = document.querySelector('.topbar');
+  if (topbar) {
+    topbar.addEventListener('click', (e) => {
+      clearSelection();
+      clearTableSelection();
+    });
+  }
+
   // Command palette (Ctrl/Cmd+K)
   const cp = document.getElementById('commandPalette');
   const ci = document.getElementById('commandInput');
@@ -844,8 +855,9 @@ async function bootstrap(){
     if (bubble && bubble.contains && bubble.contains(t)) return;
     const selBox = selectionBoxEl && selectionBoxEl();
     if (selBox && selBox.contains && selBox.contains(t)) return;
-    // Otherwise, clear element selection
+    // Otherwise, clear both element selection and table selection
     if (selectedIds && selectedIds.size > 0) clearSelection();
+    if (typeof clearTableSelection === 'function') clearTableSelection();
   });
 
   // Element context menu (right-click) — reuse the actions bar "..." dropdown

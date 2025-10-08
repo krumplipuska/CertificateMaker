@@ -505,13 +505,24 @@ function hitTableBoundary(tableNode, model, clientX, clientY, pad=6){
 // ===== Table selection state =====
 let tableSel = null; // { tableId, r0,c0,r1,c1 }
 let lastTableSel = null; // Track last table selection for fallback behavior
+let allTableSelections = new Map(); // Track multiple table selections { tableId -> { tableId, r0,c0,r1,c1 } }
 const isTableContext = () => !!tableSel || (getSelectedElement()?.type === 'table');
 function getSelectedElement(){ return selectedIds.size===1 ? getElementById([...selectedIds][0]) : null; }
+
+function clearAllTableSelections(){
+  // Clear all selections from all tables
+  allTableSelections.clear();
+  document.querySelectorAll('.table-cell.is-selected,.table-cell.is-range,.table-cell.selected').forEach(n=>{
+    n.classList.remove('is-selected','is-range','selected');
+    n.setAttribute('aria-selected','false');
+    n.tabIndex = -1;
+  });
+  // Remove all selection overlays
+  document.querySelectorAll('.table-selection').forEach(n=> n.remove());
+}
 function setTableSelection(tableId, r0,c0,r1,c1){ 
-  // Clear lastTableSel if switching to a different table
-  if (lastTableSel && lastTableSel.tableId !== tableId) {
-    lastTableSel = null;
-  }
+  // Clear all previous table selections when clicking into any cell
+  clearAllTableSelections();
   
   // Normalize selection so ranges work regardless of drag direction
   const rr0 = Math.min(r0, (r1 ?? r0));
@@ -528,13 +539,7 @@ function setTableSelection(tableId, r0,c0,r1,c1){
 function clearTableSelection(){
   tableSel = null;
   // Don't clear lastTableSel here - keep it for fallback behavior
-  document.querySelectorAll('.table-cell.is-selected,.table-cell.is-range,.table-cell.selected').forEach(n=>{
-    n.classList.remove('is-selected','is-range','selected');
-    n.setAttribute('aria-selected','false');
-    n.tabIndex = -1;
-  });
-  // Remove selection overlay if present
-  document.querySelectorAll('.table-selection').forEach(n=> n.remove());
+  clearAllTableSelections();
   updateToolbarForSelection(); updateFormatToolbarVisibility();
   const bar = document.getElementById('tableActions'); if (bar) bar.classList.add('hidden');
   // Re-enable main toolbar stroke controls when table selection is cleared
@@ -648,6 +653,11 @@ function onTableCellMouseDown(e){
   if (window.__PICKING) { e.preventDefault(); e.stopPropagation(); return; }
   if (e.button !== 0) return; // right-click shouldn't change selection
   e.stopPropagation();
+  
+  // Clear all previous selections when clicking into any cell
+  clearSelection();
+  clearTableSelection();
+  
   const div = e.currentTarget; const tableId = div.dataset.tableId; const r = +div.dataset.r, c = +div.dataset.c;
   setTableSelection(tableId, r, c);
   // Move focus to the active cell for keyboarding

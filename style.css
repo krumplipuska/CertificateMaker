@@ -193,7 +193,7 @@ html, body {
 .element.image img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
   display: block;
 }
@@ -203,6 +203,7 @@ html, body {
   width: 100%;
   height: 100%;
   position: relative;
+  overflow: hidden;
 }
 
 .element.image .image-placeholder {
@@ -709,7 +710,7 @@ input[type="color"].circle:hover::-webkit-color-swatch { border-color: var(--pri
   max-height: 100%;
   width: auto;
   height: auto;
-  object-fit: contain;      /* don't crop */
+  object-fit: cover;        /* fill the frame */
   object-position: center;  /* center inside its box */
 }
 
