@@ -778,7 +778,15 @@ function startEditCell(e, opts){
       const node = getElementNode(tableId)?.querySelector(`.table-cell[data-r="${nr}"][data-c="${nc}"]`); if (node) node.focus();
     }
   };
-  function cleanup(){ div.removeEventListener('blur', onBlur); div.removeEventListener('keydown', onKey); div.setAttribute('contenteditable','false'); div.removeAttribute('role'); }
+  function cleanup(){ 
+    // Stop inline picker if active
+    try { if (div._pickerStop) { div._pickerStop(); div._pickerStop = null; } } catch {}
+    try { if (div._pickerDoneRef) { div._pickerDoneRef(); div._pickerDoneRef = null; } } catch {}
+    div.removeEventListener('blur', onBlur); 
+    div.removeEventListener('keydown', onKey); 
+    div.setAttribute('contenteditable','false'); 
+    div.removeAttribute('role'); 
+  }
   div.addEventListener('blur', onBlur);
   div.addEventListener('keydown', onKey);
 

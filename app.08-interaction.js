@@ -471,24 +471,28 @@ function onMouseDown(e){
     //console.log('[MOUSE] down on element', id);
     const page = getCurrentPage();
     const model = page.elements.find(el => el.id === id);
-    // Respect locked layers
+    // Prevent selection of locked elements
     if (model && model.attrs && (model.attrs.locked === true || model.attrs.locked === 'true')){
-      // Allow selection but block drag/resize
-      setSelection([id]);
+      // Locked elements cannot be selected - just prevent default and return
       e.preventDefault();
       return;
     }
     // Alt-drag duplicate: when starting a drag with Alt pressed, clone selection first
-    if ((e.altKey || e.metaKey && e.shiftKey) && (selectedIds.has(id) || selectedIds.size === 0)){
-      // If nothing selected, select target first then clone
-      if (!selectedIds.has(id)) setSelection([id]);
-      copySelection(0); // duplicate at same position
-      // Keep newly created clones selected and start dragging them
-      // Offset start so immediate movement will be visible
-    }
+    // if ((e.altKey || e.metaKey && e.shiftKey) && (selectedIds.has(id) || selectedIds.size === 0)){
+    //   // If nothing selected, select target first then clone
+    //   if (!selectedIds.has(id)) setSelection([id]);
+    //   copySelection(0); // duplicate at same position
+    //   // Keep newly created clones selected and start dragging them
+    //   // Offset start so immediate movement will be visible
+    // }
     const append = e.shiftKey || e.ctrlKey || e.metaKey;
     const toggle = e.ctrlKey || e.metaKey;
-    if (!append && !toggle && model?.groupId) { setSelection(getElementsByGroup(model.groupId).map(e=>e.id)); }
+    if (!append && !toggle && model?.groupId) { 
+      const groupIds = getElementsByGroup(model.groupId).map(e=>e.id);
+      // Filter out locked elements from group selection
+      const filteredIds = typeof filterLockedElements === 'function' ? filterLockedElements(groupIds) : groupIds;
+      setSelection(filteredIds);
+    }
     else if (toggle) toggleSelection(id);
     else if (append) addToSelection(id);
     else {
@@ -650,70 +654,84 @@ function onMouseMove(e){
   const idx = page.elements.findIndex(el => el.id === active.id); if (idx === -1) return;
   const dx = pt.x - active.start.x; const dy = pt.y - active.start.y;
   const m = deepClone(active.orig);
+
   if (resize) {
-    applyResize(m, dx, dy, resize.mode);
-    // Apply snapping to single element resize
-    const tentativeBounds = getBoundsForModel(m);
-    // Provide preference so snapping uses the active resized edges
-    const prefer = { x: resize.mode.includes('e') ? 'right' : resize.mode.includes('w') ? 'left' : undefined,
-                     y: resize.mode.includes('s') ? 'bottom' : resize.mode.includes('n') ? 'top' : undefined };
-    // Consistent snapping for resize (do not clamp to page when freeMove)
-    const snappedBounds = snapSelectionBounds(tentativeBounds, [active.id], prefer, INTERACTIVE_SNAP);
-    // Instead of shifting the whole element (which moves the opposite edge),
-    // adjust the resized edge to the snapped coordinate.
-    const tentLeft = tentativeBounds.x;
-    const tentRight = tentativeBounds.x + tentativeBounds.w;
-    const tentTop = tentativeBounds.y;
-    const tentBottom = tentativeBounds.y + tentativeBounds.h;
-    const snapLeft = snappedBounds.x;
-    const snapRight = snappedBounds.x + snappedBounds.w;
-    const snapTop = snappedBounds.y;
-    const snapBottom = snappedBounds.y + snappedBounds.h;
+    // Apply resize transformation (handles all element types including images)
+    applyResize(m, dx, dy, resize.mode, active.orig);
+    
+    // Check if this is an image corner resize (aspect ratio locked, anchoring handled in applyResize)
+    const isImageCorner = (active.orig && active.orig.type === 'image' && /^(nw|ne|sw|se)$/.test(resize.mode));
+    
+    if (isImageCorner) {
+      // For image corner resizing, show guides but don't apply snapping adjustments
+      // (snapping would break aspect ratio and anchoring)
+      const currentBounds = getBoundsForModel(m);
+      showGuidesForBounds(currentBounds, getPageNode());
+    } else {
+      // For edge resizing (images or other elements), apply snapping
+      const tentativeBounds = getBoundsForModel(m);
+      // Provide preference so snapping uses the active resized edges
+      const prefer = { 
+        x: resize.mode.includes('e') ? 'right' : resize.mode.includes('w') ? 'left' : undefined,
+        y: resize.mode.includes('s') ? 'bottom' : resize.mode.includes('n') ? 'top' : undefined 
+      };
+      // Consistent snapping for resize (do not clamp to page when freeMove)
+      const snappedBounds = snapSelectionBounds(tentativeBounds, [active.id], prefer, INTERACTIVE_SNAP);
+      
+      // Adjust the resized edge to the snapped coordinate
+      const tentLeft = tentativeBounds.x;
+      const tentRight = tentativeBounds.x + tentativeBounds.w;
+      const tentTop = tentativeBounds.y;
+      const tentBottom = tentativeBounds.y + tentativeBounds.h;
+      const snapLeft = snappedBounds.x;
+      const snapRight = snappedBounds.x + snappedBounds.w;
+      const snapTop = snappedBounds.y;
+      const snapBottom = snappedBounds.y + snappedBounds.h;
 
-    // Horizontal adjustment
-    if (resize.mode.includes('e')) {
-      const deltaRight = snapRight - tentRight;
-      if (m.type === 'line' && typeof m.x2 === 'number'){
-        m.x2 += deltaRight;
-      } else {
-        m.w = Math.max(10, (m.w || 0) + deltaRight);
+      // Horizontal adjustment
+      if (resize.mode.includes('e')) {
+        const deltaRight = snapRight - tentRight;
+        if (m.type === 'line' && typeof m.x2 === 'number'){
+          m.x2 += deltaRight;
+        } else {
+          m.w = Math.max(10, (m.w || 0) + deltaRight);
+        }
+      } else if (resize.mode.includes('w')) {
+        const newLeftPx = snapLeft;
+        const newWidth = Math.max(10, tentRight - newLeftPx);
+        if (m.type === 'line' && typeof m.x2 === 'number'){
+          const shift = newLeftPx - tentLeft;
+          if (m.x <= m.x2) { m.x += shift; } else { m.x2 += shift; }
+        } else {
+          m.x = newLeftPx; 
+          m.w = newWidth;
+        }
       }
-    } else if (resize.mode.includes('w')) {
-      const newLeft = snapLeft;
-      const newWidth = Math.max(10, tentRight - newLeft);
-      if (m.type === 'line' && typeof m.x2 === 'number'){
-        // Move left endpoint while keeping right endpoint fixed
-        const rightX = Math.max(m.x, m.x2);
-        const leftWas = Math.min(m.x, m.x2);
-        const shift = newLeft - tentLeft;
-        if (m.x <= m.x2) { m.x += shift; } else { m.x2 += shift; }
-      } else {
-        m.x = newLeft; m.w = newWidth;
-      }
-    }
 
-    // Vertical adjustment
-    if (resize.mode.includes('s')) {
-      const deltaBottom = snapBottom - tentBottom;
-      if (m.type === 'line' && typeof m.y2 === 'number'){
-        m.y2 += deltaBottom;
-      } else {
-        m.h = Math.max(10, (m.h || 0) + deltaBottom);
+      // Vertical adjustment
+      if (resize.mode.includes('s')) {
+        const deltaBottom = snapBottom - tentBottom;
+        if (m.type === 'line' && typeof m.y2 === 'number'){
+          m.y2 += deltaBottom;
+        } else {
+          m.h = Math.max(10, (m.h || 0) + deltaBottom);
+        }
+      } else if (resize.mode.includes('n')) {
+        const newTopPx = snapTop;
+        const newHeight = Math.max(10, tentBottom - newTopPx);
+        if (m.type === 'line' && typeof m.y2 === 'number'){
+          const shift = newTopPx - tentTop;
+          if (m.y <= m.y2) { m.y += shift; } else { m.y2 += shift; }
+        } else {
+          m.y = newTopPx; 
+          m.h = newHeight;
+        }
       }
-    } else if (resize.mode.includes('n')) {
-      const newTop = snapTop;
-      const newHeight = Math.max(10, tentBottom - newTop);
-      if (m.type === 'line' && typeof m.y2 === 'number'){
-        const topWas = Math.min(m.y, m.y2);
-        const shift = newTop - tentTop;
-        if (m.y <= m.y2) { m.y += shift; } else { m.y2 += shift; }
-      } else {
-        m.y = newTop; m.h = newHeight;
-      }
+      
+      showGuidesForBounds(snappedBounds, getPageNode());
     }
-    showGuidesForBounds(snappedBounds, getPageNode());
   } else {
-  if (m.type === 'line') { m.x += dx; m.y += dy; m.x2 += dx; m.y2 += dy; } else { m.x += dx; m.y += dy; }
+    if (m.type === 'line') { m.x += dx; m.y += dy; m.x2 += dx; m.y2 += dy; } else { m.x += dx; m.y += dy; }
     // snap and show guides for single element
     const tentative = getBoundsForModel(m);
     // Consistent snapping for movement
@@ -721,7 +739,10 @@ function onMouseMove(e){
     const snapDx = snapped.x - tentative.x; const snapDy = snapped.y - tentative.y;
     if (m.type === 'line' && typeof m.x2 === 'number'){
       m.x += snapDx; m.y += snapDy; m.x2 += snapDx; m.y2 += snapDy;
-    } else { m.x += snapDx; m.y += snapDy; }
+    } else { 
+      m.x += snapDx; m.y += snapDy; 
+    }
+    
     // Clamp if not freeMove
     if (!m.freeMove){
       const pageNode = getPageNode();

@@ -110,7 +110,12 @@ async function bootstrap(){
         document.querySelectorAll('.page .element').forEach(node => {
           const r = node.getBoundingClientRect();
           const inter = !(left > r.left + r.width || left + w < r.left || top > r.top + r.height || top + h < r.top);
-          if (inter) hits.push(node.dataset.id);
+          if (inter) {
+            const id = node.dataset.id;
+            // Filter out locked elements
+            if (typeof isElementLocked === 'function' && isElementLocked(id)) return;
+            hits.push(id);
+          }
         });
         additive ? setSelection([...selectedIds, ...hits]) : setSelection(hits);
       };
@@ -244,7 +249,12 @@ async function bootstrap(){
         document.querySelectorAll('.page .element').forEach(node => {
           const r = node.getBoundingClientRect();
           const inter = !(left > r.left + r.width || left + w < r.left || top > r.top + r.height || top + h < r.top);
-          if (inter) hits.push(node.dataset.id);
+          if (inter) {
+            const id = node.dataset.id;
+            // Filter out locked elements
+            if (typeof isElementLocked === 'function' && isElementLocked(id)) return;
+            hits.push(id);
+          }
         });
         additive ? setSelection([...selectedIds, ...hits]) : setSelection(hits);
       };
@@ -732,27 +742,143 @@ async function bootstrap(){
       zoomAtViewportCenter(target);
     });
   }
-  // Ctrl/Cmd + wheel zoom over page only, keep cursor fixed
+  // Prevent browser zoom on Ctrl/Cmd + wheel (trackpad pinch) - handle globally
+  // Use requestAnimationFrame for smooth, responsive zoom
+  let wheelZoomPending = null;
+  let wheelZoomRAF = null;
   window.addEventListener('wheel', (e) => {
-    const overWorkspace = !!(e.target.closest && (e.target.closest('.page') || e.target.closest('#pageViewport')));
-    if (!overWorkspace) return;
-    if (!e.ctrlKey && !e.metaKey) return;
-    e.preventDefault();
-    const dir = e.deltaY > 0 ? -1 : 1;
-    const factor = dir > 0 ? 1.05 : 0.95;
-    const next = getZoom() * factor;
-    const vpRect = document.getElementById('pageViewport').getBoundingClientRect();
-    const cx = Math.max(vpRect.left, Math.min(e.clientX, vpRect.right));
-    const cy = Math.max(vpRect.top,  Math.min(e.clientY, vpRect.bottom));
-    zoomAtClientPoint(cx, cy, next);
+    // Prevent browser zoom for all Ctrl/Cmd + wheel events (trackpad pinch gestures)
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      // Only zoom page content if we have a valid viewport
+      const vp = document.getElementById('pageViewport');
+      if (vp) {
+        const vpRect = vp.getBoundingClientRect();
+        // Use cursor position, clamped to viewport bounds
+        const cx = Math.max(vpRect.left, Math.min(e.clientX, vpRect.right));
+        const cy = Math.max(vpRect.top, Math.min(e.clientY, vpRect.bottom));
+        
+        // More responsive zoom: use deltaY directly for smoother scaling
+        // Negative deltaY = zoom in, positive = zoom out
+        const sensitivity = 0.01; // Adjust for responsiveness
+        const delta = -e.deltaY * sensitivity;
+        const currentZoom = getZoom();
+        const next = Math.min(3, Math.max(0.25, currentZoom * (1 + delta)));
+        
+        // Cancel any pending zoom update
+        if (wheelZoomRAF) {
+          cancelAnimationFrame(wheelZoomRAF);
+        }
+        
+        // Store the pending zoom update
+        wheelZoomPending = { cx, cy, next };
+        
+        // Schedule smooth update via requestAnimationFrame
+        wheelZoomRAF = requestAnimationFrame(() => {
+          if (wheelZoomPending) {
+            zoomAtClientPoint(wheelZoomPending.cx, wheelZoomPending.cy, wheelZoomPending.next);
+            wheelZoomPending = null;
+            wheelZoomRAF = null;
+          }
+        });
+      }
+    }
   }, { passive:false });
-  // Safari pinch gestures
-  window.addEventListener('gesturestart',  (e) => { if (e.target.closest && (e.target.closest('.page') || e.target.closest('#pageViewport'))) e.preventDefault(); }, { passive:false });
+  // Prevent browser zoom on pinch gestures - handle all pinch gestures globally
+  // Safari gesture events
+  window.addEventListener('gesturestart', (e) => {
+    e.preventDefault(); // Prevent browser zoom
+  }, { passive:false });
+  // Safari gesture events - use requestAnimationFrame for smooth updates
+  let gestureZoomRAF = null;
+  let gestureZoomPending = null;
   window.addEventListener('gesturechange', (e) => {
-    if (!(e.target.closest && (e.target.closest('.page') || e.target.closest('#pageViewport')))) return;
-    e.preventDefault();
-    zoomAtClientPoint(e.clientX, e.clientY, getZoom() * e.scale);
+    e.preventDefault(); // Prevent browser zoom
+    // Zoom the page content instead
+    const newZoom = Math.min(3, Math.max(0.25, getZoom() * e.scale));
+    
+    // Cancel any pending update
+    if (gestureZoomRAF) {
+      cancelAnimationFrame(gestureZoomRAF);
+    }
+    
+    // Store pending zoom
+    gestureZoomPending = { clientX: e.clientX, clientY: e.clientY, newZoom };
+    
+    // Schedule smooth update
+    gestureZoomRAF = requestAnimationFrame(() => {
+      if (gestureZoomPending) {
+        zoomAtClientPoint(gestureZoomPending.clientX, gestureZoomPending.clientY, gestureZoomPending.newZoom);
+        gestureZoomPending = null;
+        gestureZoomRAF = null;
+      }
+    });
   }, { passive:false });
+  window.addEventListener('gestureend', (e) => {
+    e.preventDefault(); // Prevent browser zoom
+  }, { passive:false });
+
+  // Touch events for pinch-to-zoom (works across all browsers)
+  // Use capture phase to catch events before they bubble
+  // Update immediately for maximum responsiveness (touch events are already throttled by browser)
+  let pinchState = null;
+  
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      // Start of pinch gesture - prevent browser zoom immediately
+      e.preventDefault();
+      e.stopPropagation();
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+      pinchState = {
+        initialDistance: distance,
+        initialZoom: getZoom(),
+        centerX: (touch1.clientX + touch2.clientX) / 2,
+        centerY: (touch1.clientY + touch2.clientY) / 2
+      };
+    }
+  }, { passive:false, capture:true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && pinchState) {
+      // Continue pinch gesture - prevent browser zoom and update immediately
+      e.preventDefault();
+      e.stopPropagation();
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const currentDistance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+      const scale = currentDistance / pinchState.initialDistance;
+      const newZoom = Math.min(3, Math.max(0.25, pinchState.initialZoom * scale));
+      const centerX = (touch1.clientX + touch2.clientX) / 2;
+      const centerY = (touch1.clientY + touch2.clientY) / 2;
+      
+      // Immediate update for maximum responsiveness
+      zoomAtClientPoint(centerX, centerY, newZoom);
+    } else if (e.touches.length === 2) {
+      // If we have 2 touches but no pinchState, prevent browser zoom anyway
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, { passive:false, capture:true });
+
+  document.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2 && pinchState) {
+      // End of pinch gesture
+      e.preventDefault();
+      e.stopPropagation();
+      pinchState = null;
+    }
+  }, { passive:false, capture:true });
+
+  document.addEventListener('touchcancel', (e) => {
+    // Clean up pinch state if gesture is cancelled
+    if (pinchState) {
+      e.preventDefault();
+      e.stopPropagation();
+      pinchState = null;
+    }
+  }, { passive:false, capture:true });
 
   // element actions wiring
   const actions = elementActions();
@@ -766,6 +892,10 @@ async function bootstrap(){
     }
     const btn = e.target.closest('[data-action],[data-z],[data-group],[data-group-toggle],[data-align],[data-distribute]'); if (!btn) return;
     if (btn.hasAttribute('data-group-toggle')) { toggleGroupSelection(); updateGroupToggleButton(); return; }
+    if (btn.dataset.action === 'lock-toggle') {
+      if (typeof toggleLockSelection === 'function') toggleLockSelection();
+      return;
+    }
     if (selectedIds.size===0) return;
     if (btn.dataset.action === 'copy') {
       copySelection();
@@ -867,7 +997,14 @@ async function bootstrap(){
       if (!el) return; // allow default context menu elsewhere
       e.preventDefault();
       const id = el.dataset.id;
-      if (!selectedIds.has(id)) setSelection([id]);
+      // Allow selecting locked elements via right-click so they can be unlocked
+      if (!selectedIds.has(id)) {
+        if (typeof setSelectionAllowLocked === 'function') {
+          setSelectionAllowLocked([id]);
+        } else {
+          setSelection([id]);
+        }
+      }
       // Ensure the element actions bubble is visible and positioned
       try { elementActions().classList.remove('hidden'); positionElementActions(); } catch {}
       // Open the existing actions dropdown panel

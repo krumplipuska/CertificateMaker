@@ -18,7 +18,8 @@ function pasteFromClipboard() {
   
   clipboardElements.forEach(src => {
     const clone = deepClone(src);
-    // Keep original ID when pasting cut elements
+    // Generate new ID for pasted elements (same logic as copySelection)
+    clone.id = generateId();
     clone.x += offset;
     clone.y += offset;
     if (clone.type === 'line' && typeof clone.x2 === 'number' && typeof clone.y2 === 'number') {

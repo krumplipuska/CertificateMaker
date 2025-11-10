@@ -5,6 +5,23 @@
 /* ----------------------- Selection (multi-select) ----------------------- */
 let selectedIds = new Set();
 
+// Helper function to check if an element is locked
+function isElementLocked(id) {
+  if (!id) return false;
+  try {
+    const model = getElementById(id);
+    if (!model || !model.attrs) return false;
+    return model.attrs.locked === true || model.attrs.locked === 'true';
+  } catch {
+    return false;
+  }
+}
+
+// Filter out locked elements from an array of IDs
+function filterLockedElements(ids) {
+  return (ids || []).filter(id => !isElementLocked(id));
+}
+
 function clearSelection(){ 
   selectedIds.clear(); 
   //console.log('[SELECTION] clear');
@@ -19,14 +36,24 @@ function clearSelection(){
   updateSelectionUI(); 
 }
 function setSelection(ids){ 
-  selectedIds = new Set((ids||[]).filter(Boolean));
+  // Filter out locked elements before setting selection
+  const filteredIds = filterLockedElements((ids||[]).filter(Boolean));
+  selectedIds = new Set(filteredIds);
   //console.log('[SELECTION] set', Array.from(selectedIds));
   // Note: We no longer automatically clear table selection when selecting elements
   // This allows for multiple selections across different tables
   updateSelectionUI(); 
 }
+
+// Allow selecting locked elements (used for right-click context menu)
+function setSelectionAllowLocked(ids){ 
+  // Don't filter out locked elements - allow them to be selected
+  selectedIds = new Set((ids||[]).filter(Boolean));
+  //console.log('[SELECTION] setAllowLocked', Array.from(selectedIds));
+  updateSelectionUI(); 
+}
 function addToSelection(id){ 
-  if (!id) return; 
+  if (!id || isElementLocked(id)) return; 
   selectedIds.add(id); 
   //console.log('[SELECTION] add', id, '→', Array.from(selectedIds));
   // Note: We no longer automatically clear table selection when adding elements
@@ -34,7 +61,7 @@ function addToSelection(id){
   updateSelectionUI(); 
 }
 function toggleSelection(id){ 
-  if (!id) return; 
+  if (!id || isElementLocked(id)) return; 
   selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id); 
   //console.log('[SELECTION] toggle', id, '→', Array.from(selectedIds));
   // Note: We no longer automatically clear table selection when toggling elements
@@ -42,6 +69,53 @@ function toggleSelection(id){
   updateSelectionUI(); 
 }
 function isSelected(id){ return selectedIds.has(id); }
+
+// Toggle lock/unlock state for selected elements
+function toggleLockSelection() {
+  if (selectedIds.size === 0) return;
+  commitHistory('lock-toggle');
+  const ids = Array.from(selectedIds);
+  let allLocked = true;
+  
+  // Check if all selected elements are locked
+  ids.forEach(id => {
+    if (!isElementLocked(id)) {
+      allLocked = false;
+    }
+  });
+  
+  const newLockState = !allLocked;
+  const unlockedAfterToggle = [];
+  
+  // Toggle lock state for all selected elements
+  ids.forEach(id => {
+    const model = getElementById(id);
+    if (!model) return;
+    if (!model.attrs) model.attrs = {};
+    model.attrs.locked = newLockState;
+    updateElement(id, { attrs: model.attrs });
+    // Track which elements will be unlocked after this toggle
+    if (!newLockState) {
+      unlockedAfterToggle.push(id);
+    }
+  });
+  
+  // If unlocking, keep unlocked elements selected; if locking, remove them from selection
+  if (newLockState) {
+    // Locking: remove locked elements from selection
+    const unlockedIds = ids.filter(id => !isElementLocked(id));
+    if (unlockedIds.length === 0) {
+      clearSelection();
+    } else {
+      setSelection(unlockedIds);
+    }
+  } else {
+    // Unlocking: keep the unlocked elements selected
+    setSelectionAllowLocked(unlockedAfterToggle.length > 0 ? unlockedAfterToggle : ids);
+  }
+  
+  renderAll();
+}
 
 function updateSelectionUI(){
   //console.log('[SELECTION] updateUI size=', selectedIds.size);
@@ -73,8 +147,41 @@ function updateSelectionUI(){
   renderProperties();
   // update group toggle state
   if (typeof updateGroupToggleButton === 'function') updateGroupToggleButton();
+  // Update lock button icon based on selection state
+  updateLockButtonIcon();
   // NEW: keep the action bubble in sync with selection
   positionElementActions();
+}
+
+// Update lock button icon based on selection state
+function updateLockButtonIcon() {
+  const lockBtn = document.querySelector('[data-action="lock-toggle"]');
+  if (!lockBtn) return;
+  
+  const lockIcon = lockBtn.querySelector('.lock-icon');
+  const unlockIcon = lockBtn.querySelector('.unlock-icon');
+  if (!lockIcon || !unlockIcon) return;
+  
+  if (selectedIds.size === 0) {
+    // No selection: show unlock icon (default state)
+    lockIcon.style.display = 'none';
+    unlockIcon.style.display = 'block';
+    lockBtn.title = 'Lock/Unlock';
+  } else {
+    // Check if all selected elements are locked
+    const ids = Array.from(selectedIds);
+    const allLocked = ids.length > 0 && ids.every(id => isElementLocked(id));
+    
+    if (allLocked) {
+      lockIcon.style.display = 'block';
+      unlockIcon.style.display = 'none';
+      lockBtn.title = 'Unlock';
+    } else {
+      lockIcon.style.display = 'none';
+      unlockIcon.style.display = 'block';
+      lockBtn.title = 'Lock';
+    }
+  }
 }  
 
 function updateFormatToolbarVisibility(){

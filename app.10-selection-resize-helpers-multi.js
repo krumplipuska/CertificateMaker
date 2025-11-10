@@ -28,9 +28,50 @@ function applySelectionResize(event){
   const pageNode = getPageNode();
   const pt = getCanvasPoint(event, pageNode);
   const sb = resizeSelectionState.startBounds;
-  const minW = 10, minH = 10; // Allow elements to be resized to minimum size
-  let nx = sb.x, ny = sb.y, nw = sb.w, nh = sb.h;
+  const minW = 10, minH = 10;
   const h = resizeSelectionState.handle;
+  
+  // Check if this is a single image element with corner resize - use applyResize for proper anchoring
+  const isCornerResize = (h.includes('n') && h.includes('w')) || (h.includes('n') && h.includes('e')) || 
+                         (h.includes('s') && h.includes('w')) || (h.includes('s') && h.includes('e'));
+  
+  if (selectedIds.size === 1 && isCornerResize) {
+    const id = [...selectedIds][0];
+    const start = resizeSelectionState.starts.get(id);
+    if (start && start.type === 'image') {
+      // Convert handle to mode format (e.g., 'sw' -> 'sw')
+      let mode = '';
+      if (h.includes('n') && h.includes('w')) mode = 'nw';
+      else if (h.includes('n') && h.includes('e')) mode = 'ne';
+      else if (h.includes('s') && h.includes('w')) mode = 'sw';
+      else if (h.includes('s') && h.includes('e')) mode = 'se';
+      
+      if (mode) {
+        // Calculate dx/dy relative to the start point
+        const dx = pt.x - resizeSelectionState.startPoint.x;
+        const dy = pt.y - resizeSelectionState.startPoint.y;
+        
+        // Use applyResize for proper side anchoring
+        const out = deepClone(start);
+        applyResize(out, dx, dy, mode, start);
+        
+        const page = getCurrentPage();
+        const idx = page.elements.findIndex(e => e.id === id);
+        if (idx !== -1) page.elements[idx] = out;
+        const node = document.querySelector(`.page [data-id="${id}"]`);
+        if (node) applyElementStyles(node, out);
+        
+        // Show guides
+        const bounds = getBoundsForModel(out);
+        showGuidesForBounds(bounds, getPageNode());
+        updateSelectionBox();
+        return;
+      }
+    }
+  }
+  
+  // Multi-selection or non-image corner resize: use original logic
+  let nx = sb.x, ny = sb.y, nw = sb.w, nh = sb.h;
   const right = sb.x + sb.w, bottom = sb.y + sb.h;
   if (h.includes('e')) { nw = Math.max(minW, pt.x - sb.x); }
   if (h.includes('s')) { nh = Math.max(minH, pt.y - sb.y); }
@@ -80,9 +121,6 @@ function applySelectionResize(event){
   const sx = nw / sb.w;
   const sy = nh / sb.h;
   
-  // For corner resizing of images, lock to uniform scaling (aspect ratio lock)
-  const isCornerResize = h.includes('n') && h.includes('w') || h.includes('n') && h.includes('e') || h.includes('s') && h.includes('w') || h.includes('s') && h.includes('e');
-  
   const page = getCurrentPage();
   [...selectedIds].forEach(id => {
     const start = resizeSelectionState.starts.get(id);
@@ -96,18 +134,9 @@ function applySelectionResize(event){
       const rx = start.x - sb.x; const ry = start.y - sb.y;
       out.x = nx + rx * sx; out.y = ny + ry * sy;
       if (typeof start.w === 'number' && typeof start.h === 'number') {
-        // For images with corner resize: preserve aspect ratio
-        if (start.type === 'image' && isCornerResize) {
-          const aspectRatio = start.w / start.h;
-          // Use the average scale factor to maintain aspect ratio
-          const uniformScale = (sx + sy) / 2;
-          out.w = Math.max(minW, (start.w || 0) * uniformScale);
-          out.h = Math.max(minH, (start.h || 0) * uniformScale);
-        } else {
-          // Normal scaling for other elements
-          out.w = Math.max(minW, (start.w || 0) * sx);
-          out.h = Math.max(minH, (start.h || 0) * sy);
-        }
+        // Normal scaling for all elements (image corner resize handled above)
+        out.w = Math.max(minW, (start.w || 0) * sx);
+        out.h = Math.max(minH, (start.h || 0) * sy);
       } else {
         if (typeof start.w === 'number') out.w = Math.max(minW, (start.w || 0) * sx);
         if (typeof start.h === 'number') out.h = Math.max(minH, (start.h || 0) * sy);

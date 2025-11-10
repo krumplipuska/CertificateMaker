@@ -54,6 +54,8 @@ html, body {
   background: var(--bg);
   color: var(--ink);
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial;
+  /* Prevent browser zoom - we handle it ourselves */
+  touch-action: manipulation; /* Prevents double-tap zoom but allows pinch (which we handle) */
 }
 
 /* Top bar */
@@ -182,7 +184,7 @@ html, body {
 .workspace { display: grid; grid-template-columns: 1fr; }
 #pageViewport { height: calc(100dvh - 96px); overflow:auto; display:grid; place-items:start center; padding-left: calc(var(--left-panel-width) + 12px); padding-right: calc(var(--right-panel-width) + 12px); }
 #pageContainer { padding: 12px; }
-.page { position: relative; width: var(--page-w); height: var(--page-h); background:#fff; box-shadow: var(--shadow); overflow:visible; border-radius:6px; transform: scale(var(--zoom)); transform-origin: top left; }
+.page { position: relative; width: var(--page-w); height: var(--page-h); background:#fff; box-shadow: var(--shadow); overflow:visible; border-radius:6px; transform: scale(var(--zoom)); transform-origin: top left; will-change: transform; backface-visibility: hidden; }
 /* grid background removed per request (no ::before) */
 
 /* Elements */

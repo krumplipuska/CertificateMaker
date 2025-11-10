@@ -24,8 +24,9 @@ function updateResizeCursor(e, node){
   node.style.cursor = map[mode] || '';
 }
 
-function applyResize(m, dx, dy, mode){
+function applyResize(m, dx, dy, mode, origElement = null){
   if (m.type === 'line') return;
+  
   const minW = 10, minH = 10;
   let minTableW = minW, minTableH = minH;
   if (m.type === 'table'){
@@ -35,52 +36,111 @@ function applyResize(m, dx, dy, mode){
   const clampW = (w) => Math.max(m.type==='table'?minTableW:minW, w);
   const clampH = (h) => Math.max(m.type==='table'?minTableH:minH, h);
   
-  // For images: lock aspect ratio when resizing from corners
-  const isCornerResize = (mode === 'nw' || mode === 'ne' || mode === 'sw' || mode === 'se');
-  if (m.type === 'image' && isCornerResize) {
-    const startW = m.w || minW;
-    const startH = m.h || minH;
-    const aspectRatio = startW / startH;
+  // Image corner resizing: maintain aspect ratio and anchor opposite SIDES
+  const isImageCorner = (m.type === 'image' && (mode === 'nw' || mode === 'ne' || mode === 'sw' || mode === 'se'));
+  
+  if (isImageCorner && origElement) {
+    const origW = origElement.w || minW;
+    const origH = origElement.h || minH;
+    const origX = origElement.x || 0;
+    const origY = origElement.y || 0;
+    const aspectRatio = origW / origH;
     
-    // Use the dominant axis (larger absolute change) to determine scaling
-    let scale = 1;
-    if (Math.abs(dx) > Math.abs(dy)) {
-      // Width is dominant - scale based on width change
-      if (mode.includes('e')) scale = (startW + dx) / startW;
-      else if (mode.includes('w')) scale = (startW - dx) / startW;
-    } else {
-      // Height is dominant - scale based on height change
-      if (mode.includes('s')) scale = (startH + dy) / startH;
-      else if (mode.includes('n')) scale = (startH - dy) / startH;
+    // Calculate the original corner position (the corner being dragged)
+    let origCornerX, origCornerY;
+    if (mode === 'se') {
+      origCornerX = origX + origW;  // Bottom-right corner
+      origCornerY = origY + origH;
+    } else if (mode === 'ne') {
+      origCornerX = origX + origW;  // Top-right corner
+      origCornerY = origY;
+    } else if (mode === 'sw') {
+      origCornerX = origX;          // Bottom-left corner
+      origCornerY = origY + origH;
+    } else if (mode === 'nw') {
+      origCornerX = origX;          // Top-left corner
+      origCornerY = origY;
     }
     
-    const newW = clampW(startW * scale);
+    // Calculate new corner position (original corner + mouse movement)
+    const newCornerX = origCornerX + dx;
+    const newCornerY = origCornerY + dy;
+    
+    // Calculate target dimensions from the anchored opposite SIDES
+    // Anchor opposite sides: keep the sides opposite to the dragged corner fixed
+    let targetWidth, targetHeight;
+    
+    if (mode === 'se') {
+      // SE corner: anchor TOP and LEFT sides
+      targetWidth = newCornerX - origX;
+      targetHeight = newCornerY - origY;
+    } else if (mode === 'ne') {
+      // NE corner: anchor BOTTOM and LEFT sides
+      targetWidth = newCornerX - origX;
+      targetHeight = (origY + origH) - newCornerY;
+    } else if (mode === 'sw') {
+      // SW corner: anchor TOP and RIGHT sides
+      targetWidth = (origX + origW) - newCornerX;
+      targetHeight = newCornerY - origY;
+    } else if (mode === 'nw') {
+      // NW corner: anchor BOTTOM and RIGHT sides
+      targetWidth = (origX + origW) - newCornerX;
+      targetHeight = (origY + origH) - newCornerY;
+    }
+    
+    // Ensure target dimensions are positive
+    targetWidth = Math.max(minW, targetWidth);
+    targetHeight = Math.max(minH, targetHeight);
+    
+    // Calculate scale factors for both axes
+    const scaleX = targetWidth / origW;
+    const scaleY = targetHeight / origH;
+    
+    // Use the larger scale to maintain aspect ratio (prevents distortion)
+    const scale = Math.max(scaleX, scaleY);
+    
+    // Calculate new dimensions maintaining aspect ratio
+    const newW = clampW(origW * scale);
     const newH = clampH(newW / aspectRatio);
     
-    // For corner resizing, we need to adjust position to keep the opposite corner anchored
-    // Calculate how much the size changed
-    const deltaW = newW - startW;
-    const deltaH = newH - startH;
+    // Calculate how much size changed from original
+    const deltaW = newW - origW;
+    const deltaH = newH - origH;
     
-    // Adjust position based on which corner is being dragged
-    if (mode === 'nw') {
-      // Northwest: anchor bottom-right corner
-      m.x += -deltaW;  // Move left by the width increase
-      m.y += -deltaH;  // Move up by the height increase
+    // Anchor the opposite SIDES by adjusting position
+    if (mode === 'se') {
+      // Southeast: anchor TOP and LEFT sides (no position change)
+      m.x = origX;
+      m.y = origY;
     } else if (mode === 'ne') {
-      // Northeast: anchor bottom-left corner
-      m.y += -deltaH;  // Move up by the height increase (x stays same)
+      // Northeast: anchor BOTTOM and LEFT sides
+      // Keep left edge fixed, move up to keep bottom edge fixed
+      m.x = origX;
+      m.y = (origY + origH) - newH; // bottom - new height
     } else if (mode === 'sw') {
-      // Southwest: anchor top-right corner
-      m.x += -deltaW;  // Move left by the width increase (y stays same)
-    } else if (mode === 'se') {
-      // Southeast: anchor top-left corner (no position change needed)
+      // Southwest: anchor TOP and RIGHT sides
+      // Keep top edge fixed, move left to keep right edge fixed
+      m.x = (origX + origW) - newW; // right - new width
+      m.y = origY;
+    } else if (mode === 'nw') {
+      // Northwest: anchor BOTTOM and RIGHT sides
+      // Move left and up to keep right and bottom edges fixed
+      m.x = (origX + origW) - newW; // right - new width
+      m.y = (origY + origH) - newH; // bottom - new height
     }
     
     m.w = newW;
     m.h = newH;
+    
+  } else if (m.type === 'image' && (mode === 'n' || mode === 's' || mode === 'e' || mode === 'w')) {
+    // Image edge resizing: allow free resizing on edges (no aspect ratio lock)
+    if (mode.includes('e')) m.w = clampW((m.w || 0) + dx);
+    if (mode.includes('s')) m.h = clampH((m.h || 0) + dy);
+    if (mode.includes('w')) { m.x += dx; m.w = clampW((m.w || 0) - dx); }
+    if (mode.includes('n')) { m.y += dy; m.h = clampH((m.h || 0) - dy); }
+    
   } else {
-    // Normal resize behavior for non-images or edge resizing
+    // Normal resize behavior for non-image elements
     if (mode.includes('e')) m.w = clampW((m.w || 0) + dx);
     if (mode.includes('s')) m.h = clampH((m.h || 0) + dy);
     if (mode.includes('w')) { m.x += dx; m.w = clampW((m.w || 0) - dx); }
